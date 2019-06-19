@@ -1,0 +1,54 @@
+<html>
+<head>
+<script src="./thunderdb.js"></script>
+<script>
+var db;
+function submit(event) {
+	event.preventDefault();
+	const config = {endpoint:"",username:"",password:""};
+	Object.keys(config).forEach((key) => {
+		config[key] = document.getElementById(key).value;
+	});
+	const {endpoint,username,password} = config;
+	db = new ThunderDB({endpoint,user:{username,password}});
+	const command = {fname:"",arg1:"",arg2:""};
+	Object.keys(command).forEach((key) => {
+		command[key] = document.getElementById(key).value;
+	});
+	const {fname,arg1,arg2} = command;
+	if(fname) {
+		const el = document.getElementById("console");
+		el.innerText = "";
+		Function("db",`return db.${fname}(${arg1},${arg2})`)(db)
+			.then((result => {
+				el.innerText = JSON.stringify(result);
+			}))
+			.catch((e) => {
+				el.innerHTML = e.errors.map((e) => e+"").join("<br>");
+			});
+	}
+	return false;
+}
+</script>
+</head>
+<body>
+<input type="url" id="endpoint" placeholder="endpoint" required><br>
+<input type="text" id="username" placeholder="username" required><br>
+<input type="password" id="password" required><br>
+<select id="fname">
+	<option></option>
+	<option>getItem</option>
+	<option>getSchema</option>
+	<option>putItem</option>
+	<option>query</option>
+	<option>removeItem</option>
+	<option>setItem</option>
+</select>
+<input type="text" id="arg1" placeholder="arg1">
+<input type="text" id="arg2" placeholder="arg2"><br>
+<button onclick="submit(event)">Submit</button>
+<div id="console">
+
+</div>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "thunderdb",
+  "version": "v0.0.1b",
+  "description": "An indexed object database for Cloudflare",
+  "engines": {
+    "node": "10.x"
+  },
+  "license": "SSPL",
+  "scripts": {
+    "thunderclap": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eventscope/thunderdb.git"
+  },
+  "keywords": [],
+  "author": "Simon Y. Blackwell <syblackwell@anywhichway.com> (http://app.github.com/anywhichway)",
+  "bugs": {
+    "url": "https://github.com/eventscope/thunderdb/issues"
+  },
+  "homepage": "https://github.com/eventscope/thunderdb#readme",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "live-server": "^1.2.1",
+    "mocha": "^5.2.0",
+    "webpack": "^4.33.0",
+    "webpack-cli": "^3.3.4",
+    "webpack-shell-plugin": "^0.5.0"
+  },
+  "dependencies": {}
+}
