@@ -5,11 +5,12 @@
 var db;
 function submit(event) {
 	event.preventDefault();
-	const config = {endpoint:"",username:"",password:""};
+	const config = {username:"",password:""},
+		endpoint = `${window.location.protocol}//${window.location.host}/db.json`;
 	Object.keys(config).forEach((key) => {
 		config[key] = document.getElementById(key).value;
 	});
-	const {endpoint,username,password} = config;
+	const {username,password} = config;
 	db = new ThunderDB({endpoint,user:{username,password}});
 	const command = {fname:"",arg1:"",arg2:""};
 	Object.keys(command).forEach((key) => {
@@ -24,7 +25,7 @@ function submit(event) {
 				el.innerText = JSON.stringify(result);
 			}))
 			.catch((e) => {
-				el.innerHTML = e.errors.map((e) => e+"").join("<br>");
+				el.innerHTML = e.errors ? JSON.stringify(e.errors.map((e) => e+"")) : e+"";
 			});
 	}
 	return false;
@@ -32,7 +33,6 @@ function submit(event) {
 </script>
 </head>
 <body>
-<input type="url" id="endpoint" placeholder="endpoint" required><br>
 <input type="text" id="username" placeholder="username" required><br>
 <input type="password" id="password" required><br>
 <select id="fname">
@@ -43,6 +43,7 @@ function submit(event) {
 	<option>query</option>
 	<option>removeItem</option>
 	<option>setItem</option>
+	<option>createUser</option>
 </select>
 <input type="text" id="arg1" placeholder="arg1">
 <input type="text" id="arg2" placeholder="arg2"><br>

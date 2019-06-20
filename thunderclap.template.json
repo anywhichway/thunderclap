@@ -1,14 +1,14 @@
 {
 	"cloudflaredPath": "../../cloudflared",
-	"cloudflareAccountId": "92dcaefc91ea9f8eb9632c01148179af",
-	"cloudflareAuthKey": "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
-	"zoneId": "5bb43cd0afd1a77088081e3dd1d20ef1",
-	"nameSpaceId": "d8bf6f118dd44e9b97b4144eda548beb",
-	"email": "syblackwell@anywhichway.com",
-	"primaryHostName": "thunderdb.com",
+	"cloudflareAccountId": "<from cloudflare dashboard>",
+	"cloudflareAuthKey": "<from cloudflare dashboard>",
+	"zoneId": "<zone of your domain from cloudflare dashboard>",
+	"nameSpaceId": "<worker KV namespace id to use for production>",
+	"email": "<your cloudflare login email>",
+	"primaryHostName": "<host name associated with zone>",
 	"mode": "development",
 	"devPort": 9000,
 	"devRoot": "./docs",
-	"devHostPrefix": "syblackwell",
-	"devNameSpaceId": "3a3cdb194feb4024b7b1476cf191c38a"
+	"devHost": "<host name to prepend when in development mode>",
+	"devNameSpaceId": "<worker KV namespace id to use for development>"
 }

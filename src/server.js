@@ -3,13 +3,27 @@ const uuid4 = require("./uuid4.js"),
 	joqular = require("./joqular.js"),
 	secure = require("./secure.js"),
 	Schema = require("./schema.js"),
-	User = require("./user.js");
+	User = require("./user.js"),
+	hashPassword = require("./hash-password.js");
 
+const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
 let thunderdb;
 addEventListener('fetch', event => {
 	const db = NAMESPACE;
 		thunderdb = {
+			async authUser(userName,password,options) {
+				const user = (await this.query({userName},options))[0];
+				if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
+					secure.mapRoles(user);
+					return user;
+				}
+			},
+			async createUser(userName,password,options) {
+				const user = new User(userName);
+				Object.assign(user,await hashPassword(password,1000));
+				return this.putItem(user,options);
+			},
 			async getItem(key,options={}) {
 				let data = await db.get(key);
 				if(data) {
@@ -24,7 +38,7 @@ addEventListener('fetch', event => {
 						data = secured.data;
 					}
 				}
-				return data;
+				return data==null ? undefined : data;
 			},
 			async getSchema(ctor,options) {
 				const data = await db.get(`Schema@${ctor.name||ctor}`);
@@ -69,6 +83,45 @@ addEventListener('fetch', event => {
 			},
 			async keys(lastKey) {
 				return db.getKeys(lastKey)
+			},
+			async putItem(object,options={}) {
+				let id = object["#"];
+				if(!id) {
+					id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
+				}
+				const cname = id.split("@")[0];
+				let schema = await this.getSchema(cname);
+				if(schema) {
+					options.schema = schema = new Schema(cname,schema);
+					const errors = await schema.validate(object,this);
+					if(errors.length>0) {
+						const error = new Error();
+						error.errors = errors;
+						return error;
+					}
+				}
+				const {data,removed} = await secure(cname,"write",options.user,object),
+					root = (await this.getItem("!",options)) || {},
+					original = await this.getItem(id,{user:this.dbo});
+				if(!data) {
+					const error = new Error();
+					error.errors = [new Error(`Denied 'write' for ${id}`)];
+					return error;
+				}
+				if(original && removed) {
+					removed.forEach((key) => {
+						if(original[key]!==undefined) {
+							data[key] = original[key];
+						}
+					});
+				}
+				// need to add code to unindex the changes from original
+				const count = await this.index(data,root,options);
+				if(count) {
+					await this.setItem("!",root,options);
+				}
+				await this.setItem(id,data,options,true);
+				return object;
 			},
 			async query(object,options={}) {
 				let ids,
@@ -176,46 +229,7 @@ addEventListener('fetch', event => {
 				}
 				return results;
 			},
-			async putItem(object,options={}) {
-				let id = object["#"];
-				if(!id) {
-					id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
-				}
-				const cname = id.split("@")[0];
-				let schema = await this.getSchema(cname);
-				if(schema) {
-					options.schema = schema = new Schema(cname,schema);
-					const errors = await schema.validate(object,this);
-					if(errors.length>0) {
-						const error = new Error();
-						error.errors = errors;
-						return error;
-					}
-				}
-				const {data,removed} = await secure(cname,"write",options.user,object),
-					root = (await this.getItem("!",options)) || {},
-					original = await this.getItem(id,{user:this.dbo});
-				if(!data) {
-					const error = new Error();
-					error.errors = [new Error(`Denied 'write' for ${id}`)];
-					return error;
-				}
-				if(original && removed) {
-					removed.forEach((key) => {
-						if(original[key]!==undefined) {
-							data[key] = original[key];
-						}
-					});
-				}
-				// need to add code to unindex the changes from original
-				const count = await this.index(data,root,options);
-				if(count) {
-					await this.setItem("!",root,options);
-				}
-				await this.setItem(id,data,options,true);
-				return object;
-			},
-			async removeItem(keyOrObject,options) {
+			async removeItem(keyOrObject,options={}) {
 				const type = typeof(keyOrObject)==="object";
 				if(keyOrObject && type==="object") {
 					keyOrObject = keyOrObject["#"];
@@ -223,9 +237,17 @@ addEventListener('fetch', event => {
 				if(keyOrObject) {
 					const root = type==="object" ? await this.getItem("!",options) : null,
 						object = root ? await this.getItem(keyOrObject,options) : null;
-					await db.delete(keyOrObject);
-					if(await this.unindex(object,root,options)) {
-						await this.setItem("!",root,options);
+					if(object) {
+						const cname = keyOrObject.split("@")[0],
+							{data} = secure(cname,"write",options.user,object,true);
+						if(data) {
+							await db.delete(keyOrObject);
+							if(await this.unindex(object,root,options)) {
+								await this.setItem("!",root,options);
+							}
+						}
+					} else {
+						await db.delete(keyOrObject);
 					}
 				}
 			},
@@ -279,6 +301,9 @@ addEventListener('fetch', event => {
 async function handleRequest(request) {
 	let body = "Not Found",
 		status = 404;
+	if(request.URL.pathname!=="/db.json") {
+		return fetch(request);
+	}
 	if(request.method==="OPTIONS") {
 		return new Response(null,{
 			headers: {
@@ -295,29 +320,33 @@ async function handleRequest(request) {
 		//}
 		let dbo = await thunderdb.getItem("User@dbo",{user:thunderdb.dbo});
 		if(!dbo) {
-			await thunderdb.putItem(dbouser,{user:thunderdb.dbo});
+			Object.assign(thunderdb.dbo,await hashPassword("dbo",1000));
+			dbo = await thunderdb.putItem(thunderdb.dbo,{user:thunderdb.dbo});
 		}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
 			fname = command.shift(),
 			args = command;
 		if(thunderdb[fname]) {
-			const userName = request.headers.get("X-Auth-Username"),
-				password = request.headers.get("X-Auth-Password"),
-				user = userName ? (await thunderdb.query({userName},{user:thunderdb.dbo}))[0] : null; // should do an instanceof check against id
-			//const {readable,writable} = new TransformStream();
-			if(!user) {
-				return new Response(null,{
-					status: 403,
-					headers:
-					{
-						"Content-Type":"text/plain",
-						"Access-Control-Allow-Origin": "*", //'${request.URL.protocol}//${request.URL.hostname}'
-						"Access-Control-Allow-Headers": "*"
-					}
-				});
+			if(fname==="createUser") {
+				args.push({user:thunderdb.dbo});
+			} else {
+				const userName = request.headers.get("X-Auth-Username"),
+					password = request.headers.get("X-Auth-Password"),
+					user = await thunderdb.authUser(userName,password,{user:thunderdb.dbo}); // thunderdb.dbo;
+				if(!user) {
+					return new Response(null,{
+						status: 403,
+						headers:
+						{
+							"Content-Type":"text/plain",
+							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+						}
+					});
+				}
+				args.push({user});
 			}
-			return thunderdb[fname](args[0],{user})
+			return thunderdb[fname](...args)
 			.then((result) => {
 				const type = typeof(result),
 					options = args.pop();
@@ -336,7 +365,7 @@ async function handleRequest(request) {
 								headers:
 								{
 									"Content-Type":"text/plain",
-									"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 								}
 							});
 					}
@@ -347,7 +376,7 @@ async function handleRequest(request) {
 					headers:
 					{
 						"Content-Type":"text/plain",
-						"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
 			});
@@ -356,7 +385,7 @@ async function handleRequest(request) {
 			//		headers:
 			//		{
 			//			"Content-Type":"text/plain",
-			//			"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+			//			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 			//		}
 			//	}
 			//)
@@ -372,7 +401,7 @@ async function handleRequest(request) {
 				{
 					"Status": status,
 					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 				}
 			}
 	);

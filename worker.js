@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 5);
+/******/ 	return __webpack_require__(__webpack_require__.s = 6);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -122,7 +122,29 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(2),
+	const uuid4 = __webpack_require__(0);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uuid4()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const soundex = __webpack_require__(3),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -434,7 +456,7 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
+/* 3 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -444,16 +466,15 @@
 }).call(this);
 
 /***/ }),
-/* 3 */
-/***/ (function(module, exports) {
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	class Schema {
+	const Entity = __webpack_require__(1);
+	
+	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
-			Object.assign(this,config);
-			const meta = {"#":`Schema@${ctor.name||ctor}`};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			super(config);
 		}
 		async validate(object,db) {
 			const errors = [];
@@ -514,17 +535,20 @@
 })();
 
 /***/ }),
-/* 4 */
-/***/ (function(module, exports) {
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	class User {
+	const Entity = __webpack_require__(1);
+	
+	class User extends Entity {
 		constructor(userName,config) {
-			Object.assign(this,config);
+			super(config);
 			this.userName = userName;
-			const meta = {"#":config["#"]};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			if(!this.roles) {
+				this.roles = {};
+			}
+			this.roles.user = true;
 		}
 		static create(config) {
 			return new User(config.userName,config);
@@ -538,21 +562,35 @@
 })();
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 const uuid4 = __webpack_require__(0),
-	isSoul = __webpack_require__(6),
-	joqular = __webpack_require__(1),
-	secure = __webpack_require__(7),
-	Schema = __webpack_require__(3),
-	User = __webpack_require__(4);
+	isSoul = __webpack_require__(7),
+	joqular = __webpack_require__(2),
+	secure = __webpack_require__(8),
+	Schema = __webpack_require__(4),
+	User = __webpack_require__(5),
+	hashPassword = __webpack_require__(11);
 
+const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
 let thunderdb;
 addEventListener('fetch', event => {
 	const db = NAMESPACE;
 		thunderdb = {
+			async authUser(userName,password,options) {
+				const user = (await this.query({userName},options))[0];
+				if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
+					secure.mapRoles(user);
+					return user;
+				}
+			},
+			async createUser(userName,password,options) {
+				const user = new User(userName);
+				Object.assign(user,await hashPassword(password,1000));
+				return this.putItem(user,options);
+			},
 			async getItem(key,options={}) {
 				let data = await db.get(key);
 				if(data) {
@@ -567,7 +605,7 @@ addEventListener('fetch', event => {
 						data = secured.data;
 					}
 				}
-				return data;
+				return data==null ? undefined : data;
 			},
 			async getSchema(ctor,options) {
 				const data = await db.get(`Schema@${ctor.name||ctor}`);
@@ -612,6 +650,45 @@ addEventListener('fetch', event => {
 			},
 			async keys(lastKey) {
 				return db.getKeys(lastKey)
+			},
+			async putItem(object,options={}) {
+				let id = object["#"];
+				if(!id) {
+					id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
+				}
+				const cname = id.split("@")[0];
+				let schema = await this.getSchema(cname);
+				if(schema) {
+					options.schema = schema = new Schema(cname,schema);
+					const errors = await schema.validate(object,this);
+					if(errors.length>0) {
+						const error = new Error();
+						error.errors = errors;
+						return error;
+					}
+				}
+				const {data,removed} = await secure(cname,"write",options.user,object),
+					root = (await this.getItem("!",options)) || {},
+					original = await this.getItem(id,{user:this.dbo});
+				if(!data) {
+					const error = new Error();
+					error.errors = [new Error(`Denied 'write' for ${id}`)];
+					return error;
+				}
+				if(original && removed) {
+					removed.forEach((key) => {
+						if(original[key]!==undefined) {
+							data[key] = original[key];
+						}
+					});
+				}
+				// need to add code to unindex the changes from original
+				const count = await this.index(data,root,options);
+				if(count) {
+					await this.setItem("!",root,options);
+				}
+				await this.setItem(id,data,options,true);
+				return object;
 			},
 			async query(object,options={}) {
 				let ids,
@@ -719,46 +796,7 @@ addEventListener('fetch', event => {
 				}
 				return results;
 			},
-			async putItem(object,options={}) {
-				let id = object["#"];
-				if(!id) {
-					id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
-				}
-				const cname = id.split("@")[0];
-				let schema = await this.getSchema(cname);
-				if(schema) {
-					options.schema = schema = new Schema(cname,schema);
-					const errors = await schema.validate(object,this);
-					if(errors.length>0) {
-						const error = new Error();
-						error.errors = errors;
-						return error;
-					}
-				}
-				const {data,removed} = await secure(cname,"write",options.user,object),
-					root = (await this.getItem("!",options)) || {},
-					original = await this.getItem(id,{user:this.dbo});
-				if(!data) {
-					const error = new Error();
-					error.errors = [new Error(`Denied 'write' for ${id}`)];
-					return error;
-				}
-				if(original && removed) {
-					removed.forEach((key) => {
-						if(original[key]!==undefined) {
-							data[key] = original[key];
-						}
-					});
-				}
-				// need to add code to unindex the changes from original
-				const count = await this.index(data,root,options);
-				if(count) {
-					await this.setItem("!",root,options);
-				}
-				await this.setItem(id,data,options,true);
-				return object;
-			},
-			async removeItem(keyOrObject,options) {
+			async removeItem(keyOrObject,options={}) {
 				const type = typeof(keyOrObject)==="object";
 				if(keyOrObject && type==="object") {
 					keyOrObject = keyOrObject["#"];
@@ -766,9 +804,17 @@ addEventListener('fetch', event => {
 				if(keyOrObject) {
 					const root = type==="object" ? await this.getItem("!",options) : null,
 						object = root ? await this.getItem(keyOrObject,options) : null;
-					await db.delete(keyOrObject);
-					if(await this.unindex(object,root,options)) {
-						await this.setItem("!",root,options);
+					if(object) {
+						const cname = keyOrObject.split("@")[0],
+							{data} = secure(cname,"write",options.user,object,true);
+						if(data) {
+							await db.delete(keyOrObject);
+							if(await this.unindex(object,root,options)) {
+								await this.setItem("!",root,options);
+							}
+						}
+					} else {
+						await db.delete(keyOrObject);
 					}
 				}
 			},
@@ -822,6 +868,9 @@ addEventListener('fetch', event => {
 async function handleRequest(request) {
 	let body = "Not Found",
 		status = 404;
+	if(request.URL.pathname!=="/db.json") {
+		return fetch(request);
+	}
 	if(request.method==="OPTIONS") {
 		return new Response(null,{
 			headers: {
@@ -838,29 +887,33 @@ async function handleRequest(request) {
 		//}
 		let dbo = await thunderdb.getItem("User@dbo",{user:thunderdb.dbo});
 		if(!dbo) {
-			await thunderdb.putItem(dbouser,{user:thunderdb.dbo});
+			Object.assign(thunderdb.dbo,await hashPassword("dbo",1000));
+			dbo = await thunderdb.putItem(thunderdb.dbo,{user:thunderdb.dbo});
 		}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
 			fname = command.shift(),
 			args = command;
 		if(thunderdb[fname]) {
-			const userName = request.headers.get("X-Auth-Username"),
-				password = request.headers.get("X-Auth-Password"),
-				user = userName ? (await thunderdb.query({userName},{user:thunderdb.dbo}))[0] : null; // should do an instanceof check against id
-			//const {readable,writable} = new TransformStream();
-			if(!user) {
-				return new Response(null,{
-					status: 403,
-					headers:
-					{
-						"Content-Type":"text/plain",
-						"Access-Control-Allow-Origin": "*", //'${request.URL.protocol}//${request.URL.hostname}'
-						"Access-Control-Allow-Headers": "*"
-					}
-				});
+			if(fname==="createUser") {
+				args.push({user:thunderdb.dbo});
+			} else {
+				const userName = request.headers.get("X-Auth-Username"),
+					password = request.headers.get("X-Auth-Password"),
+					user = await thunderdb.authUser(userName,password,{user:thunderdb.dbo}); // thunderdb.dbo;
+				if(!user) {
+					return new Response(null,{
+						status: 403,
+						headers:
+						{
+							"Content-Type":"text/plain",
+							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+						}
+					});
+				}
+				args.push({user});
 			}
-			return thunderdb[fname](args[0],{user})
+			return thunderdb[fname](...args)
 			.then((result) => {
 				const type = typeof(result),
 					options = args.pop();
@@ -879,7 +932,7 @@ async function handleRequest(request) {
 								headers:
 								{
 									"Content-Type":"text/plain",
-									"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 								}
 							});
 					}
@@ -890,7 +943,7 @@ async function handleRequest(request) {
 					headers:
 					{
 						"Content-Type":"text/plain",
-						"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
 			});
@@ -899,7 +952,7 @@ async function handleRequest(request) {
 			//		headers:
 			//		{
 			//			"Content-Type":"text/plain",
-			//			"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+			//			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 			//		}
 			//	}
 			//)
@@ -915,7 +968,7 @@ async function handleRequest(request) {
 				{
 					"Status": status,
 					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": "*" //'${request.URL.protocol}//${request.URL.hostname}'
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 				}
 			}
 	);
@@ -924,7 +977,7 @@ async function handleRequest(request) {
 
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -933,7 +986,7 @@ async function handleRequest(request) {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
 					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (!checkUUID && isnum) || uuid4.is(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
 			}
 			return false;
 		};
@@ -943,13 +996,15 @@ async function handleRequest(request) {
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(8);
-	
-	async function secure(ruleName,action,user,data) {
+	const acl = __webpack_require__(9),
+		roles = __webpack_require__(10);
+	// looks-up rule for action in acl
+	// if user is not permitted to take action, modifies data accordingly
+	async function secure(ruleName,action,user,data,documentOnly) {
 		const rule = acl[ruleName],
 			removed = [];
 		if(!user || !user.roles) {
@@ -959,7 +1014,7 @@ async function handleRequest(request) {
 			if(rule.document) {
 				if(rule.document[action]) {
 					if(typeof(rule.document[action])==="function") {
-						if(!rule.document[action](action,user,data)) {
+						if(!(await rule.document[action](action,user,data))) {
 							return {removed};
 						}
 					} else {
@@ -971,29 +1026,34 @@ async function handleRequest(request) {
 				}
 				if(rule.document.filter) {
 					data = await rule.document.filter(action,user,data);
+					if(data==null) {
+						return {removed};
+					}
 				}
 			}
-			if(rule.properties && data && typeof(data)==="object") {
+			if(!documentOnly && rule.properties && data && typeof(data)==="object") {
 				const properties = rule.properties[action];
 				if(properties) {
 					for(const key of Object.keys(properties)) {
-						if(typeof(properties[key])==="function") {
-							if(!properties[key](action,user,data,key)) {
-								delete data[key];
-								removed.push(key);
-							}
-						} else {
-							const roles = Array.isArray(properties[key]) ?  properties[key] : Object.keys(properties[key]);
-							if(!roles.some((role) => user.roles[role])) {
-								delete data[key];
-								removed.push(key);
+						if(data[key]!==undefined) {
+							if(typeof(properties[key])==="function") {
+								if(!(await properties[key](action,user,data,key))) {
+									delete data[key];
+									removed.push(key);
+								}
+							} else {
+								const roles = Array.isArray(properties[key]) ?  properties[key] : Object.keys(properties[key]);
+								if(!roles.some((role) => user.roles[role])) {
+									delete data[key];
+									removed.push(key);
+								}
 							}
 						}
 					}
 				}
 				if(rule.properties.filter) {
 					for(const key of Object.keys(data)) {
-						if(!(await rule.properties.filter(action,user,data,key))) {
+						if(data[key]!==undefined && !(await rule.properties.filter(action,user,data,key))) {
 							delete data[key];
 							removed.push(key);
 						}
@@ -1003,17 +1063,38 @@ async function handleRequest(request) {
 		}
 		return {data,removed};
 	}
-	
+	secure.mapRoles = (user) => {
+		if(user && user.roles) {
+			let changes;
+			do {
+				changes = false;
+				Object.keys(roles).forEach((role) => {
+					if(user.roles[role]) {
+						Object.keys(roles[role]).forEach((childRole) => {
+							if(!user.roles[childRole]) {
+								changes = user.roles[childRole] = true;
+							}
+						})
+					}
+				});
+			} while(changes);
+		}
+	}
 	module.exports = secure;
 }).call(this)
 
 /***/ }),
-/* 8 */
-/***/ (function(module, exports, __webpack_require__) {
+/* 9 */
+/***/ (function(module, exports) {
 
 (function () {
-	const hashPassword = __webpack_require__(9);
 	//{"#":"User@8",roles:{},userName:"bill",password:"test"}
+	/*
+	 * {
+	 * 	 dbo: {
+	 * 		{user: true}
+	 *   }
+	 */
 	module.exports = {
 		User: {
 			document: {
@@ -1024,11 +1105,6 @@ async function handleRequest(request) {
 				 */
 				filter: async function(action,user,document) {
 					if(user.roles.dbo || user.userName===document.userName) {
-						if(action==="write") {
-							if(document.password) {
-								Object.assign(document,await hashPassword(document.password,1000))
-							}
-						}
 						return document;
 					}
 				}
@@ -1047,7 +1123,7 @@ async function handleRequest(request) {
 					salt: (action,user,document) => user.roles.dbo || document.userName===user.userName,
 				},
 				filter: async function(action,user,document,key) {
-					return document;
+					return true;
 				}
 			}
 		}
@@ -1055,18 +1131,30 @@ async function handleRequest(request) {
 })();
 
 /***/ }),
-/* 9 */
+/* 10 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		dbo: {
+			user: true
+		}
+	};
+}).call(this);
+
+/***/ }),
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
 	function bufferToHexString(buffer) {
-	    var s = '', h = '0123456789ABCDEF';
+	    var s = '', h = '0123456789abcdef';
 	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
 	    return s;
 	}
-	async function generateKey(password,iterations) {
-	    const salt = crypto.getRandomValues(new Uint8Array(8)),
-	    	encoder = new TextEncoder('utf-8'),
+	async function hashPassword(password,iterations,salt) {
+		salt || (salt = crypto.getRandomValues(new Uint8Array(8)));
+	    const encoder = new TextEncoder('utf-8'),
 	    	passphraseKey = encoder.encode(password),
 	    	key = await crypto.subtle.importKey(
 			  'raw', 
@@ -1083,15 +1171,10 @@ async function handleRequest(request) {
 			    	hash: 'SHA-256'
 			    },
 			    key,
-			    // Note: we don't actually need a cipher suite,
-			    // but the api requires that it must be specified.
-			    // For AES the length required to be 128 or 256 bits (not bytes)
+			    // Don't actually need a cipher suite,
+			    // but api requires it is specified.
 			    { name: 'AES-CBC', length: 256 },
-		
-			    // Whether or not the key is extractable (less secure) or not (more secure)
 			    true,
-		
-			    // this web crypto object will only be allowed for these functions
 			    [ "encrypt", "decrypt" ]
 			), 
 			buffer = await crypto.subtle.exportKey("raw", webKey);
@@ -1100,7 +1183,7 @@ async function handleRequest(request) {
 			salt: bufferToHexString(salt)
 		}
 	}
-	module.exports = generateKey;
+	module.exports = hashPassword;
 }).call(this)
 
 /***/ })

@@ -5,7 +5,7 @@
   "engines": {
     "node": "10.x"
   },
-  "license": "SSPL",
+  "license": "SSPL v1",
   "scripts": {
     "thunderclap": "webpack"
   },

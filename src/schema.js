@@ -1,10 +1,9 @@
 (function() {
-	class Schema {
+	const Entity = require("./entity.js");
+	
+	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
-			Object.assign(this,config);
-			const meta = {"#":`Schema@${ctor.name||ctor}`};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			super(config);
 		}
 		async validate(object,db) {
 			const errors = [];

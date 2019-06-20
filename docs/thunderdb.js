@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 10);
+/******/ 	return __webpack_require__(__webpack_require__.s = 12);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -122,7 +122,29 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(2),
+	const uuid4 = __webpack_require__(0);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uuid4()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const soundex = __webpack_require__(3),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -434,7 +456,7 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
+/* 3 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -444,16 +466,15 @@
 }).call(this);
 
 /***/ }),
-/* 3 */
-/***/ (function(module, exports) {
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	class Schema {
+	const Entity = __webpack_require__(1);
+	
+	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
-			Object.assign(this,config);
-			const meta = {"#":`Schema@${ctor.name||ctor}`};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			super(config);
 		}
 		async validate(object,db) {
 			const errors = [];
@@ -514,17 +535,20 @@
 })();
 
 /***/ }),
-/* 4 */
-/***/ (function(module, exports) {
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	class User {
+	const Entity = __webpack_require__(1);
+	
+	class User extends Entity {
 		constructor(userName,config) {
-			Object.assign(this,config);
+			super(config);
 			this.userName = userName;
-			const meta = {"#":config["#"]};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			if(!this.roles) {
+				this.roles = {};
+			}
+			this.roles.user = true;
 		}
 		static create(config) {
 			return new User(config.userName,config);
@@ -538,20 +562,21 @@
 })();
 
 /***/ }),
-/* 5 */,
 /* 6 */,
 /* 7 */,
 /* 8 */,
 /* 9 */,
-/* 10 */
+/* 10 */,
+/* 11 */,
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
 	const uuid4 = __webpack_require__(0),
-		joqular = __webpack_require__(1),
-		Schema = __webpack_require__(3),
-		User = __webpack_require__(4);
+		joqular = __webpack_require__(2),
+		Schema = __webpack_require__(4),
+		User = __webpack_require__(5);
 	
 	// "https://cloudworker.io/db.json";
 	//"https://us-central1-reasondb-d3f23.cloudfunctions.net/query/";
@@ -565,9 +590,15 @@
 			this.register(Schema);
 			this.register(User);
 		}
+		async createUser(userName,password) {
+			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
+	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
+	    	.then((data) => this.create(data));
+		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
-		    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => this.create(data));
 		}
 		async getSchema(className) {
@@ -578,12 +609,6 @@
 		async keys(lastKey) {
 			return fetch(`${this.endpoint}?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
 	    		.then((response) => response.json())
-		}
-		async query(object,verify) {
-			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(object))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
-	    		.then((objects) => objects.map((object) => this.create(object)))
-	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		async putItem(object) {
 			this.register(object.constructor);
@@ -606,7 +631,12 @@
 			return fetch(`${this.endpoint}?["putItem",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
 				.then((response) => response.json())
 				.then((object) => this.create(object))
-				.catch((e) => console.log(e))
+		}
+		async query(object,verify) {
+			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(object))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
+	    		.then((objects) => objects.map((object) => this.create(object)))
+	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
@@ -614,14 +644,15 @@
 			}
 		}
 		async removeItem(keyOrObject) {
-			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(keyOrObject))}]`,{headers:this.headers});
-				//.then((response) => response.json()); 
+			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(keyOrObject))}]`,{headers:this.headers})
+				.then((response) => response.json())
+				.then((data) => this.create(data))
 		}
 		async setItem(key,data) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
 				.then((response) => response.json()); 
 		}
 		async setSchema(className,config) {

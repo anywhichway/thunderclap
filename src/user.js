@@ -1,11 +1,14 @@
 (function() {
-	class User {
+	const Entity = require("./entity.js");
+	
+	class User extends Entity {
 		constructor(userName,config) {
-			Object.assign(this,config);
+			super(config);
 			this.userName = userName;
-			const meta = {"#":config["#"]};
-			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			if(!this.roles) {
+				this.roles = {};
+			}
+			this.roles.user = true;
 		}
 		static create(config) {
 			return new User(config.userName,config);

@@ -1,12 +1,12 @@
 (function() {
 	function bufferToHexString(buffer) {
-	    var s = '', h = '0123456789ABCDEF';
+	    var s = '', h = '0123456789abcdef';
 	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
 	    return s;
 	}
-	async function generateKey(password,iterations) {
-	    const salt = crypto.getRandomValues(new Uint8Array(8)),
-	    	encoder = new TextEncoder('utf-8'),
+	async function hashPassword(password,iterations,salt) {
+		salt || (salt = crypto.getRandomValues(new Uint8Array(8)));
+	    const encoder = new TextEncoder('utf-8'),
 	    	passphraseKey = encoder.encode(password),
 	    	key = await crypto.subtle.importKey(
 			  'raw', 
@@ -23,15 +23,10 @@
 			    	hash: 'SHA-256'
 			    },
 			    key,
-			    // Note: we don't actually need a cipher suite,
-			    // but the api requires that it must be specified.
-			    // For AES the length required to be 128 or 256 bits (not bytes)
+			    // Don't actually need a cipher suite,
+			    // but api requires it is specified.
 			    { name: 'AES-CBC', length: 256 },
-		
-			    // Whether or not the key is extractable (less secure) or not (more secure)
 			    true,
-		
-			    // this web crypto object will only be allowed for these functions
 			    [ "encrypt", "decrypt" ]
 			), 
 			buffer = await crypto.subtle.exportKey("raw", webKey);
@@ -40,5 +35,5 @@
 			salt: bufferToHexString(salt)
 		}
 	}
-	module.exports = generateKey;
+	module.exports = hashPassword;
 }).call(this)

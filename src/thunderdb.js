@@ -17,9 +17,15 @@
 			this.register(Schema);
 			this.register(User);
 		}
+		async createUser(userName,password) {
+			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
+	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
+	    	.then((data) => this.create(data));
+		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
-		    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => this.create(data));
 		}
 		async getSchema(className) {
@@ -30,12 +36,6 @@
 		async keys(lastKey) {
 			return fetch(`${this.endpoint}?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
 	    		.then((response) => response.json())
-		}
-		async query(object,verify) {
-			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(object))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
-	    		.then((objects) => objects.map((object) => this.create(object)))
-	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		async putItem(object) {
 			this.register(object.constructor);
@@ -58,7 +58,12 @@
 			return fetch(`${this.endpoint}?["putItem",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
 				.then((response) => response.json())
 				.then((object) => this.create(object))
-				.catch((e) => console.log(e))
+		}
+		async query(object,verify) {
+			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(object))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
+	    		.then((objects) => objects.map((object) => this.create(object)))
+	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
@@ -66,14 +71,15 @@
 			}
 		}
 		async removeItem(keyOrObject) {
-			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(keyOrObject))}]`,{headers:this.headers});
-				//.then((response) => response.json()); 
+			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(keyOrObject))}]`,{headers:this.headers})
+				.then((response) => response.json())
+				.then((data) => this.create(data))
 		}
 		async setItem(key,data) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
 				.then((response) => response.json()); 
 		}
 		async setSchema(className,config) {
