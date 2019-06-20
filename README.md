@@ -82,7 +82,10 @@ You do not need a CNAME record for your dev host, Argo manages this for you.
 
 If the 'mode' in 'thunderclap.json` is set to `development`, then in addition to deploying the worker script to
 `<devHost>-thunderdb-<primaryHostName>-<com|org|...>` with a route, a local web server is started with an Argo tunnel 
-through `<dev-host-prefix>-thunderdb.<your-domain>`.
+to access `<dev-host-prefix>-thunderdb.<your-domain>` via your web browser.
+
+When in dev mode files are watched by webpack and any changes cause a re-bundling and deployment of 
+the worker script to Cloudflare.
 
 # Data Manipulation
 

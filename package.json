@@ -1,6 +1,6 @@
 {
   "name": "thunderdb",
-  "version": "v0.0.1b",
+  "version": "v0.0.1a",
   "description": "An indexed object database for Cloudflare",
   "engines": {
     "node": "10.x"
