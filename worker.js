@@ -883,7 +883,7 @@ async function handleRequest(request) {
 	try {
 		//let userschema = await thunderdb.getSchema(User);
 		//if(!userschema) {
-		const userschema = await thunderdb.putItem(new Schema(User));
+		//const userschema = await thunderdb.putItem(new Schema(User));
 		//}
 		let dbo = await thunderdb.getItem("User@dbo",{user:thunderdb.dbo});
 		if(!dbo) {

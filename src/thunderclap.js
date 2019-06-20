@@ -7,7 +7,7 @@
 	
 	// "https://cloudworker.io/db.json";
 	//"https://us-central1-reasondb-d3f23.cloudfunctions.net/query/";
-	class ThunderDB  {
+	class Thunderclap  {
 		constructor({endpoint,user,headers={}}) {
 			this.ctors = {};
 			this.endpoint = endpoint;
@@ -101,7 +101,7 @@
 				if(data==="@NaN") {
 					return NaN;
 				}
-				if(data.startsWith("@Date")) {
+				if(data.startsWith("Date@")) {
 					return new Date(parseInt(data.substring(5)));
 				}
 				return data;
@@ -128,6 +128,6 @@
 			return instance;
 		}
 	}
-	if(typeof(module)!=="undefined") module.exports = ThunderDB;
-	if(typeof(window)!=="undefined") window.ThunderDB = ThunderDB;
+	if(typeof(module)!=="undefined") module.exports = Thunderclap;
+	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
 }).call(this);

@@ -11,7 +11,7 @@ function submit(event) {
 		config[key] = document.getElementById(key).value;
 	});
 	const {username,password} = config;
-	db = new ThunderDB({endpoint,user:{username,password}});
+	db = new Thunderclap({endpoint,user:{username,password}});
 	const command = {fname:"",arg1:"",arg2:""};
 	Object.keys(command).forEach((key) => {
 		command[key] = document.getElementById(key).value;

@@ -115,12 +115,9 @@ using the id as the key.
 `undefined async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the object is removed from the index. 
 
-`async query(object JOQULARExpression)` - uses the index to find matching objects.
+`async query(object JOQULARExpression)` - uses the index to find matching objects. There are a lot of examples in the unit
+test `file docs/test/index.js`.
 
-```
-db.query({userName:"dbo"})
-db.query({age:{$gt: 21}});
-```
 
 ## URL Requests 
 
