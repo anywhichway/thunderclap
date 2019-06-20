@@ -1,7 +1,7 @@
 # thunderclap
 
 Thunderclap is an indexed JSON database designed specifically for Cloudflare. It runs on top of the Cloudflare KV store. 
-Its query language, JOQULAR (JavaScript Object Query Language), is similar to, but more extensive than, the query language
+Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-powered-javascript-pattern-matching-273a0d77eab5) (JavaScript Object Query Language), is similar to, but more extensive than, the query language
 associated with MongoDB.
 
 Thunderclap also includes role based access control mechanisms and schema or schemaless operation.
@@ -116,6 +116,11 @@ using the id as the key.
 or a key that resolves to an indexed object, the object is removed from the index. 
 
 `async query(object JOQULARExpression)` - uses the index to find matching objects.
+
+```
+db.query({userName:"dbo"})
+db.query({age:{$gt: 21}});
+```
 
 ## URL Requests 
 
