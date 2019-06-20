@@ -15,9 +15,9 @@ const path = require("path"),
 	ROOT = config.devRoot,
 	DEV_HOST = config.devHost,
 	DEV_NAMESPACE_ID = config.devNameSpaceId,
-	host = `${MODE==="development" ? DEV_HOST+'-' : ''}thunderdb.${HOSTNAME}`,
+	host = `${MODE==="development" ? DEV_HOST+'-' : ''}thunderclap.${HOSTNAME}`,
 	namespace = `${MODE==="development" ? DEV_NAMESPACE_ID : NAMESPACE_ID}`,
-	scriptName = `${MODE==="development"  ? DEV_HOST+"-" : ""}thunderdb-${HOSTNAME.split(".").join("-")}`,
+	scriptName = `${MODE==="development"  ? DEV_HOST+"-" : ""}thunderclap-${HOSTNAME.split(".").join("-")}`,
 	metadataScript = `echo {"body_part":"script","bindings":[{"type":"kv_namespace","name":"NAMESPACE","namespace_id":"${namespace}"}]} > metadata.json`,
 	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@worker.js;type=application/javascript"`,
 	putRoute = `curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -H "Content-type: application/json" -d "{\\"pattern\\": \\"${host}/*\\", \\"script\\":\\"${scriptName}\\"}"`;
@@ -56,7 +56,7 @@ module.exports = {
   context: path.resolve(__dirname, "src"),
   entry: {
 	server: "./server.js" ,
-	thunderdb: "./thunderdb.js"
+	thunderclap: "./thunderclap.js"
   },
   output: {
 	  path: __dirname, //path.resolve(__dirname,ROOT),

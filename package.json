@@ -11,14 +11,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eventscope/thunderdb.git"
+    "url": "git+https://github.com/eventscope/thunderclap.git"
   },
   "keywords": [],
   "author": "Simon Y. Blackwell <syblackwell@anywhichway.com> (http://app.github.com/anywhichway)",
   "bugs": {
-    "url": "https://github.com/eventscope/thunderdb/issues"
+    "url": "https://github.com/eventscope/thunderclap/issues"
   },
-  "homepage": "https://github.com/eventscope/thunderdb#readme",
+  "homepage": "https://github.com/eventscope/thunderclap#readme",
   "devDependencies": {
     "chai": "^4.2.0",
     "live-server": "^1.2.1",
