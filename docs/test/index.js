@@ -1,10 +1,10 @@
-const TESTDATE = new Date();
+const TESTDATE = new Date("2019-06-20T23:04:35.815Z");
 
 let o1,
 	o2;
 
 describe("query",function() {
-	xit("put nested item",async function() {
+	/*it("put nested item",async function() {
 		const object = await db.putItem({
 			date: TESTDATE,
 			name:"test",
@@ -19,6 +19,7 @@ describe("query",function() {
 			ip:"127.0.0.1",
 			email: "someone@somewhere.com"});
 		o1 = object; // save for deletion in final test
+		expect(object.date.getTime()).equal(TESTDATE.getTime()); 
 		expect(object.name).equal("test"); 
 		expect(object.low).equal(-1);
 		expect(object.middle).equal(0);
@@ -30,8 +31,17 @@ describe("query",function() {
 		expect(object.ssn).equal("555-55-5555");
 		expect(object.ip).equal("127.0.0.1");
 		expect(object.email).equal("someone@somewhere.com");
-		done();
-	}).timeout(5000);
+	}).timeout(10000);*/
+	it("wild card key",async function() {
+		const results = await db.query({$_:"test"});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	}).timeout(3000);
+	it("RegExp key",async function() {
+		const results = await db.query({[/.*name/]:"test"});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
 	it("$lt",async function() {
 		const results = await db.query({low:{$lt:0}});
 		expect(typeof(results[0])).equal("object");
@@ -107,6 +117,21 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].name).equal("test");
 	});
+	it("-Infinity",async function() {
+		const results = await db.query({minusInfinity:-Infinity});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].minusInfinity).equal(-Infinity);
+	});
+	it("Infinity",async function() {
+		const results = await db.query({plusInfinity:Infinity});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].plusInfinity).equal(Infinity);
+	});
+	it("NaN",async function() {
+		const results = await db.query({NaN:{$isNaN:null}});
+		expect(typeof(results[0])).equal("object");
+		expect(typeof(results[0].NaN)==="number" && isNaN(results[0].NaN)).equal(true);
+	});
 	xit("$isArray",function(done) {
 		let some = 0;
 		db.query({favoriteNumbers:{$isArray:null}}).forEach(object => { 
@@ -145,29 +170,24 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(typeof(results[0].name)).equal("string");
 	});
-	xit("$in",function(done) {
-		let some = 0;
-		db.query({name:{$in:["joe"]}}).forEach(object => { some++; expect(object.name).equal("joe");})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$in",async function() {
+		const results = await db.query({name:{$in:["test"]}});
+		expect(typeof(results[0])).equal("object");
+		expect(typeof(results[0].name)).equal("string");
 	});
-	xit("$instanceof",function(done) {
-		let some = 0;
-		db.query({name:{$neq:null},address:{$instanceof:Object}}).forEach(object => { some++; expect(object.address instanceof Object).equal(true)})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$nin",async function() {
+		const results = await db.query({name:{$nin:["name"]}});
+		expect(typeof(results[0])).equal("object");
+		expect(typeof(results[0].name)).equal("string");
 	});
-	xit("$instanceof cname",function(done) {
-		let some = 0;
-		db.query({name:{$neq:null},address:{$instanceof:"Object"}}).forEach(object => { some++; expect(object.address instanceof Object).equal(true)})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$instanceof",async function() {
+		const results = await db.query({date:{$instanceof:"Date"}});
+		expect(typeof(results[0])).equal("object");
+		expect(new Date(results[0].date)).instanceof(Date);
 	});
 	xit("$matches",function(done) {
 		let some = 0;
 		db.query({name:{$matches:["joe"]}}).forEach(object => { some++; expect(object.name).equal("joe"); expect(object.age).equal(27);})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("$nin",function(done) {
-		let some = 0;
-		db.query({name:{$nin:["mary"]}}).forEach(object => { some++; expect(object.name).equal("joe");})
 			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
 	});
 	it("$and flat",async function() {
@@ -200,72 +220,50 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].middle).equal(0);
 	});
-	xit("$xor",function(done) {
-		let some = 0;
-		db.query({age:{$xor:{$eeq:28,$eq:27}}}).forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$xor flat",async function() {
+		const results = await db.query({middle:{$xor:{$lt:1,$gt:1}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
 	});
-	xit("$not",function(done) {
-		let some = 0;
-		db.query({age:{$not:{$eeq:28}}}).forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$xor nested",async function() {
+		const results = await db.query({middle:{$xor:{$lt:1,$xor:{$gt:1}}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
 	});
-	xit("$not $xor",function(done) {
-		let some = 0;
-		db.query({age:{$not:{$xor:{$eeq:27,$eq:27}}}}).forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$xor array",async function() {
+		const results = await db.query({middle:{$xor:[{$lt:1},{$gt:1}]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
 	});
-	xit("wild card key",function(done) {
-		let some = 0;
-		db.query({$_:{$eq: "joe"}})
-		.forEach(object => { some++; expect(object.name).equal("joe"); })
-		.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$not",async function() {
+		const results = await db.query({name:{$not:{$eq:"name"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
 	});
-	xit("RegExp key",function(done) {
-		let some = 0;
-		db.query({[/.*name/]:{$eq: "joe"}})
-		.forEach(object => { some++; expect(object.name).equal("joe"); })
-		.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	for(const key of ["date","day","fullYear","hours","milliseconds","minutes","month","seconds","time","UTCDate","UTCDay","UTCFullYear","UTCHours","UTCSeconds","UTCMilliseconds","UTCMinutes","UTCMonth","year"]) {
+		const fname = `get${key[0].toUpperCase()}${key.substring(1)}`;
+		it("$" + key, Function("expect","db",`return async function() {
+			const results = await db.query({date:{["$${key}"]:TESTDATE}});
+			expect(typeof(results[0])).equal("object");
+			expect(results[0].date["${fname}"]()).equal(TESTDATE["${fname}"]()); 
+		}`)(expect,db));
+		it("$" + key + " from time", Function("expect","db",`return async function() {
+			const results = await db.query({date:{["$${key}"]:TESTDATE.getTime()}});
+			expect(typeof(results[0])).equal("object");
+			expect(results[0].date["${fname}"]()).equal(TESTDATE["${fname}"]()); 
+		}`)(expect,db));
+	}
+	it("double property",async function() {
+		const results = await db.query({name:"test",middle:0});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+		expect(results[0].middle).equal(0);
 	});
-	xit("partial",function(done) {
-		let some = 0;
-		db.query({name:"joe"},{partial:true})
-			.forEach(object => { some++; expect(object.name).equal("joe"); expect(Object.keys(object).length).equal(1);})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("double property",function(done) {
-		let some = 0;
-		db.query({name:"joe",age:27})
-			.forEach(object => { some++; expect(object.name).equal("joe"); expect(object.age).equal(27);})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("inline property",function(done) {
-		let some = 0;
-		db.query({[key => key==="age"]:{$lt:28}})
-			.forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("inline value true",function(done) {
-		let some = 0;
-		db.query({age:value => value < 28})
-			.forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("inline value false",function(done) {
-		let some = 0;
-		db.query({age:value => value < 27}).forEach(object => { some++; expect(object.age).equal(27); })
-			.then(() => some ? done(new Error("Unexpected result")) :  done()).catch(e => done(e));
-	});
-	xit("functional key",function(done) {
-		let some = 0;
-		db.query({[key => key==="name"]:{$typeof:"string"}})
-			.forEach(object => { some++; expect(typeof(object.name)).equal("string"); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("$",function(done) {
-		let some = 0;
-		db.query({name:{$:value=>value==="joe"}}).forEach(object => { some++; expect(object.name).equal("joe"); })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("partial",async function() {
+		const results = await db.query({name:"test"},{partial:true});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+		expect(Object.keys(results[0]).length).equal(2);
 	});
 	xit("$search", function(done) {
 		let some = 0;
@@ -292,70 +290,9 @@ describe("query",function() {
 		db.query({notes:{$search:`{$eq:"loves"}`}}).forEach(object => { some++; expect(object.notes.indexOf("loves")>=0).equal(true); })
 		.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
 	});
-	/*for(const key of ["date","day","fullYear","hours","milliseconds","minutes","month","seconds","time","UTCDate","UTCDay","UTCFullYear","UTCHours","UTCSeconds","UTCMilliseconds","UTCMinutes","UTCMonth","year"]) {
-		const fname = `get${key[0].toUpperCase()}${key.substring(1)}`;
-		it("$" + key, Function("chai","db",`return function(done) {
-			let some = 0;
-			db.query({birthday:{["$${key}"]:TESTDATE}}).forEach(object => { 
-				some++; 
-				//console.log(object);
-				expect(object.birthday["${fname}"]()).equal(TESTDATE["${fname}"]()); 
-			})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-		}`)(chai,db));
-		it("$" + key + " from time", Function("chai","db",`return function(done) {
-			let some = 0;
-			//debugger;
-			db.query({birthday:{["$${key}"]:TESTDATE.getTime()}}).forEach(object => { 
-				some++; 
-				//console.log(object);
-				expect(object.birthday["${fname}"]()).equal(TESTDATE["${fname}"]()); 
-			})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-		}`)(chai,db));
-	}*/
-	xit("secret", function(done) {
-		let some = 0;
-		db.query({name:"joe"}).forEach(object => { some++; expect(object.name).equal("joe"); expect(object.secret).equal("****");})
-				.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("handle Infinity and NaN ",function(done) {
-		let some = 0;
-		db.query({name:"joe"})
-			.forEach(object => { 
-				some++; 
-				expect(object.favoriteNumbers[2]).equal(Infinity);
-				expect(typeof(object.favoriteNumbers[3])).equal("number");
-				expect(isNaN(object.favoriteNumbers[3])).equal(true);
-				})
-				.then(() => some ? done() : done(new Error("Missing result")))
-				.catch(e => done(e));
-	});
-	xit("query nested",function(done) {
-		let some = 0;
-		db.query({name:{$neq:null},address:{city:"seattle"}})
-			.forEach(object => { 
-					some++; expect(object.address.city).equal("seattle");
-			 })
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-		});
-	xit("join",function(done) {
-		let some = 0;
-		db.join({name:{$neq:null}},{name:{$neq:null}},([o1,o2]) => o1.name===o2.name).forEach(record => { some++; expect(record.length).equal(2); expect(record[0].name).equal(record[1].name); })
-		.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
-	});
-	xit("find",async function() {
-			const object = await db.query({name:{$neq:null},address:{city:"seattle"}})
-				.find(object => object.address.city==="seattle");
-			expect(object.address.city).equal("seattle");
-	});
-	xit("findIndex",async function() {
-			const i = await db.query({name:{$neq:null},address:{city:"seattle"}}).findIndex(object => object.address.city==="seattle");
-			expect(i).equal(0);
-	});
-	xit("findIndex not",async function() {
-			const i = await db.query({name:{$neq:null},address:{city:{$neq:null}}}).findIndex(object => object.address.city==="miami");
-			expect(i).equal(-1);
+	xit("join",async function() {
+		const results = await db.join({name:{$neq:null}},{name:{$neq:null}},([o1,o2]) => o1.name===o2.name);
+		expect(results.length).equal(1);
 	});
 	xit("delete",async function() {
 		await db.removeItem(o1);

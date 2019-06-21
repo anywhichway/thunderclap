@@ -12,8 +12,8 @@ In addition to having more predicates than MongoDB, JOQULAR extends pattern matc
 Thunderclap also includes role based access control mechanisms and schema or schemaless operation.
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
-modify the code for internal applications or applications that are not primarily a means of providing Thunderclap as a 
-hosted service. In order to provide Thunderclap as a hosted service you must either secure a commercial license from 
+modify the code for internal applications or public applications that are not primarily a means of providing Thunderclap
+as a hosted service. In order to provide Thunderclap as a hosted service you must either secure a commercial license from 
 AnyWhichWay or make all your source code available, including the source of non-derivative works that support the 
 monitoring and operation of Thunderclap as a service.
 
@@ -23,9 +23,9 @@ Thunderclap is currently in ALPHA because:
 
 1) Workers KV from Cloudflare just came out of beta
 
-2) Security measures have not yet been vetted by a third party
+2) Security measures are incomplete and have not yet been vetted by a third party
 
-3) Functional testing has been limited
+3) Although there are many unit tests, application level functional testing has been limited
 
 4) Load and stress testing has not been started
 
@@ -138,18 +138,18 @@ To be written
 # Security
 
 The Thunderclap security mechanisms support the application of role based read and write access rules at the object, 
-property and key level. 
+property and storage key level. 
 
 If a user is not authorized read access to an object or key value, it will not be returned. If a user is not 
 authorized access to a particular property, the property will be stripped from the object before the
 object is returned. Additionaly, a query for an object using properties to which a user does not have access
 will automatically drop the properties from the selection process to prevent data leakage through inference.
 
-If a user is not authorized write access to specific properties on an indexed object, update attempts will 
+If a user is not authorized write access to specific properties on an object, update attempts will 
 fall back to partial updates on just those properties for which write access is allowed. If write access to a
 key or an entire object is not allowed, the write will simply fail.
 
-At the moment, by default, all keys, object, and properties are available for read and write unless specifically
+At the moment, by default, all keys, objects, and properties are available for read and write unless specifically
 controlled in the `acl.js` file in the root of the Thunderclap repository. A future release will support defaulting
 to prevent read and write unless specifically permitted.
 
@@ -164,9 +164,11 @@ To be written.
 # History and Roadmap
 
 Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB development has been suspended for now, 
-but many features found in ReasonDB will make their way into Thunderclap if interest in shown in the software. This
+but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. This
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
+# Change Log (reverse chronological order)
 
+2019-06-20 v0.0.4a Added a large number of unit tests
 
 

@@ -145,6 +145,7 @@
 
 (function() {
 	const soundex = __webpack_require__(3),
+		isSoul = __webpack_require__(7),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -165,19 +166,12 @@
 				const resolve = (a,pname,value) => joqular[pname] ? joqular[pname](a,value) : false;
 				return tests.some(test => Object.keys(test).some(pname => resolve(a,pname,test[pname])));
 			},
-			$xor(a,tests) {
+			$xor(a,...tests) {
 				let found = 0;
 				const resolve = (a,pname,value) => joqular[pname] ? joqular[pname](a,value) : false;
-				if(Array.isArray(tests)) {
-					for(const test of tests) {
-						for(const pname in test) {
-							if(resolve(a,pname,test[pname])) found++;
-							if(found>1) return false;
-						}
-					}
-				} else {
-					for(const pname in tests) {
-						if(resolve(a,pname,tests[pname])) found++;
+				for(const test of tests) {
+					for(const pname in test) {
+						if(resolve(a,pname,test[pname])) found++;
 						if(found>1) return false;
 					}
 				}
@@ -248,12 +242,16 @@
 				return typeof(a)===b;
 			},
 			$instanceof(a,b) {
-				if(isSoul(a)) {
-					const cname = a.split("@")[0],
-						ctor = joqular.db.ctors()[cname] ? joqular.db.ctors()[cname] : null,
-					a = ctor ? Object.create(ctor.prototype) : a;
-				} 
-				b = typeof(b)==="string" && joqular.db.ctors()[b] ? joqular.db.ctors()[b] : b;
+				let ctor;
+				if(isSoul(a,false)) {
+					const cname = a.split("@")[0];
+					if(cname===b) {
+						return true;
+					}
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors()[cname] : null;
+				}
+				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors()[b] : b;
+				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
 			},
 			async $isArray() { 
@@ -316,7 +314,11 @@
 				})
 			},
 			$date(a,b){ 
-				if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getDate()===b.getDate();
+				if(typeof(a)==="number") { a = new Date(a); } 
+				if(typeof(b)==="number") { b = new Date(b); }; 
+				if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) {
+					return a.getDate()===b.getDate();
+				}
 			},
 			$day(a,b){ if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getDay()===b.getDay(); },
 			$fullYear(a,b){ if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getFullYear()===b.getFullYear(); },
@@ -400,38 +402,17 @@
 					return;
 				}
 				key = key.trim();
-				if(key.startsWith("=>")) {
-					key = `(value)=>value${key.substring(2)}`
-				} else if(["==","===",">",">=","=<","<","!"].some((op) => key.startsWith(op))) {
-					key = `(value)=>value${key}`
-				} else if(key[0]==="(" && key[key.length-1]==")") {
-					key = `(value)=>${key}`
-				}
 				if(joqular[key]) {
 					return joqular[key];
 				}
 				if(key==="$_") {
-					return pkey = () => true;
+					return () => true;
 				}
 				if(key.startsWith("$.")) {
 					const fname = key.substring(2);
 					return (a,b) => typeof(a[fname])==="function" ? a[fname](b) : false;
 				}
 				if(keyTest) {
-					if(key[0]==="{" && key[key.length-1]==="}") {
-						key = key.replace(/([{,])(\s*)([A-Za-z0-9_\-\$]+?)\s*:/g, '$1"$3":')
-						const spec = JSON.parse(key);
-						return (value) => {
-							return joqular.matches(spec,value);
-						}
-					}
-					if(key.includes("=>") && typeof(window)!=="undefined") {
-						try {
-							return new Function("return " + key)();
-						} catch(e) {
-							return () => true;
-						}
-					}
 					if(key[0]==="/") {
 						const i = key.lastIndexOf("/");
 						if(i>0) {
@@ -443,6 +424,27 @@
 							}
 						}
 						return;
+					}
+					if(key[0]==="{" && key[key.length-1]==="}") {
+						key = key.replace(/([{,])(\s*)([A-Za-z0-9_\-\$]+?)\s*:/g, '$1"$3":')
+						const spec = JSON.parse(key);
+						return (value) => {
+							return joqular.matches(spec,value);
+						}
+					}
+					if(key.startsWith("=>")) {
+						key = `(value)=>value${key.substring(2)}`
+					} else if(["==","===",">",">=","=<","<","!"].some((op) => key.startsWith(op))) {
+						key = `(value)=>value${key}`
+					} else if(key[0]==="(" && key[key.length-1]==")") {
+						key = `(value)=>${key}`
+					}
+					if(key.includes("=>") && typeof(window)!=="undefined") {
+						try {
+							return new Function("return " + key)();
+						} catch(e) {
+							return () => true;
+						}
 					}
 				}
 			}
@@ -580,7 +582,7 @@ addEventListener('fetch', event => {
 	const db = NAMESPACE;
 		thunderdb = {
 			async authUser(userName,password,options) {
-				const user = (await this.query({userName},options))[0];
+				const user = (await this.query({userName},false,options))[0];
 				if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 					secure.mapRoles(user);
 					return user;
@@ -690,14 +692,16 @@ addEventListener('fetch', event => {
 				await this.setItem(id,data,options,true);
 				return object;
 			},
-			async query(object,options={}) {
+			async query(pattern,partial,options={}) {
 				let ids,
-					count = 0;
+					count = 0,
 					results = [];
 				const root = await this.getItem("!",options);
 				if(!root) return results;
-				for(const key in object) {
-					const keytest = joqular.toTest(key,true);
+				for(const key in pattern) {
+					const keytest = joqular.toTest(key,true),
+						value = pattern[key],
+						type = typeof(value);
 					let keys;
 					if(keytest) { // if key can be converted to a test, assemble matching keys
 						keys = Object.keys(root).filter((key) => keytest(key));
@@ -708,20 +712,28 @@ addEventListener('fetch', event => {
 						if(root[key]) {
 							const node = await this.getItem(`!${key}`,options);
 							if(node) {
-								const value = object[key],
-									type = typeof(value);
 								if(value && type==="object") {
 									const valuecopy = Object.assign({},value);
-									for(const [predicate,pvalue] of Object.entries(value)) {
+									for(let [predicate,pvalue] of Object.entries(value)) {
 										if(predicate==="$return") continue;
 										const test = joqular.toTest(predicate);
 										if(predicate==="$search") {
 
 										} else if(test) {
+											const ptype = typeof(pvalue);
+											if(ptype==="string") {
+												if(pvalue.startsWith("Date@")) {
+													pvalue = new Date(parseInt(pvalue.split("@")[1]));
+												}
+											}
 											let testids = {};
 											delete valuecopy[predicate];
 											for(const valuekey in node) {
-												if(await test.call(node,JSON.parse(valuekey),...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
+												let value = JSON.parse(valuekey);
+												if(typeof(value)==="string" && value.startsWith("Date@")) {
+													value = new Date(parseInt(value.split("@")[1]));
+												}
+												if(await test.call(node,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 													// disallow index use by unauthorized users at document && property level
 													for(const id in node[valuekey]) {
 														const cname = id.split("@")[0],
@@ -782,14 +794,22 @@ addEventListener('fetch', event => {
 							} 
 						}
 					}
-					if(!ids) { // if no ids after first loop, then no matches
-						return [];
-					}
+					// if no ids after first loop, then no matches
+					//if(!ids) { 
+					//	return [];
+					//}
 				}
 				if(ids) {
 					for(const id in ids) {
 						const object = await this.getItem(id,options);
 						if(object) {
+							if(partial) {
+								Object.keys(object).forEach((key) => {
+									if(pattern[key]===undefined && key!=="#" && key!=="^") {
+										delete object[key];
+									}
+								})
+							}
 							results.push(object);
 						}
 					}
@@ -881,15 +901,22 @@ async function handleRequest(request) {
 		})
 	}
 	try {
-		//let userschema = await thunderdb.getSchema(User);
-		//if(!userschema) {
-		//const userschema = await thunderdb.putItem(new Schema(User));
-		//}
 		let dbo = await thunderdb.getItem("User@dbo",{user:thunderdb.dbo});
 		if(!dbo) {
 			Object.assign(thunderdb.dbo,await hashPassword("dbo",1000));
 			dbo = await thunderdb.putItem(thunderdb.dbo,{user:thunderdb.dbo});
 		}
+		/*return new Response(JSON.stringify(dbo),{
+			headers:
+			{
+				"Content-Type":"text/plain",
+				"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+			}
+		});*/
+		//let userschema = await thunderdb.getSchema(User);
+		//if(!userschema) {
+		//const userschema = await thunderdb.putItem(new Schema(User),{user:thunderdb.dbo});
+		//}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
 			fname = command.shift(),
@@ -923,7 +950,7 @@ async function handleRequest(request) {
 				else if(type==="number" && isNaN(result)) result = "@NaN";
 				else if(result && type==="object") {
 					if(result instanceof Date) {
-						result = `@Date${result.timestamp}`;
+						result = `@Date${result.getTime()}`;
 					}
 					if(result instanceof Error) {
 						return new Response(JSON.stringify(result.errors.map(error => error+"")),

@@ -5,6 +5,34 @@
 		Schema = require("./schema.js"),
 		User = require("./user.js");
 	
+	function toSerializable(data) {
+		const type = typeof(data);
+		if(data===undefined) {
+			return "@undefined";
+		}
+		if(data===Infinity) {
+			return "@Infinity";
+		}
+		if(data===-Infinity) {
+			return "@-Infinity";
+		}
+		if(type==="number" && isNaN(data)) {
+			return "@NaN";
+		}
+		if(data && type==="object") {
+			if(data instanceof Date) {
+				return `Date@${data.getTime()}`;
+			}
+			Object.keys(data).forEach((key) => {
+				data[key] = toSerializable(data[key]);
+			});
+			if(data["^"]) {
+				data["^"] = toSerializable(data["^"]);
+			}
+		}
+		return data;
+	}
+	
 	// "https://cloudworker.io/db.json";
 	//"https://us-central1-reasondb-d3f23.cloudfunctions.net/query/";
 	class Thunderclap  {
@@ -55,12 +83,12 @@
 					throw error;
 				}
 			}	
-			return fetch(`${this.endpoint}?["putItem",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
 				.then((response) => response.json())
 				.then((object) => this.create(object))
 		}
-		async query(object,verify) {
-			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(object))}]`,{headers:this.headers})
+		async query(object,{verify,partial}={}) {
+			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
 	    		.then((response) => response.json())
 	    		.then((objects) => objects.map((object) => this.create(object)))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
@@ -71,7 +99,7 @@
 			}
 		}
 		async removeItem(keyOrObject) {
-			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(keyOrObject))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(toSerializable(keyOrObject)))}]`,{headers:this.headers})
 				.then((response) => response.json())
 				.then((data) => this.create(data))
 		}
@@ -79,7 +107,7 @@
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
 				.then((response) => response.json()); 
 		}
 		async setSchema(className,config) {

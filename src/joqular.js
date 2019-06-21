@@ -1,5 +1,6 @@
 (function() {
 	const soundex = require("./soundex.js"),
+		isSoul = require("./is-soul.js"),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -20,19 +21,12 @@
 				const resolve = (a,pname,value) => joqular[pname] ? joqular[pname](a,value) : false;
 				return tests.some(test => Object.keys(test).some(pname => resolve(a,pname,test[pname])));
 			},
-			$xor(a,tests) {
+			$xor(a,...tests) {
 				let found = 0;
 				const resolve = (a,pname,value) => joqular[pname] ? joqular[pname](a,value) : false;
-				if(Array.isArray(tests)) {
-					for(const test of tests) {
-						for(const pname in test) {
-							if(resolve(a,pname,test[pname])) found++;
-							if(found>1) return false;
-						}
-					}
-				} else {
-					for(const pname in tests) {
-						if(resolve(a,pname,tests[pname])) found++;
+				for(const test of tests) {
+					for(const pname in test) {
+						if(resolve(a,pname,test[pname])) found++;
 						if(found>1) return false;
 					}
 				}
@@ -103,12 +97,16 @@
 				return typeof(a)===b;
 			},
 			$instanceof(a,b) {
-				if(isSoul(a)) {
-					const cname = a.split("@")[0],
-						ctor = joqular.db.ctors()[cname] ? joqular.db.ctors()[cname] : null,
-					a = ctor ? Object.create(ctor.prototype) : a;
-				} 
-				b = typeof(b)==="string" && joqular.db.ctors()[b] ? joqular.db.ctors()[b] : b;
+				let ctor;
+				if(isSoul(a,false)) {
+					const cname = a.split("@")[0];
+					if(cname===b) {
+						return true;
+					}
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors()[cname] : null;
+				}
+				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors()[b] : b;
+				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
 			},
 			async $isArray() { 
@@ -171,7 +169,11 @@
 				})
 			},
 			$date(a,b){ 
-				if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getDate()===b.getDate();
+				if(typeof(a)==="number") { a = new Date(a); } 
+				if(typeof(b)==="number") { b = new Date(b); }; 
+				if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) {
+					return a.getDate()===b.getDate();
+				}
 			},
 			$day(a,b){ if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getDay()===b.getDay(); },
 			$fullYear(a,b){ if(typeof(a)==="number") { a = new Date(a); } if(typeof(b)==="number") { b = new Date(b); }; if(typeof(a)==="object" && a instanceof Date && typeof(b)==="object" && b instanceof Date) return a.getFullYear()===b.getFullYear(); },
@@ -255,38 +257,17 @@
 					return;
 				}
 				key = key.trim();
-				if(key.startsWith("=>")) {
-					key = `(value)=>value${key.substring(2)}`
-				} else if(["==","===",">",">=","=<","<","!"].some((op) => key.startsWith(op))) {
-					key = `(value)=>value${key}`
-				} else if(key[0]==="(" && key[key.length-1]==")") {
-					key = `(value)=>${key}`
-				}
 				if(joqular[key]) {
 					return joqular[key];
 				}
 				if(key==="$_") {
-					return pkey = () => true;
+					return () => true;
 				}
 				if(key.startsWith("$.")) {
 					const fname = key.substring(2);
 					return (a,b) => typeof(a[fname])==="function" ? a[fname](b) : false;
 				}
 				if(keyTest) {
-					if(key[0]==="{" && key[key.length-1]==="}") {
-						key = key.replace(/([{,])(\s*)([A-Za-z0-9_\-\$]+?)\s*:/g, '$1"$3":')
-						const spec = JSON.parse(key);
-						return (value) => {
-							return joqular.matches(spec,value);
-						}
-					}
-					if(key.includes("=>") && typeof(window)!=="undefined") {
-						try {
-							return new Function("return " + key)();
-						} catch(e) {
-							return () => true;
-						}
-					}
 					if(key[0]==="/") {
 						const i = key.lastIndexOf("/");
 						if(i>0) {
@@ -298,6 +279,27 @@
 							}
 						}
 						return;
+					}
+					if(key[0]==="{" && key[key.length-1]==="}") {
+						key = key.replace(/([{,])(\s*)([A-Za-z0-9_\-\$]+?)\s*:/g, '$1"$3":')
+						const spec = JSON.parse(key);
+						return (value) => {
+							return joqular.matches(spec,value);
+						}
+					}
+					if(key.startsWith("=>")) {
+						key = `(value)=>value${key.substring(2)}`
+					} else if(["==","===",">",">=","=<","<","!"].some((op) => key.startsWith(op))) {
+						key = `(value)=>value${key}`
+					} else if(key[0]==="(" && key[key.length-1]==")") {
+						key = `(value)=>${key}`
+					}
+					if(key.includes("=>") && typeof(window)!=="undefined") {
+						try {
+							return new Function("return " + key)();
+						} catch(e) {
+							return () => true;
+						}
 					}
 				}
 			}
