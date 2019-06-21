@@ -1,6 +1,6 @@
 {
   "name": "thunderclap",
-  "version": "v0.0.4a",
+  "version": "v0.0.5a",
   "description": "Thunderclap: An indexed object database for Cloudflare",
   "engines": {
     "node": "10.x"
