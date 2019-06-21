@@ -16,7 +16,7 @@
 	}
 	User.schema = {
 		userName: {required:true, type: "string", unique:true},
-		groups: {type: "object"}
+		roles: {type: "object"}
 	}
 	module.exports = User;
 })();

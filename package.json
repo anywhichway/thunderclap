@@ -27,5 +27,7 @@
     "webpack-cli": "^3.3.4",
     "webpack-shell-plugin": "^0.5.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "node-fetch": "^2.6.0"
+  }
 }

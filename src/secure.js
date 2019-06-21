@@ -10,24 +10,22 @@
 			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : removed};
 		}
 		if(rule) {
-			if(rule.document) {
-				if(rule.document[action]) {
-					if(typeof(rule.document[action])==="function") {
-						if(!(await rule.document[action](action,user,data))) {
-							return {removed};
-						}
-					} else {
-						const roles = Array.isArray(rule.document[action]) ? rule.document[action] : Object.keys(rule.document[action]);
-						if(!roles.some((role) => user.roles[role])) {
-							return {removed};
-						}
-					}
-				}
-				if(rule.document.filter) {
-					data = await rule.document.filter(action,user,data);
-					if(data==null) {
+			if(rule[action]) {
+				if(typeof(rule[action])==="function") {
+					if(!(await rule[action](action,user,data))) {
 						return {removed};
 					}
+				} else {
+					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
+					if(!roles.some((role) => user.roles[role])) {
+						return {removed};
+					}
+				}
+			}
+			if(rule.filter) {
+				data = await rule.filter(action,user,data);
+				if(data==null) {
+					return {removed};
 				}
 			}
 			if(!documentOnly && rule.properties && data && typeof(data)==="object") {

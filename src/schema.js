@@ -3,6 +3,7 @@
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
+			config["#"] = `Schema@${ctor.name||ctor}`;
 			super(config);
 		}
 		async validate(object,db) {
@@ -28,11 +29,9 @@
 			}
 			return errors;
 		}
-		static get className() {
-			return this["#"].split("@")[1];
-		}
 		static create(config) {
-			return new Schema(config.className,config);
+			const cname = config["#"].split("@")[1];
+			return new Schema(cname,config);
 		}
 	}
 	Schema.validations = {

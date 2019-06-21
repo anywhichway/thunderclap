@@ -7,23 +7,35 @@
 <script src="../thunderclap.js"></script>
 </head>
 <body>
-<div id="mocha"></div>
+<div id="mocha">
+<div>
+User Name:<input id="username" placeholder="Account to use for testing" value="dbo"><br>
+Password: <input type="password" id="password" value="dbo"><br>
+<button onclick="test()">Run Tests</button>
+</div>
+</div>
 <div id="messages"></div>
 <div id="fixtures"></div>
 <div id="app"></div>
 <script>
 mocha.setup('bdd');
-const expect = chai.expect,	
-	endpoint = `${window.location.protocol}//${window.location.host}/db.json`,
-	db = new Thunderclap({endpoint,user:{username:"dbo",password:"dbo"}});
+const expect = chai.expect;
 </script>
-
 <script src="./index.js"></script>
 
 <script>
-    mocha.checkLeaks();    
-    mocha.run();
-	//benchtest(mocha.run(),{log:"md",off:false});
+	var db,
+		username,
+		password;
+	function test() {
+		const endpoint = `${window.location.protocol}//${window.location.host}/db.json`;
+		username = document.getElementById("username").value,
+		password = document.getElementById("password").value;
+		db = new Thunderclap({endpoint,user:{username,password}});
+			mocha.checkLeaks();    
+		mocha.run();
+		//benchtest(mocha.run(),{log:"md",off:false});
+	}
 </script>
 
 </body>

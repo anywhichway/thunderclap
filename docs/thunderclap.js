@@ -144,8 +144,27 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(3),
-		isSoul = __webpack_require__(7),
+	const uuid4 = __webpack_require__(0),
+		isSoul = (value,checkUUID=true) => {
+			if(typeof(value)==="string") {
+				const parts = value.split("@"),
+					isnum = !isNaN(parseInt(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
+			}
+			return false;
+		};
+	module.exports = isSoul;
+})();
+
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const soundex = __webpack_require__(4),
+		isSoul = __webpack_require__(2),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -458,7 +477,7 @@
 }).call(this);
 
 /***/ }),
-/* 3 */
+/* 4 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -468,7 +487,7 @@
 }).call(this);
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -476,6 +495,7 @@
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
+			config["#"] = `Schema@${ctor.name||ctor}`;
 			super(config);
 		}
 		async validate(object,db) {
@@ -501,11 +521,9 @@
 			}
 			return errors;
 		}
-		static get className() {
-			return this["#"].split("@")[1];
-		}
 		static create(config) {
-			return new Schema(config.className,config);
+			const cname = config["#"].split("@")[1];
+			return new Schema(cname,config);
 		}
 	}
 	Schema.validations = {
@@ -537,7 +555,7 @@
 })();
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -558,32 +576,13 @@
 	}
 	User.schema = {
 		userName: {required:true, type: "string", unique:true},
-		groups: {type: "object"}
+		roles: {type: "object"}
 	}
 	module.exports = User;
 })();
 
 /***/ }),
-/* 6 */,
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const uuid4 = __webpack_require__(0),
-		isSoul = (value,checkUUID=true) => {
-			if(typeof(value)==="string") {
-				const parts = value.split("@"),
-					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
-			}
-			return false;
-		};
-	module.exports = isSoul;
-})();
-
-
-
-/***/ }),
+/* 7 */,
 /* 8 */,
 /* 9 */,
 /* 10 */,
@@ -594,37 +593,71 @@
 (function() {
 	"use strict"
 	const uuid4 = __webpack_require__(0),
-		joqular = __webpack_require__(2),
-		Schema = __webpack_require__(4),
-		User = __webpack_require__(5);
+		joqular = __webpack_require__(3),
+		Schema = __webpack_require__(5),
+		User = __webpack_require__(6);
 	
-	function toSerializable(data) {
-		const type = typeof(data);
-		if(data===undefined) {
-			return "@undefined";
-		}
-		if(data===Infinity) {
-			return "@Infinity";
-		}
-		if(data===-Infinity) {
-			return "@-Infinity";
-		}
-		if(type==="number" && isNaN(data)) {
-			return "@NaN";
-		}
-		if(data && type==="object") {
-			if(data instanceof Date) {
-				return `Date@${data.getTime()}`;
-			}
-			Object.keys(data).forEach((key) => {
-				data[key] = toSerializable(data[key]);
-			});
-			if(data["^"]) {
-				data["^"] = toSerializable(data["^"]);
-			}
-		}
-		return data;
+	var fetch;
+	if(typeof(fetch)==="undefined") {
+		fetch = __webpack_require__(13);
 	}
+	
+	const fromSerializable = (data) => {
+			const type = typeof(data);
+			if(data==="@undefined") {
+				return undefined;
+			}
+			if(data==="@Infinity") {
+				return Infinity;
+			}
+			if(data==="@-Infinity") {
+				return -Infinity;
+			}
+			if(data==="@NaN") {
+				return NaN;
+			}
+			if(type==="string") {
+				if(data.startsWith("Date@")) {
+					return new Date(parseInt(data.substring(5)));
+				}
+			}
+			if(data && type==="object") {
+				Object.keys(data).forEach((key) => {
+					data[key] = fromSerializable(data[key]);
+				});
+				if(data["^"]) {
+					data["^"] = fromSerializable(data["^"]);
+				}
+			}
+			return data;
+		},
+		toSerializable = (data) => {
+			const type = typeof(data);
+			if(data===undefined) {
+				return "@undefined";
+			}
+			if(data===Infinity) {
+				return "@Infinity";
+			}
+			if(data===-Infinity) {
+				return "@-Infinity";
+			}
+			if(type==="number" && isNaN(data)) {
+				return "@NaN";
+			}
+			if(data && type==="object") {
+				if(data instanceof Date) {
+					return `Date@${data.getTime()}`;
+				}
+				Object.keys(data).forEach((key) => {
+					data[key] = toSerializable(data[key]);
+				});
+				if(data["^"]) {
+					data["^"] = toSerializable(data["^"]);
+				}
+			}
+			return data;
+		};
 	
 	// "https://cloudworker.io/db.json";
 	//"https://us-central1-reasondb-d3f23.cloudfunctions.net/query/";
@@ -638,10 +671,17 @@
 			this.register(Schema);
 			this.register(User);
 		}
-		async createUser(userName,password) {
+		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
 	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
-	    	.then((data) => this.create(data));
+	    	.then((data) => this.create(data))
+	    	.then((user) => {
+	    		if(reAuth || !this.headers["X-Auth-Username"]) {
+	    			this.headers["X-Auth-Username"] = user.username;
+	    			this.headers["X-Auth-Password"] = user.password;
+	    		}
+	    		return user;
+	    	});
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -701,7 +741,9 @@
 				this.register(data.constructor);
 			}
 			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
-				.then((response) => response.json()); 
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => this.create(data));
 		}
 		async setSchema(className,config) {
 			const object = new Schema(className,config);
@@ -710,42 +752,32 @@
 		create(data) {
 			const type = typeof(data);
 			if(type==="string") {
-				if(data==="@undefined") {
-					return undefined;
-				}
-				if(data==="@Infinity") {
-					return Infinity;
-				}
-				if(data==="@-Infinity") {
-					return -Infinity;
-				}
-				if(data==="@NaN") {
-					return NaN;
-				}
-				if(data.startsWith("Date@")) {
-					return new Date(parseInt(data.substring(5)));
-				}
-				return data;
+				return fromSerializable(data);
 			}
 			if(!data || typeof(data)!=="object") return data;
 			Object.keys(data).forEach(key => data[key] = this.create(data[key]));
-			if(!data["^"]) return data;
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 				[cname] = id.split("@"),
 				ctor = cname ? this.ctors[cname] : null;
+			if(!ctor) {
+				return data;
+			}
 			let instance;
-			if(ctor) {
-				if(ctor.create) {
-					instance = ctor.create(data);
-				}
+			if(ctor.create) {
+				instance = ctor.create(data);
+			} else {
 				instance = Object.create(ctor.prototype);
 				Object.assign(instance,data);
-			} else {
-				instance = Object.assign({},data);
 			}
-			const meta = Object.assign({},data["^"]);
-			Object.defineProperty(instance,"^",{value:meta});
-			Object.defineProperty(instance,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			if(!instance["^"]) {
+				const meta = Object.assign({},data["^"]);
+				Object.defineProperty(instance,"^",{value:meta});
+			}
+			try {
+				Object.defineProperty(instance,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				// ignore if already defined
+			}
 			return instance;
 		}
 	}
@@ -753,6 +785,35 @@
 	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
 }).call(this);
 
+
+/***/ }),
+/* 13 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+// ref: https://github.com/tc39/proposal-global
+var getGlobal = function () {
+	// the only reliable means to get the global object is
+	// `Function('return this')()`
+	// However, this causes CSP violations in Chrome apps.
+	if (typeof self !== 'undefined') { return self; }
+	if (typeof window !== 'undefined') { return window; }
+	if (typeof global !== 'undefined') { return global; }
+	throw new Error('unable to locate global object');
+}
+
+var global = getGlobal();
+
+module.exports = exports = global.fetch;
+
+// Needed for TypeScript and Webpack.
+exports.default = global.fetch.bind(global);
+
+exports.Headers = global.Headers;
+exports.Request = global.Request;
+exports.Response = global.Response;
 
 /***/ })
 /******/ ]);

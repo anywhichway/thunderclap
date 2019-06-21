@@ -32,12 +32,38 @@ describe("query",function() {
 		expect(object.ip).equal("127.0.0.1");
 		expect(object.email).equal("someone@somewhere.com");
 	}).timeout(10000);*/
-	it("wild card key",async function() {
+	it("setItem primitive", async function() {
+		const value = await db.setItem("test","test");
+		expect(value).equal("test");
+	});
+	it("getItem primitive", async function() {
+		const value = await db.getItem("test");
+		expect(value).equal("test");
+	});
+	it("removeItem primitive", async function() {
+		let value = await db.removeItem("test");
+		expect(value).equal(undefined);
+		value = await db.getItem("test");
+		expect(value).equal(undefined);
+	});
+	it("securedTestWriteKey", async function() {
+		let value = await db.setItem("securedTestWriteKey","test");
+		expect(value).equal(undefined);
+		value = await db.getItem("securedTestWriteKey");
+		expect(value).equal(undefined);
+	});
+	it("securedTestReadKey", async function() {
+		let value = await db.setItem("securedTestReadKey","test");
+		expect(value).equal("test");
+		value = await db.getItem("securedTestReadKey");
+		expect(value).equal(undefined);
+	});
+	it("wild card key {$_:'test'}",async function() {
 		const results = await db.query({$_:"test"});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].name).equal("test");
 	}).timeout(3000);
-	it("RegExp key",async function() {
+	it("RegExp key {[/.*name/]:'test'}",async function() {
 		const results = await db.query({[/.*name/]:"test"});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].name).equal("test");
@@ -242,16 +268,16 @@ describe("query",function() {
 	});
 	for(const key of ["date","day","fullYear","hours","milliseconds","minutes","month","seconds","time","UTCDate","UTCDay","UTCFullYear","UTCHours","UTCSeconds","UTCMilliseconds","UTCMinutes","UTCMonth","year"]) {
 		const fname = `get${key[0].toUpperCase()}${key.substring(1)}`;
-		it("$" + key, Function("expect","db",`return async function() {
+		it("$" + key, Function(`return async function() {
 			const results = await db.query({date:{["$${key}"]:TESTDATE}});
 			expect(typeof(results[0])).equal("object");
 			expect(results[0].date["${fname}"]()).equal(TESTDATE["${fname}"]()); 
-		}`)(expect,db));
-		it("$" + key + " from time", Function("expect","db",`return async function() {
+		}`)());
+		it("$" + key + " from time", Function(`return async function() {
 			const results = await db.query({date:{["$${key}"]:TESTDATE.getTime()}});
 			expect(typeof(results[0])).equal("object");
 			expect(results[0].date["${fname}"]()).equal(TESTDATE["${fname}"]()); 
-		}`)(expect,db));
+		}`)());
 	}
 	it("double property",async function() {
 		const results = await db.query({name:"test",middle:0});
@@ -298,6 +324,22 @@ describe("query",function() {
 		await db.removeItem(o1);
 		const results = await db.query({name:"test"});
 		expect(results.length).equal(0);
+	});
+	it("get User",async function() {
+		const results = await db.query({userName:username});
+		expect(results.length).equal(1);
+		expect(results[0]).instanceof(db.ctors["User"]);
+		expect(results[0].userName).equal(username);
+	});
+	it("get Schema",async function() {
+		const schema = await db.getSchema("User");
+		expect(schema).instanceof(db.ctors["Schema"]);
+		expect(schema["#"]).equal("Schema@User");
+	});
+	it("fail Schema validation", async function() {
+		const schema = await db.getSchema("User"),
+			errors = await schema.validate({"#":"User@1234"},db);
+		expect(errors.length>=1).equal(true);
 	});
 });
 

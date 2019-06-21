@@ -269,14 +269,17 @@ addEventListener('fetch', event => {
 					}
 				}
 			},
-			async setItem(key,data,options,patched) {
-				if(!patched && key[0]!=="!") {
+			async setItem(key,data,options,secured) {
+				if(!secured && key[0]!=="!") {
 					const secured = await secure(key,"write",options.user,data);
 					data = secured.data;
+					if(data && typeof(data)==="object") {
+						const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
+							secured = await secure(key,"write",options.user,data);
+						data = secured.data;
+					}
 				}
-				if(data===undefined) {
-					await db.removeItem(key,options);
-				} else {
+				if(data!==undefined) {
 					await db.put(key,JSON.stringify(data));
 				}
 				return data;

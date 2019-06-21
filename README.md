@@ -9,7 +9,7 @@ In addition to having more predicates than MongoDB, JOQULAR extends pattern matc
 {[/a.*/]:{$eq: 1}} // match all objects with properties starting with the letter "a" containing the value 1
 ```
 
-Thunderclap also includes role based access control mechanisms and schema or schemaless operation.
+Thunderclap also supports role based access control mechanisms and schema or schemaless operation.
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
 modify the code for internal applications or public applications that are not primarily a means of providing Thunderclap
@@ -111,11 +111,12 @@ const endpoint = "https://thunderclap.mydomain.com/db.json",
 </script>
 ```
 
-`User async createUser(string userName,string password)` - creates a user. The password is stored as an SHA-256 hash 
-and salt. `createUser` can be called even if Thunderclap is started without a username and password. If this is done,
-and `createUser` succeeds, the Thunderclap instance is bound to the new user for immediate authenticated use. You 
-can implement access control and account creation logic on the server to prevent the creation of un-authorized accounts.
-See the section Security.
+`User async createUser(string userName,string password,reAuth)` - creates a user. The password is stored on the server
+as an SHA-256 hash and salt. `createUser` can be called even if Thunderclap is started without a username and password. 
+If this is done and `createUser` succeeds, the Thunderclap instance is bound to the new user for immediate authenticated 
+use. If `reAuth` is truthy, the Thunderclap instance will also be re-bound to the new user. You can implement access 
+control and account creation logic on the server to prevent the creation of un-authorized accounts. See the section 
+Security.
 
 `any async setItem(string key,any value)` - sets the `key` to `value`. If the `value` is an object it is NOT indexed.
 
@@ -127,8 +128,8 @@ using the id as the key.
 `undefined async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the object is removed from the index. 
 
-`async query(object JOQULARExpression)` - uses the index to find matching objects. There are a lot of examples in the unit
-test `file docs/test/index.js`.
+`async query(object JOQULARExpression)` - uses the index to find matching objects. See the unit
+test `file docs/test/index.js` to understand the currently supported JOQULAR expressions and examples.
 
 
 ## URL Requests 

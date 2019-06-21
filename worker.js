@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 6);
+/******/ 	return __webpack_require__(__webpack_require__.s = 7);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -144,8 +144,27 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(3),
-		isSoul = __webpack_require__(7),
+	const uuid4 = __webpack_require__(0),
+		isSoul = (value,checkUUID=true) => {
+			if(typeof(value)==="string") {
+				const parts = value.split("@"),
+					isnum = !isNaN(parseInt(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
+			}
+			return false;
+		};
+	module.exports = isSoul;
+})();
+
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const soundex = __webpack_require__(4),
+		isSoul = __webpack_require__(2),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -458,7 +477,7 @@
 }).call(this);
 
 /***/ }),
-/* 3 */
+/* 4 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -468,7 +487,7 @@
 }).call(this);
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -476,6 +495,7 @@
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
+			config["#"] = `Schema@${ctor.name||ctor}`;
 			super(config);
 		}
 		async validate(object,db) {
@@ -501,11 +521,9 @@
 			}
 			return errors;
 		}
-		static get className() {
-			return this["#"].split("@")[1];
-		}
 		static create(config) {
-			return new Schema(config.className,config);
+			const cname = config["#"].split("@")[1];
+			return new Schema(cname,config);
 		}
 	}
 	Schema.validations = {
@@ -537,7 +555,7 @@
 })();
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -558,21 +576,21 @@
 	}
 	User.schema = {
 		userName: {required:true, type: "string", unique:true},
-		groups: {type: "object"}
+		roles: {type: "object"}
 	}
 	module.exports = User;
 })();
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 const uuid4 = __webpack_require__(0),
-	isSoul = __webpack_require__(7),
-	joqular = __webpack_require__(2),
+	isSoul = __webpack_require__(2),
+	joqular = __webpack_require__(3),
 	secure = __webpack_require__(8),
-	Schema = __webpack_require__(4),
-	User = __webpack_require__(5),
+	Schema = __webpack_require__(5),
+	User = __webpack_require__(6),
 	hashPassword = __webpack_require__(11);
 
 const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
@@ -838,14 +856,17 @@ addEventListener('fetch', event => {
 					}
 				}
 			},
-			async setItem(key,data,options,patched) {
-				if(!patched && key[0]!=="!") {
+			async setItem(key,data,options,secured) {
+				if(!secured && key[0]!=="!") {
 					const secured = await secure(key,"write",options.user,data);
 					data = secured.data;
+					if(data && typeof(data)==="object") {
+						const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
+							secured = await secure(key,"write",options.user,data);
+						data = secured.data;
+					}
 				}
-				if(data===undefined) {
-					await db.removeItem(key,options);
-				} else {
+				if(data!==undefined) {
 					await db.put(key,JSON.stringify(data));
 				}
 				return data;
@@ -1004,25 +1025,6 @@ async function handleRequest(request) {
 
 
 /***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const uuid4 = __webpack_require__(0),
-		isSoul = (value,checkUUID=true) => {
-			if(typeof(value)==="string") {
-				const parts = value.split("@"),
-					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
-			}
-			return false;
-		};
-	module.exports = isSoul;
-})();
-
-
-
-/***/ }),
 /* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1038,24 +1040,22 @@ async function handleRequest(request) {
 			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : removed};
 		}
 		if(rule) {
-			if(rule.document) {
-				if(rule.document[action]) {
-					if(typeof(rule.document[action])==="function") {
-						if(!(await rule.document[action](action,user,data))) {
-							return {removed};
-						}
-					} else {
-						const roles = Array.isArray(rule.document[action]) ? rule.document[action] : Object.keys(rule.document[action]);
-						if(!roles.some((role) => user.roles[role])) {
-							return {removed};
-						}
-					}
-				}
-				if(rule.document.filter) {
-					data = await rule.document.filter(action,user,data);
-					if(data==null) {
+			if(rule[action]) {
+				if(typeof(rule[action])==="function") {
+					if(!(await rule[action](action,user,data))) {
 						return {removed};
 					}
+				} else {
+					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
+					if(!roles.some((role) => user.roles[role])) {
+						return {removed};
+					}
+				}
+			}
+			if(rule.filter) {
+				data = await rule.filter(action,user,data);
+				if(data==null) {
+					return {removed};
 				}
 			}
 			if(!documentOnly && rule.properties && data && typeof(data)==="object") {
@@ -1116,34 +1116,42 @@ async function handleRequest(request) {
 
 (function () {
 	module.exports = {
+		securedTestReadKey: { // for testing purposes
+			read: [] // no reads allowed
+		},
+		securedTestWriteKey: { // for testing purposes
+			write: [] // no writes allowed
+		},
 		User: { // class name or key to control
-			document: { // controls at the document or primitive value level
-				// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
-				// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have read
-				// a filter function can also be used
-				// action with be "read" or "write", not returning anything will result in denial
-				// not specifying a filter function will allow all read and write, unless controlled above
-				// a function with the same call signature can also be used as a property value above
-				filter: async function(action,user,document) {
-					// very restrictive, don't return a user record unless requested by the dbo or data subject
-					if(user.roles.dbo || user.userName===document.userName) {
-						return document;
-					}
+			
+			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
+			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have read
+			// a filter function can also be used
+			// action with be "read" or "write", not returning anything will result in denial
+			// not specifying a filter function will allow all read and write, unless controlled above
+			// a function with the same call signature can also be used as a property value above
+			filter: async function(action,user,document) {
+				// very restrictive, don't return a user record unless requested by the dbo or data subject
+				if(user.roles.dbo || user.userName===document.userName) {
+					return document;
 				}
 			},
 			properties: { // only applies to objects
-				read: { // controls access to three properties
-					roles: (action,user,document) => user.roles.dbo, // example of using a function
-					hash: ["dbo"],
-					salt: ["dbo"]
+				read: {
+					roles: (action,user,document) => user.roles.dbo, // example of using a function, only dbo's can get roles
+					hash: ["dbo"], // only dbo's can read passwod hashes
+					salt: {
+						dbo: true // example of alternate control form, only dbo's can read password salts
+					}
 				},
 				write: {
 					password: {
-						// a propery names password can never be written
+						// a propery named password can never be written
 					},
 					// only the dbo and data subject can write a hash and salt
 					hash: (action,user,document) => user.roles.dbo || document.userName===user.userName,
 					salt: (action,user,document) => user.roles.dbo || document.userName===user.userName,
+					userName: (action,user,document) => user.userName!=="dbo" // can't change name of primary dbo
 				},
 				filter: async function(action,user,document,key) {
 					return true; // allows all other properties to be read or written, same as having no filter at all
