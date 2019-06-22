@@ -1,6 +1,8 @@
 (function() {
 	const soundex = require("./soundex.js"),
 		isSoul = require("./is-soul.js"),
+		isInt = require("./is-int.js"),
+		isFloat = require("./is-float.js"),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -64,6 +66,29 @@
 			$gt(a,b) { 
 				return a > b; 
 			},
+			$near(n,target,range) {
+				let f = (n,target,range) => n >= target - range && n <= target + range;
+				if(typeof(range)==="string") {
+					if(range.endsWith("%")) {
+						f = (n,target,range) => n >= (target - Math.abs(range * target)) && n <= (target + Math.abs(range * target));
+					}
+					range = parseFloat(range);
+				}
+				if(typeof(range)==="number") {
+					let ntype = typeof(n),
+						ttype = typeof(target);
+					if(n && ntype==="object" && target && ttype==="object" && n instanceof Date && target instanceof Date) {
+						n = n.getTime();
+						target = target.getTime();
+						ntype = "number";
+						ttype = "number";
+					}
+					if(ntype==="number" && ttype==="number") {
+						return f(n,target,range)
+					}
+				}
+				return false;
+			},
 			$between(a,lo,hi,inclusive=true) { 
 				if(inclusive) return (a>=lo && a<=hi) || (a>=hi && a <=lo);
 				return (a>lo && a<hi) || (a>hi && a<lo);
@@ -97,15 +122,19 @@
 				return typeof(a)===b;
 			},
 			$instanceof(a,b) {
-				let ctor;
+				let ctor,
+					cname;
 				if(isSoul(a,false)) {
-					const cname = a.split("@")[0];
+					cname = a.split("@")[0];
 					if(cname===b) {
 						return true;
 					}
-					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors()[cname] : null;
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
 				}
-				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors()[b] : b;
+				if(cname===b) {
+					return true;
+				}
+				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors[b] : b;
 				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
 			},
@@ -131,8 +160,14 @@
 			$isEven(a) {
 				return a % 2 === 0;
 			},
+			$isFloat(a) {
+				return isFloat(a);
+			},
 			$isIPAddress(a) {
 				return (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a);
+			},
+			$isInt(a) {
+				return isInt(a);
 			},
 			$isNaN(a) { 
 				return isNaN(a); 

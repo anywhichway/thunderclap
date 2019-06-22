@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 12);
+/******/ 	return __webpack_require__(__webpack_require__.s = 14);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -133,7 +133,11 @@
 			}
 			const meta = {"#":id};
 			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
 		}
 	}
 	module.exports = Entity;
@@ -165,6 +169,8 @@
 (function() {
 	const soundex = __webpack_require__(4),
 		isSoul = __webpack_require__(2),
+		isInt = __webpack_require__(5),
+		isFloat = __webpack_require__(6),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -228,6 +234,29 @@
 			$gt(a,b) { 
 				return a > b; 
 			},
+			$near(n,target,range) {
+				let f = (n,target,range) => n >= target - range && n <= target + range;
+				if(typeof(range)==="string") {
+					if(range.endsWith("%")) {
+						f = (n,target,range) => n >= (target - Math.abs(range * target)) && n <= (target + Math.abs(range * target));
+					}
+					range = parseFloat(range);
+				}
+				if(typeof(range)==="number") {
+					let ntype = typeof(n),
+						ttype = typeof(target);
+					if(n && ntype==="object" && target && ttype==="object" && n instanceof Date && target instanceof Date) {
+						n = n.getTime();
+						target = target.getTime();
+						ntype = "number";
+						ttype = "number";
+					}
+					if(ntype==="number" && ttype==="number") {
+						return f(n,target,range)
+					}
+				}
+				return false;
+			},
 			$between(a,lo,hi,inclusive=true) { 
 				if(inclusive) return (a>=lo && a<=hi) || (a>=hi && a <=lo);
 				return (a>lo && a<hi) || (a>hi && a<lo);
@@ -261,15 +290,19 @@
 				return typeof(a)===b;
 			},
 			$instanceof(a,b) {
-				let ctor;
+				let ctor,
+					cname;
 				if(isSoul(a,false)) {
-					const cname = a.split("@")[0];
+					cname = a.split("@")[0];
 					if(cname===b) {
 						return true;
 					}
-					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors()[cname] : null;
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
 				}
-				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors()[b] : b;
+				if(cname===b) {
+					return true;
+				}
+				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors[b] : b;
 				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
 			},
@@ -295,8 +328,14 @@
 			$isEven(a) {
 				return a % 2 === 0;
 			},
+			$isFloat(a) {
+				return isFloat(a);
+			},
 			$isIPAddress(a) {
 				return (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a);
+			},
+			$isInt(a) {
+				return isInt(a);
 			},
 			$isNaN(a) { 
 				return isNaN(a); 
@@ -488,6 +527,22 @@
 
 /***/ }),
 /* 5 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (x) => typeof x === "number" && isFinite(x) && x % 1 === 0;
+}).call(this)
+
+/***/ }),
+/* 6 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (x) => typeof x === "number" && isFinite(x) && x % 1 !== 0;
+}).call(this)
+
+/***/ }),
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -495,7 +550,7 @@
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
-			config["#"] = `Schema@${ctor.name||ctor}`;
+			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
 			super(config);
 		}
 		async validate(object,db) {
@@ -555,7 +610,7 @@
 })();
 
 /***/ }),
-/* 6 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -582,24 +637,30 @@
 })();
 
 /***/ }),
-/* 7 */,
-/* 8 */,
 /* 9 */,
 /* 10 */,
 /* 11 */,
-/* 12 */
+/* 12 */,
+/* 13 */,
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
+
+/*
+Server Side Public License
+VERSION 1, OCTOBER 16, 2018
+Copyright AnyWhichWay, LLC 2019
+ */
 
 (function() {
 	"use strict"
 	const uuid4 = __webpack_require__(0),
 		joqular = __webpack_require__(3),
-		Schema = __webpack_require__(5),
-		User = __webpack_require__(6);
+		Schema = __webpack_require__(7),
+		User = __webpack_require__(8);
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(13);
+		fetch = __webpack_require__(15);
 	}
 	
 	const fromSerializable = (data) => {
@@ -757,7 +818,7 @@
 			if(!data || typeof(data)!=="object") return data;
 			Object.keys(data).forEach(key => data[key] = this.create(data[key]));
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
-				[cname] = id.split("@"),
+				cname = typeof(id)==="string" ? id.split("@")[0] : null,
 				ctor = cname ? this.ctors[cname] : null;
 			if(!ctor) {
 				return data;
@@ -787,7 +848,7 @@
 
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

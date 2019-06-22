@@ -1,18 +1,40 @@
 (function() {
 	const acl = require("../acl.js"),
-		roles = require("../roles.js");
-	// looks-up rule for action in acl
+		roles = require("../roles.js"),
+		aclKeys = Object.keys(acl),
+		// compile rules that are RegExp based
+		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
+			const parts = key.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					aclRegExps.push({regexp:new RegExp(parts[1],parts[2]),rule:acl[key]})
+				} catch(e) {
+					aclLiterals[key] = acl[key];
+				}
+			} else {
+				aclLiterals[key] = acl[key];
+			}
+			return {aclRegExps,aclLiterals};
+		},{aclRegExps:[],aclLiterals:{}});
+	
+	// applies acl rules for key and action
 	// if user is not permitted to take action, modifies data accordingly
-	async function secure(ruleName,action,user,data,documentOnly) {
-		const rule = acl[ruleName],
-			removed = [];
+	async function secure(key,action,user,data,request,documentOnly) {
 		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : removed};
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : []};
 		}
-		if(rule) {
+		// assemble applicable rules
+		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
+				if(regexp.test(key)) {
+					accum.push(key);
+				}
+				return accum;
+			},[]).concat(aclLiterals[key]||[]),
+			removed = [];
+		for(const rule of rules) {
 			if(rule[action]) {
 				if(typeof(rule[action])==="function") {
-					if(!(await rule[action](action,user,data))) {
+					if(!(await rule[action](action,user,data,request))) {
 						return {removed};
 					}
 				} else {
@@ -23,8 +45,8 @@
 				}
 			}
 			if(rule.filter) {
-				data = await rule.filter(action,user,data);
-				if(data==null) {
+				data = await rule.filter(action,user,data,request);
+				if(data==undefined) {
 					return {removed};
 				}
 			}
@@ -34,7 +56,7 @@
 					for(const key of Object.keys(properties)) {
 						if(data[key]!==undefined) {
 							if(typeof(properties[key])==="function") {
-								if(!(await properties[key](action,user,data,key))) {
+								if(!(await properties[key](action,user,data,key,request))) {
 									delete data[key];
 									removed.push(key);
 								}
@@ -50,7 +72,7 @@
 				}
 				if(rule.properties.filter) {
 					for(const key of Object.keys(data)) {
-						if(data[key]!==undefined && !(await rule.properties.filter(action,user,data,key))) {
+						if(data[key]!==undefined && !(await rule.properties.filter(action,user,data,key,request))) {
 							delete data[key];
 							removed.push(key);
 						}

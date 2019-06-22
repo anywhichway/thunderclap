@@ -3,7 +3,7 @@
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
-			config["#"] = `Schema@${ctor.name||ctor}`;
+			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
 			super(config);
 		}
 		async validate(object,db) {

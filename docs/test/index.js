@@ -118,6 +118,31 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].name).equal("test");
 	});
+	it("$near low absolute", async function() {
+		const results = await db.query({low:{$near:[0,1]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].low).equal(-1);
+	});
+	it("$near high absolute", async function() {
+		const results = await db.query({high:{$near:[0,1]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].high).equal(1);
+	});
+	it("$near low percent", async function() {
+		const results = await db.query({low:{$near:[-2,"50%"]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].low).equal(-1);
+	});
+	it("$near multiple percent", async function() {
+		const results = await db.query({high:{$near:[0.5,"200%"]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].high).equal(1);
+	});
+	it("$near high percent", async function() {
+		const results = await db.query({high:{$near:[2,"50%"]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].high).equal(1);
+	});
 	it("$between",async function()  {
 		const results = await db.query({middle:{$between:[-1,1]}});
 		expect(typeof(results[0])).equal("object");
@@ -211,10 +236,10 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(new Date(results[0].date)).instanceof(Date);
 	});
-	xit("$matches",function(done) {
-		let some = 0;
-		db.query({name:{$matches:["joe"]}}).forEach(object => { some++; expect(object.name).equal("joe"); expect(object.age).equal(27);})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$matches",async function() {
+		const results = await db.query({name:{$matches:["test"]}});
+		expect(typeof(results[0])).equal("object");
+		expect((new RegExp("test")).test(results[0].name)).equal(true);
 	});
 	it("$and flat",async function() {
 		const results = await db.query({middle:{$and:{$lt:1,$gt:-1}}});
@@ -338,9 +363,34 @@ describe("query",function() {
 	});
 	it("fail Schema validation", async function() {
 		const schema = await db.getSchema("User"),
-			errors = await schema.validate({"#":"User@1234"},db);
+			data = {"#":"User@1234"};
+			errors = await schema.validate(data,db);
 		expect(errors.length>=1).equal(true);
 	});
+	it("1000 async setItem", function(done) {
+		for(let i=0;i<1000;i++) {
+			db.setItem(`key${i}`,i);
+		}
+		setTimeout(() => done(),3000)
+	}).timeout(4000);
+	it("100 getItem", async function() {
+		for(let i=900;i<1000;i++) {
+			const value = await db.getItem(`key${i}`);
+			expect(value).equal(i);
+		}
+	}).timeout(20000);
+	it("1000 async removeItem", function(done) {
+		for(let i=0;i<1000;i++) {
+			db.removeItem(`key${i}`);
+		}
+		setTimeout(() => done(),3000)
+	}).timeout(4000);
+	it("100 getItem after remove", async function() {
+		for(let i=900;i<1000;i++) {
+			const value = await db.getItem(`key${i}`);
+			expect(value).equal(undefined);
+		}
+	}).timeout(20000);
 });
 
 

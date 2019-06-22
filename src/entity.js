@@ -10,7 +10,11 @@
 			}
 			const meta = {"#":id};
 			Object.defineProperty(this,"^",{value:meta});
-			Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
 		}
 	}
 	module.exports = Entity;

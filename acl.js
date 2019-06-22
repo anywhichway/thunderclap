@@ -6,10 +6,14 @@
 		securedTestWriteKey: { // for testing purposes
 			write: [] // no writes allowed
 		},
-		User: { // class name or key to control
+		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
+			read: ["dbo"],
+			write: ["dbo"]
+		},
+		"User@": { // key to control, user <cname>@ for classes
 			
 			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
-			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have read
+			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
 			// a filter function can also be used
 			// action with be "read" or "write", not returning anything will result in denial
 			// not specifying a filter function will allow all read and write, unless controlled above
@@ -19,6 +23,7 @@
 				if(user.roles.dbo || user.userName===document.userName) {
 					return document;
 				}
+				//return document;
 			},
 			properties: { // only applies to objects
 				read: {
@@ -35,7 +40,7 @@
 					// only the dbo and data subject can write a hash and salt
 					hash: (action,user,document) => user.roles.dbo || document.userName===user.userName,
 					salt: (action,user,document) => user.roles.dbo || document.userName===user.userName,
-					userName: (action,user,document) => user.userName!=="dbo" // can't change name of primary dbo
+					userName: (action,user,document) => document.userName!=="dbo" // can't change name of primary dbo
 				},
 				filter: async function(action,user,document,key) {
 					return true; // allows all other properties to be read or written, same as having no filter at all

@@ -1,3 +1,9 @@
+/*
+Server Side Public License
+VERSION 1, OCTOBER 16, 2018
+Copyright AnyWhichWay, LLC 2019
+ */
+
 (function() {
 	"use strict"
 	const uuid4 = require("./uuid4.js"),
@@ -165,7 +171,7 @@
 			if(!data || typeof(data)!=="object") return data;
 			Object.keys(data).forEach(key => data[key] = this.create(data[key]));
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
-				[cname] = id.split("@"),
+				cname = typeof(id)==="string" ? id.split("@")[0] : null,
 				ctor = cname ? this.ctors[cname] : null;
 			if(!ctor) {
 				return data;
