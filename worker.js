@@ -650,51 +650,61 @@ const uuid4 = __webpack_require__(0),
 	isSoul = __webpack_require__(2),
 	joqular = __webpack_require__(3),
 	secure = __webpack_require__(10),
+	respond = __webpack_require__(13),
 	Schema = __webpack_require__(7),
 	User = __webpack_require__(8),
-	hashPassword = __webpack_require__(13);
+	hashPassword = __webpack_require__(15);
 
 const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
-let thunderclap;
-addEventListener('fetch', event => {
-	const db = NAMESPACE,
-		request = event.request;
-	thunderclap = joqular.db = {
+class Database {
+		constructor({namespace,request}) {
+			this.ctors = {};
+			this.request = request;
+			this.namespace = namespace;
+			this.register(Object);
+			this.register(Array);
+			this.register(Date);
+			this.register(URL);
+			this.register(User);
+			this.register(Schema);
+		}
 		async authUser(userName,password,options) {
 			const user = (await this.query({userName},false,options))[0];
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
 			}
-		},
+		}
 		async createUser(userName,password,options) {
 			const user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
 			return this.putItem(user,options);
-		},
-		async getItem(key,options={}) {
-			let data = await db.get(key);
+		}
+		async getItem(key,{user}={}) {
+			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
 				if(key[0]!=="!") {
+					const action = "read",
+						request = this.request;
 					if(isSoul(data["#"],false)) {
-						const cname = data["#"].split("@")[0],
-							secured = await secure(`${cname}@`,"read",options.user,data,request);
+						const key = `${data["#"].split("@")[0]}@`,
+							secured = await secure({key,action,user,data,request});
 						data = secured.data;
 					}
-					const secured = await secure(key,"read",options.user,data,request);
+					const secured = await secure({key,action,user,data,request});
 					data = secured.data;
 				}
 			}
 			return data==null ? undefined : data;
-		},
+		}
 		async getSchema(ctor,options) {
-			const data = await db.get(`Schema@${ctor.name||ctor}`);
+			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
 				return new Schema(ctor.name||ctor,JSON.parse(data));
 			}
-		},
+		}
 		async index(data,root,options={},recursing) {
 			let changed = 0;
 			if(data && typeof(data)==="object" && data["#"]) {
@@ -729,16 +739,19 @@ addEventListener('fetch', event => {
 				}
 			}
 			return changed;
-		},
+		}
 		async keys(lastKey) {
-			return db.getKeys(lastKey)
-		},
+			return this.namespace.getKeys(lastKey)
+		}
 		async putItem(object,options={}) {
 			let id = object["#"];
 			if(!id) {
 				id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
 			}
-			const cname = id.split("@")[0];
+			const cname = id.split("@")[0],
+				key =`${cname}@`,
+				request = this.request;
+			await respond({key,when:"before",action:"put",data:object,user:options.user,request});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -749,7 +762,7 @@ addEventListener('fetch', event => {
 					return error;
 				}
 			}
-			const {data,removed} = await secure(`${cname}@`,"write",options.user,object,request),
+			const {data,removed} = await secure({key,action:"write",user:options.user,data:object,request}),
 				root = (await this.getItem("!",{user:thunderclap.dbo})) || {},
 				original = await this.getItem(id,{user:this.dbo});
 			if(!data) {
@@ -770,8 +783,11 @@ addEventListener('fetch', event => {
 				await this.setItem("!",root,{user:thunderclap.dbo});
 			}
 			await this.setItem(id,data,options,true);
-			return object;
-		},
+			setTimeout(() => {
+				respond({key,when:"after",action:"put",data,user:options.user,request});
+			});
+			return data;
+		}
 		async query(pattern,partial,options={}) {
 			let ids,
 				count = 0,
@@ -819,7 +835,7 @@ addEventListener('fetch', event => {
 												// disallow index use by unauthorized users at document && property level
 												for(const id in node[valuekey]) {
 													const cname = id.split("@")[0],
-														{data,removed} = await secure(`${cname}@`,"read",user,{[key]:value},request);
+														{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
 													if(data==null || removed.length>0) {
 														delete node[valuekey][id];
 														secured[id] = true;
@@ -854,7 +870,7 @@ addEventListener('fetch', event => {
 									const secured = {};
 									for(const id in node[valuekey]) {
 										const cname = id.split("@")[0],
-											{data,removed} = await secure(`${cname}@`,"read",user,{[key]:value},request);
+											{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
 										if(data==null || removed.length>0) {
 											delete node[valuekey][id];
 											secured[id] = true;
@@ -897,52 +913,58 @@ addEventListener('fetch', event => {
 			}
 			//results.push(keys)
 			return results;
-		},
+		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
 				this.ctors[ctor.name] = ctor;
 			}
-		},
+		}
 		async removeItem(keyOrObject,options={}) {
 			const type = typeof(keyOrObject)==="object";
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			} 
 			if(keyOrObject) {
-				const root = type==="object" ? await this.getItem("!",{user:thunderclap.dbo}) : null,
-					object = root ? await this.getItem(keyOrObject,options) : null;
+				const value = await this.getItem(keyOrObject,options),
+					root = type==="object" ? await this.getItem("!",{user:thunderclap.dbo}) : null,
+					object = root ? value : null,
+					action = "write",
+					user = options.user,
+					request = this.request;
 				if(object) {
 					const cname = keyOrObject.split("@")[0],
-						{data} = await secure(`${cname}@`,"write",options.user,object,request,true);
+						{data} = await secure({key:`${cname}@`,action,user,data:value,request,documentOnly:true});
 					if(data) {
-						await db.delete(keyOrObject);
+						await this.namespace.delete(keyOrObject);
 						if(await this.unindex(object,root,options)) {
 							await this.setItem("!",root,{user:thunderclap.dbo});
 						}
 					}
 				} else {
-					const {data} = await secure(keyOrObject,"write",options.user,"dummy",request,true);
+					const {data} = await secure({key:keyOrObject,action,user,data:value,request,documentOnly:true});
 					if(data==="dummy") {
-						await db.delete(keyOrObject);
+						await this.namespace.delete(keyOrObject);
 					}
 				}
 			}
-		},
-		async setItem(key,data,options,secured) {
+		}
+		async setItem(key,data,{user}={},secured) {
 			if(!secured && key[0]!=="!") {
-				const secured = await secure(key,"write",options.user,data,request);
+				const action = "write",
+					request = this.request,
+					secured = await secure({key,action,user,data,request});
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure(key,"write",options.user,data,request);
+						secured = await secure({key,action,user,data,request});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
-				await db.put(key,JSON.stringify(data));
+				await this.namespace.put(key,JSON.stringify(data));
 			}
 			return data;
-		},
+		}
 		async unindex(object,options,root={}) {
 			let count = 0;
 			if(object && typeof(object)==="object" && object["#"]) {
@@ -973,20 +995,43 @@ addEventListener('fetch', event => {
 			return count;
 		}
 	};
-	thunderclap.ctors = [];
-	thunderclap.register(Object);
-	thunderclap.register(Array);
-	thunderclap.register(Date);
-	thunderclap.register(URL);
-	thunderclap.register(User);
-	thunderclap.register(Schema);
-	thunderclap.dbo =  new User("dbo",{"#":"User@dbo",roles:{dbo:true}}); // should get pwd during build
 	
+
+let thunderclap;
+addEventListener('fetch', event => {
+	const namespace = NAMESPACE,
+		request = event.request;
 	request.URL = new URL(request.url);
+	thunderclap = new Database({request,namespace});
+	thunderclap.dbo =  new User("dbo",{"#":"User@dbo",roles:{dbo:true}}); // should get pwd during build
 	event.respondWith(handleRequest(request));
 });
 
 async function handleRequest(request) {
+
+	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
+	  method: "POST",
+	  body:encodeURI(
+		"from=Excited User <syblackwell@anywhichway.com>&" +
+		"to=syblackwell@anywhichway.com&"+
+		"subject=Hello&"+
+		"text=Testing some Mailgun awesomeness!"
+	  ),
+	  headers: {
+	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
+	    "Content-Type": "application/x-www-form-urlencoded"
+	  }
+	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
+	.catch((e) => e.message+'Err');
+	return new Response(JSON.stringify(mail),{
+		headers:
+		{
+			"Content-Type":"text/plain",
+			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+		}
+	});*/
+	
+	
 	let body = "Not Found",
 		status = 404;
 	if(request.URL.pathname!=="/db.json") {
@@ -1130,7 +1175,7 @@ async function handleRequest(request) {
 	
 	// applies acl rules for key and action
 	// if user is not permitted to take action, modifies data accordingly
-	async function secure(key,action,user,data,request,documentOnly) {
+	async function secure({key,action,user,data,request,documentOnly}) {
 		if(!user || !user.roles) {
 			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : []};
 		}
@@ -1145,7 +1190,7 @@ async function handleRequest(request) {
 		for(const rule of rules) {
 			if(rule[action]) {
 				if(typeof(rule[action])==="function") {
-					if(!(await rule[action](action,user,data,request))) {
+					if(!(await rule[action]({action,user,data,request}))) {
 						return {removed};
 					}
 				} else {
@@ -1156,7 +1201,7 @@ async function handleRequest(request) {
 				}
 			}
 			if(rule.filter) {
-				data = await rule.filter(action,user,data,request);
+				data = await rule.filter({action,user,data,request});
 				if(data==undefined) {
 					return {removed};
 				}
@@ -1167,7 +1212,7 @@ async function handleRequest(request) {
 					for(const key of Object.keys(properties)) {
 						if(data[key]!==undefined) {
 							if(typeof(properties[key])==="function") {
-								if(!(await properties[key](action,user,data,key,request))) {
+								if(!(await properties[key]({action,user,object:data,key,request}))) {
 									delete data[key];
 									removed.push(key);
 								}
@@ -1183,7 +1228,7 @@ async function handleRequest(request) {
 				}
 				if(rule.properties.filter) {
 					for(const key of Object.keys(data)) {
-						if(data[key]!==undefined && !(await rule.properties.filter(action,user,data,key,request))) {
+						if(data[key]!==undefined && !(await rule.properties.filter({action,user,object:data,key,request}))) {
 							delete data[key];
 							removed.push(key);
 						}
@@ -1237,16 +1282,15 @@ async function handleRequest(request) {
 			// action with be "read" or "write", not returning anything will result in denial
 			// not specifying a filter function will allow all read and write, unless controlled above
 			// a function with the same call signature can also be used as a property value above
-			filter: async function(action,user,document) {
+			filter: async function({action,user,data,request}) {
 				// very restrictive, don't return a user record unless requested by the dbo or data subject
-				if(user.roles.dbo || user.userName===document.userName) {
-					return document;
+				if(user.roles.dbo || user.userName===data.userName) {
+					return data;
 				}
-				//return document;
 			},
 			properties: { // only applies to objects
 				read: {
-					roles: (action,user,document) => user.roles.dbo, // example of using a function, only dbo's can get roles
+					roles: ({action,user,object,key,request}) => user.roles.dbo, // example of using a function, only dbo's can get roles
 					hash: ["dbo"], // only dbo's can read passwod hashes
 					salt: {
 						dbo: true // example of alternate control form, only dbo's can read password salts
@@ -1257,11 +1301,11 @@ async function handleRequest(request) {
 						// a propery named password can never be written
 					},
 					// only the dbo and data subject can write a hash and salt
-					hash: (action,user,document) => user.roles.dbo || document.userName===user.userName,
-					salt: (action,user,document) => user.roles.dbo || document.userName===user.userName,
-					userName: (action,user,document) => document.userName!=="dbo" // can't change name of primary dbo
+					hash: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
+					salt: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
+					userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
 				},
-				filter: async function(action,user,document,key) {
+				filter: async function({action,user,object,key}) {
 					return true; // allows all other properties to be read or written, same as having no filter at all
 				}
 			}
@@ -1283,6 +1327,82 @@ async function handleRequest(request) {
 
 /***/ }),
 /* 13 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const triggers = __webpack_require__(14),
+		triggersKeys = Object.keys(triggers),
+		// compile triggers that are RegExp based
+		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
+			const parts = key.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					triggersRegExps.push({regexp:new RegExp(parts[1],parts[2]),trigger:triggers[key]})
+				} catch(e) {
+					triggersLiterals[key] = triggers[key];
+				}
+			} else {
+				triggersLiterals[key] = triggers[key];
+			}
+			return {triggersRegExps,triggersLiterals};
+		},{triggersRegExps:[],triggersLiterals:{}});
+		
+	async function respond({key,when,action,user,data,property,request}) {
+		// assemble applicable triggers
+		const triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
+				if(regexp.test(key)) {
+					accum.push(key);
+				}
+				return accum;
+			},[]).concat(triggersLiterals[key]||[]);
+		for(const trigger of triggers) {
+			if(trigger[when] && trigger[when][action]) {
+				if(action==="before") {
+					await trigger[when][action]({action,user,data,property,request});
+				} else {
+					trigger[when][action]({action,user,data,property,request});
+				}
+			}
+		}
+	}
+	module.exports = respond;
+}).call(this);
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		"User@": {
+			before: {
+				async put({user,data,request}) {
+					data.beforePut = true;
+				},
+				async update({user,data,property,value,oldValue,request}) {
+					
+				},
+				async remove({user,object,request}) {
+					
+				}
+			},
+			after: {
+				put({user,object,request}) {
+					
+				},
+				update({user,object,property,value,oldValue,request}) {
+					
+				},
+				remove({user,object,request}) {
+					
+				}
+			}
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {

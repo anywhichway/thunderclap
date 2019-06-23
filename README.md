@@ -9,7 +9,13 @@ In addition to having more predicates than MongoDB, JOQULAR extends pattern matc
 {[/a.*/]:{$eq: 1}} // match all objects with properties starting with the letter "a" containing the value 1
 ```
 
-Thunderclap also supports role based access control mechanisms and schema or schemaless operation.
+Thunderclap also supports:
+
+1) role based access control mechanisms
+
+2) schema or schemaless operation
+
+3) triggers
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
 modify the code for internal applications or public applications that are not primarily a means of providing Thunderclap
@@ -226,6 +232,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-22 v0.0.8a Triggers now working for `putItem`.
 
 2019-06-22 v0.0.7a Added JOQULAR pattern `$near:[target,range]`. Range can be a number, in which case it is 
 added/substracted or a string ending in the `%` sign, in which case the percentage is add/substracted. Added 

@@ -1,25 +1,25 @@
 (function() {
 	module.exports = {
-		"@User": {
+		"User@": {
 			before: {
-				async insert(object,request) {
+				async put({user,data,request}) {
+					data.beforePut = true;
+				},
+				async update({user,data,property,value,oldValue,request}) {
 					
 				},
-				async update(object,property,value,oldValue,request) {
-					
-				},
-				async delete(object,request) {
+				async remove({user,object,request}) {
 					
 				}
 			},
 			after: {
-				insert(object,request) {
+				put({user,object,request}) {
 					
 				},
-				update(object,property,value,oldValue,request) {
+				update({user,object,property,value,oldValue,request}) {
 					
 				},
-				delete(object,request) {
+				remove({user,object,request}) {
 					
 				}
 			}

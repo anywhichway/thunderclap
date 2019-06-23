@@ -8,51 +8,61 @@ const uuid4 = require("./uuid4.js"),
 	isSoul = require("./is-soul.js"),
 	joqular = require("./joqular.js"),
 	secure = require("./secure.js"),
+	respond = require("./respond.js"),
 	Schema = require("./schema.js"),
 	User = require("./user.js"),
 	hashPassword = require("./hash-password.js");
 
 const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
-let thunderclap;
-addEventListener('fetch', event => {
-	const db = NAMESPACE,
-		request = event.request;
-	thunderclap = joqular.db = {
+class Database {
+		constructor({namespace,request}) {
+			this.ctors = {};
+			this.request = request;
+			this.namespace = namespace;
+			this.register(Object);
+			this.register(Array);
+			this.register(Date);
+			this.register(URL);
+			this.register(User);
+			this.register(Schema);
+		}
 		async authUser(userName,password,options) {
 			const user = (await this.query({userName},false,options))[0];
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
 			}
-		},
+		}
 		async createUser(userName,password,options) {
 			const user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
 			return this.putItem(user,options);
-		},
-		async getItem(key,options={}) {
-			let data = await db.get(key);
+		}
+		async getItem(key,{user}={}) {
+			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
 				if(key[0]!=="!") {
+					const action = "read",
+						request = this.request;
 					if(isSoul(data["#"],false)) {
-						const cname = data["#"].split("@")[0],
-							secured = await secure(`${cname}@`,"read",options.user,data,request);
+						const key = `${data["#"].split("@")[0]}@`,
+							secured = await secure({key,action,user,data,request});
 						data = secured.data;
 					}
-					const secured = await secure(key,"read",options.user,data,request);
+					const secured = await secure({key,action,user,data,request});
 					data = secured.data;
 				}
 			}
 			return data==null ? undefined : data;
-		},
+		}
 		async getSchema(ctor,options) {
-			const data = await db.get(`Schema@${ctor.name||ctor}`);
+			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
 				return new Schema(ctor.name||ctor,JSON.parse(data));
 			}
-		},
+		}
 		async index(data,root,options={},recursing) {
 			let changed = 0;
 			if(data && typeof(data)==="object" && data["#"]) {
@@ -87,16 +97,19 @@ addEventListener('fetch', event => {
 				}
 			}
 			return changed;
-		},
+		}
 		async keys(lastKey) {
-			return db.getKeys(lastKey)
-		},
+			return this.namespace.getKeys(lastKey)
+		}
 		async putItem(object,options={}) {
 			let id = object["#"];
 			if(!id) {
 				id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
 			}
-			const cname = id.split("@")[0];
+			const cname = id.split("@")[0],
+				key =`${cname}@`,
+				request = this.request;
+			await respond({key,when:"before",action:"put",data:object,user:options.user,request});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -107,7 +120,7 @@ addEventListener('fetch', event => {
 					return error;
 				}
 			}
-			const {data,removed} = await secure(`${cname}@`,"write",options.user,object,request),
+			const {data,removed} = await secure({key,action:"write",user:options.user,data:object,request}),
 				root = (await this.getItem("!",{user:thunderclap.dbo})) || {},
 				original = await this.getItem(id,{user:this.dbo});
 			if(!data) {
@@ -128,8 +141,11 @@ addEventListener('fetch', event => {
 				await this.setItem("!",root,{user:thunderclap.dbo});
 			}
 			await this.setItem(id,data,options,true);
-			return object;
-		},
+			setTimeout(() => {
+				respond({key,when:"after",action:"put",data,user:options.user,request});
+			});
+			return data;
+		}
 		async query(pattern,partial,options={}) {
 			let ids,
 				count = 0,
@@ -177,7 +193,7 @@ addEventListener('fetch', event => {
 												// disallow index use by unauthorized users at document && property level
 												for(const id in node[valuekey]) {
 													const cname = id.split("@")[0],
-														{data,removed} = await secure(`${cname}@`,"read",user,{[key]:value},request);
+														{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
 													if(data==null || removed.length>0) {
 														delete node[valuekey][id];
 														secured[id] = true;
@@ -212,7 +228,7 @@ addEventListener('fetch', event => {
 									const secured = {};
 									for(const id in node[valuekey]) {
 										const cname = id.split("@")[0],
-											{data,removed} = await secure(`${cname}@`,"read",user,{[key]:value},request);
+											{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
 										if(data==null || removed.length>0) {
 											delete node[valuekey][id];
 											secured[id] = true;
@@ -255,52 +271,58 @@ addEventListener('fetch', event => {
 			}
 			//results.push(keys)
 			return results;
-		},
+		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
 				this.ctors[ctor.name] = ctor;
 			}
-		},
+		}
 		async removeItem(keyOrObject,options={}) {
 			const type = typeof(keyOrObject)==="object";
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			} 
 			if(keyOrObject) {
-				const root = type==="object" ? await this.getItem("!",{user:thunderclap.dbo}) : null,
-					object = root ? await this.getItem(keyOrObject,options) : null;
+				const value = await this.getItem(keyOrObject,options),
+					root = type==="object" ? await this.getItem("!",{user:thunderclap.dbo}) : null,
+					object = root ? value : null,
+					action = "write",
+					user = options.user,
+					request = this.request;
 				if(object) {
 					const cname = keyOrObject.split("@")[0],
-						{data} = await secure(`${cname}@`,"write",options.user,object,request,true);
+						{data} = await secure({key:`${cname}@`,action,user,data:value,request,documentOnly:true});
 					if(data) {
-						await db.delete(keyOrObject);
+						await this.namespace.delete(keyOrObject);
 						if(await this.unindex(object,root,options)) {
 							await this.setItem("!",root,{user:thunderclap.dbo});
 						}
 					}
 				} else {
-					const {data} = await secure(keyOrObject,"write",options.user,"dummy",request,true);
+					const {data} = await secure({key:keyOrObject,action,user,data:value,request,documentOnly:true});
 					if(data==="dummy") {
-						await db.delete(keyOrObject);
+						await this.namespace.delete(keyOrObject);
 					}
 				}
 			}
-		},
-		async setItem(key,data,options,secured) {
+		}
+		async setItem(key,data,{user}={},secured) {
 			if(!secured && key[0]!=="!") {
-				const secured = await secure(key,"write",options.user,data,request);
+				const action = "write",
+					request = this.request,
+					secured = await secure({key,action,user,data,request});
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure(key,"write",options.user,data,request);
+						secured = await secure({key,action,user,data,request});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
-				await db.put(key,JSON.stringify(data));
+				await this.namespace.put(key,JSON.stringify(data));
 			}
 			return data;
-		},
+		}
 		async unindex(object,options,root={}) {
 			let count = 0;
 			if(object && typeof(object)==="object" && object["#"]) {
@@ -331,20 +353,43 @@ addEventListener('fetch', event => {
 			return count;
 		}
 	};
-	thunderclap.ctors = [];
-	thunderclap.register(Object);
-	thunderclap.register(Array);
-	thunderclap.register(Date);
-	thunderclap.register(URL);
-	thunderclap.register(User);
-	thunderclap.register(Schema);
-	thunderclap.dbo =  new User("dbo",{"#":"User@dbo",roles:{dbo:true}}); // should get pwd during build
 	
+
+let thunderclap;
+addEventListener('fetch', event => {
+	const namespace = NAMESPACE,
+		request = event.request;
 	request.URL = new URL(request.url);
+	thunderclap = new Database({request,namespace});
+	thunderclap.dbo =  new User("dbo",{"#":"User@dbo",roles:{dbo:true}}); // should get pwd during build
 	event.respondWith(handleRequest(request));
 });
 
 async function handleRequest(request) {
+
+	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
+	  method: "POST",
+	  body:encodeURI(
+		"from=Excited User <syblackwell@anywhichway.com>&" +
+		"to=syblackwell@anywhichway.com&"+
+		"subject=Hello&"+
+		"text=Testing some Mailgun awesomeness!"
+	  ),
+	  headers: {
+	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
+	    "Content-Type": "application/x-www-form-urlencoded"
+	  }
+	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
+	.catch((e) => e.message+'Err');
+	return new Response(JSON.stringify(mail),{
+		headers:
+		{
+			"Content-Type":"text/plain",
+			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+		}
+	});*/
+	
+	
 	let body = "Not Found",
 		status = 404;
 	if(request.URL.pathname!=="/db.json") {
