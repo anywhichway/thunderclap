@@ -7,8 +7,12 @@
 	"email": "<your cloudflare login email>",
 	"primaryHostName": "<host name associated with zone>",
 	"mode": "development",
+	"minimize": false,
 	"devPort": 9000,
 	"devRoot": "./docs",
 	"devHost": "<host name to prepend when in development mode>",
-	"devNameSpaceId": "<worker KV namespace id to use for development>"
+	"devNameSpaceId": "<worker KV namespace id to use for development>",
+	"mailGunKey": "<key for mail gun, required for account validation e-mails>",
+	"mailGunDomain": "<key for mail gun, required for account validation e-mails>",
+	"dboPassword": "<default password for dbo>"
 }

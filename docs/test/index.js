@@ -42,7 +42,7 @@ describe("query",function() {
 	});
 	it("removeItem primitive", async function() {
 		let value = await db.removeItem("test");
-		expect(value).equal(undefined);
+		expect(value).equal(true);
 		value = await db.getItem("test");
 		expect(value).equal(undefined);
 	});

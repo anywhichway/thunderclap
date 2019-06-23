@@ -67,8 +67,11 @@ e.g. `thunderclap-mydomain-com` is the KV namespace and script name associated w
 You will need to populate a file `thunderclap.json` with many of your Cloudflare ids or keys. Copy the file 
 `thunderclap.template.json` to `thunderclap.json` and replace the placeholder values. This will contain secret keys,
 so you may want to move it out of your project directory to avoid having it checked-in. The `thunderclap` script in
-`webpack.config.js` assumes the file is up one level in the directory tree. You will need to edit `webpack.config.js`
-if you wish to put `thunderclap.json` elsewhere or load keys from environment variables.
+`webpack.config.js` assumes the file is up one level in the directory tree. If you do leave it in the project
+directory it will still be found, but .gitignore is configured to not check it in. 
+
+You will need to edit `webpack.config.js` if you wish to put `thunderclap.json` elsewhere or load keys from 
+environment variables.
 
 You will need to place the file `db.json` at the root of your web server's public directory and `thunderclap.js` 
 in your normal JavaScript resources directory. For convenience, `db.json` and `thunderclap.js` are located in the `docs` 
@@ -99,7 +102,9 @@ If the 'mode' in 'thunderclap.json` is set to `development`, then in addition to
 to access `<dev-host-prefix>-thunderclap.<your-domain>` via your web browser.
 
 If you access `https://<dev-host-prefix>-thunderclap.<your-domain>/test/` via your web browser, the unit test file 
-will load.
+will load. 
+
+There is a primitive UI for making one-off requests at `https://<dev-host-prefix>-thunderclap.<your-domain>/thunderclap.html`.
 
 When in dev mode, files are watched by webpack and any changes cause a re-bundling and deployment of the worker script
 to Cloudflare.
@@ -138,8 +143,10 @@ stores it with `setItem` using the id as the key. In most cases the unique id wi
 
 `any async getItem(string key)` - gets the value at `key`. Returns `undefined` if no value exists.
 
-`undefined async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
-or a key that resolves to an indexed object, the object is removed from the index. 
+`boolean async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
+or a key that resolves to an indexed object, the key and data are removed from the database so long as the user has 
+the appropriate privileges. If the key exists but can't be removed the function returns `false`. If the key does not exist
+or removal succeeds, the function returns `true`.
 
 `Array async query(object JOQULARExpression)` - uses the index to find matching objects. See the unit
 test `file docs/test/index.js` to understand the currently supported JOQULAR expressions and examples.
@@ -203,7 +210,7 @@ will automatically drop the properties from the selection process to prevent dat
 
 If a user is not authorized write access to specific properties on an object, update attempts will 
 fall back to partial updates on just those properties for which write access is allowed. If write access to a
-key or an entire object is not allowed, the write will simply fail.
+key or an entire object is not allowed, the write will simply fail and return `undefined`.
 
 At the moment, by default, all keys, objects, and properties are available for read and write unless specifically
 controlled in the `acl.js` file in the root of the Thunderclap repository. A future release will support defaulting
@@ -225,6 +232,10 @@ of the project.
 
 To be written.
 
+# Triggers
+
+To be written. See the file `triggers.js`.
+
 # History and Roadmap
 
 Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB development has been suspended for now, 
@@ -232,6 +243,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-22 v0.0.9a Triggers on put, update, remove.
 
 2019-06-22 v0.0.8a Triggers now working for `putItem`.
 

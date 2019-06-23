@@ -1,9 +1,22 @@
 const path = require("path"),
 	fs = require("fs"),
 	{ spawn } = require('child_process'),
+	webpack = require('webpack'),
 	WebpackShellPlugin = require('webpack-shell-plugin'),
-	config = JSON.parse(fs.readFileSync(path.resolve(__dirname,"../thunderclap.json"))),
-	CLOUDFLARED = config.cloudflaredPath, 
+	TerserPlugin = require('terser-webpack-plugin');
+
+let config;
+try {
+	config = JSON.parse(fs.readFileSync(path.resolve(__dirname,"../thunderclap.json")));
+} catch(e) {
+	try {
+		config = JSON.parse(fs.readFileSync(path.resolve(__dirname,"/thunderclap.json")));
+	} catch(e) {
+		throw e;
+	}
+}
+
+const CLOUDFLARED = config.cloudflaredPath, 
 	ACCOUNT_ID = config.cloudflareAccountId, 
 	AUTH_KEY = config.cloudflareAuthKey,
 	ZONE_ID = config.zoneId,
@@ -15,6 +28,8 @@ const path = require("path"),
 	ROOT = config.devRoot,
 	DEV_HOST = config.devHost,
 	DEV_NAMESPACE_ID = config.devNameSpaceId,
+	DBO_PASSWORD = config.dboPassword||"dbo",
+	MINIMIZE = !!config.minimize,
 	host = `${MODE==="development" ? DEV_HOST+'-' : ''}thunderclap.${HOSTNAME}`,
 	namespace = `${MODE==="development" ? DEV_NAMESPACE_ID : NAMESPACE_ID}`,
 	scriptName = `${MODE==="development"  ? DEV_HOST+"-" : ""}thunderclap-${HOSTNAME.split(".").join("-")}`,
@@ -50,7 +65,15 @@ tunnel.stderr.on('data', function (data) {
 module.exports = {
   mode: "production",
   optimization: {
-    minimize: false
+    minimize: MINIMIZE,
+    minimizer: [
+    	new TerserPlugin({
+	        terserOptions: {
+	        	keep_classnames: true,
+	            keep_fnames: true
+	        }
+	      })
+    	]
   },
   watch: true,
   context: path.resolve(__dirname, "src"),
@@ -66,10 +89,14 @@ module.exports = {
   },
   plugins: [
 	  new WebpackShellPlugin({
-		  //onBuildStart:['echo "Webpack Start"'],
+		  //onBuildStart:[`echo (function() { module.exports="${DBO_PASSWORD}"; }).call(this) > dbo.js`],
 		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}`],
 		  dev: false
-	  })
+	  }),
+	  // this ignore is not working
+	  new webpack.WatchIgnorePlugin([
+		  /.*\dbo.js/ 
+	  ])
   ],
 }
 

@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 9);
+/******/ 	return __webpack_require__(__webpack_require__.s = 10);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -148,6 +148,101 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	const Entity = __webpack_require__(1);
+	
+	class Schema extends Entity {
+		constructor(ctor,config=ctor.schema) {
+			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
+			super(config);
+		}
+		async validate(object,db) {
+			const errors = [];
+			for(const key of Object.keys(this)) {
+				if(key!=="#" && key!=="^") {
+					const validation = this[key];
+					for(const validationkey of Object.keys(validation)) {
+						if(typeof(Schema.validations[validationkey])!=="function") {
+							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
+						} else {
+							if(key==="*") {
+								for(const key of Object.keys(object)) {
+									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
+								}
+							} else {
+								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+							}
+												
+						}
+					}
+				}
+			}
+			return errors;
+		}
+		static create(config) {
+			const cname = config["#"].split("@")[1];
+			return new Schema(cname,config);
+		}
+	}
+	Schema.validations = {
+			noindex() {
+				// just a dummy function so it looks like a validation, used by other code to flag non-indexed properties
+			},
+			required(constraint,object,key,value,errors) {
+				if(constraint && value==null) {
+					errors.push(new TypeError(`'${key}' is required`));
+				}
+			},
+			type(constraint,object,key,value,errors) {
+				const type = typeof(value);
+				if(value!=null && type!==constraint) {
+					errors.push(new TypeError(`'${key}' expected type '${constraint}' not '${type}'`));
+				}
+			},
+			async unique(constraint,object,key,value,errors,db) {
+				if(constraint) {
+					const node = await db.getItem(`!${key}`),
+						valuekey = JSON.stringify(value);
+					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
+						errors.push(new TypeError(`'${key}' value '${value}' must be unique`));
+					}
+				}
+			}
+	}
+	module.exports = Schema;
+})();
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Entity = __webpack_require__(1);
+	
+	class User extends Entity {
+		constructor(userName,config) {
+			super(config);
+			this.userName = userName;
+			if(!this.roles) {
+				this.roles = {};
+			}
+			this.roles.user = true;
+		}
+		static create(config) {
+			return new User(config.userName,config);
+		}
+	}
+	User.schema = {
+		userName: {required:true, type: "string", unique:true},
+		roles: {type: "object"}
+	}
+	module.exports = User;
+})();
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
 	const uuid4 = __webpack_require__(0),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
@@ -163,14 +258,14 @@
 
 
 /***/ }),
-/* 3 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(4),
-		isSoul = __webpack_require__(2),
-		isInt = __webpack_require__(5),
-		isFloat = __webpack_require__(6),
+	const soundex = __webpack_require__(6),
+		isSoul = __webpack_require__(4),
+		isInt = __webpack_require__(7),
+		isFloat = __webpack_require__(8),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -516,7 +611,7 @@
 }).call(this);
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -526,7 +621,7 @@
 }).call(this);
 
 /***/ }),
-/* 5 */
+/* 7 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -534,7 +629,7 @@
 }).call(this)
 
 /***/ }),
-/* 6 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -542,102 +637,51 @@
 }).call(this)
 
 /***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Entity = __webpack_require__(1);
-	
-	class Schema extends Entity {
-		constructor(ctor,config=ctor.schema) {
-			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
-			super(config);
-		}
-		async validate(object,db) {
-			const errors = [];
-			for(const key of Object.keys(this)) {
-				if(key!=="#" && key!=="^") {
-					const validation = this[key];
-					for(const validationkey of Object.keys(validation)) {
-						if(typeof(Schema.validations[validationkey])!=="function") {
-							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
-						} else {
-							if(key==="*") {
-								for(const key of Object.keys(object)) {
-									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
-								}
-							} else {
-								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
-							}
-												
-						}
-					}
-				}
-			}
-			return errors;
-		}
-		static create(config) {
-			const cname = config["#"].split("@")[1];
-			return new Schema(cname,config);
-		}
-	}
-	Schema.validations = {
-			noindex() {
-				// just a dummy function so it looks like a validation, used by other code to flag non-indexed properties
-			},
-			required(constraint,object,key,value,errors) {
-				if(constraint && value==null) {
-					errors.push(new TypeError(`'${key}' is required`));
-				}
-			},
-			type(constraint,object,key,value,errors) {
-				const type = typeof(value);
-				if(value!=null && type!==constraint) {
-					errors.push(new TypeError(`'${key}' expected type '${constraint}' not '${type}'`));
-				}
-			},
-			async unique(constraint,object,key,value,errors,db) {
-				if(constraint) {
-					const node = await db.getItem(`!${key}`),
-						valuekey = JSON.stringify(value);
-					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
-						errors.push(new TypeError(`'${key}' value '${value}' must be unique`));
-					}
-				}
-			}
-	}
-	module.exports = Schema;
-})();
-
-/***/ }),
-/* 8 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Entity = __webpack_require__(1);
-	
-	class User extends Entity {
-		constructor(userName,config) {
-			super(config);
-			this.userName = userName;
-			if(!this.roles) {
-				this.roles = {};
-			}
-			this.roles.user = true;
-		}
-		static create(config) {
-			return new User(config.userName,config);
-		}
-	}
-	User.schema = {
-		userName: {required:true, type: "string", unique:true},
-		roles: {type: "object"}
-	}
-	module.exports = User;
-})();
-
-/***/ }),
 /* 9 */
+/***/ (function(module, exports) {
+
+(function() {
+	function bufferToHexString(buffer) {
+	    var s = '', h = '0123456789abcdef';
+	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
+	    return s;
+	}
+	async function hashPassword(password,iterations,salt) {
+		salt || (salt = crypto.getRandomValues(new Uint8Array(8)));
+	    const encoder = new TextEncoder('utf-8'),
+	    	passphraseKey = encoder.encode(password),
+	    	key = await crypto.subtle.importKey(
+			  'raw', 
+			  passphraseKey, 
+			  {name: 'PBKDF2'}, 
+			  false, 
+			  ['deriveBits', 'deriveKey']
+			),
+			webKey = await crypto.subtle.deriveKey(
+			    {
+			    	name: 'PBKDF2',
+			    	salt,
+			    	iterations,
+			    	hash: 'SHA-256'
+			    },
+			    key,
+			    // Don't actually need a cipher suite,
+			    // but api requires it is specified.
+			    { name: 'AES-CBC', length: 256 },
+			    true,
+			    [ "encrypt", "decrypt" ]
+			), 
+			buffer = await crypto.subtle.exportKey("raw", webKey);
+		return {
+			hash: bufferToHexString(buffer),
+			salt: bufferToHexString(salt)
+		}
+	}
+	module.exports = hashPassword;
+}).call(this)
+
+/***/ }),
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -646,22 +690,184 @@ VERSION 1, OCTOBER 16, 2018
 Copyright AnyWhichWay, LLC 2019
  */
 
-const uuid4 = __webpack_require__(0),
-	isSoul = __webpack_require__(2),
-	joqular = __webpack_require__(3),
-	secure = __webpack_require__(10),
-	respond = __webpack_require__(13),
-	Schema = __webpack_require__(7),
-	User = __webpack_require__(8),
-	hashPassword = __webpack_require__(15);
+const Schema = __webpack_require__(2),
+	User = __webpack_require__(3),
+	hashPassword = __webpack_require__(9),
+	Database = __webpack_require__(11),
+	dboPassword = __webpack_require__(17);
 
-const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+let thunderclap;
+addEventListener('fetch', event => {
+	const namespace = NAMESPACE,
+		request = event.request;
+	request.URL = new URL(request.url);
+	thunderclap = new Database({request,namespace,dbo: new User("dbo",{"#":"User@dbo",roles:{dbo:true}})});
+	event.respondWith(handleRequest(request));
+});
 
-class Database {
-		constructor({namespace,request}) {
+async function handleRequest(request) {
+	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
+	  method: "POST",
+	  body:encodeURI(
+		"from=Excited User <syblackwell@anywhichway.com>&" +
+		"to=syblackwell@anywhichway.com&"+
+		"subject=Hello&"+
+		"text=Testing some Mailgun awesomeness!"
+	  ),
+	  headers: {
+	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
+	    "Content-Type": "application/x-www-form-urlencoded"
+	  }
+	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
+	.catch((e) => e.message+'Err');
+	return new Response(JSON.stringify(mail),{
+		headers:
+		{
+			"Content-Type":"text/plain",
+			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+		}
+	});*/
+	
+	
+	let body = "Not Found",
+		status = 404;
+	if(request.URL.pathname!=="/db.json") {
+		return fetch(request);
+	}
+	if(request.method==="OPTIONS") {
+		return new Response(null,{
+			headers: {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Headers": "X-Auth-Username,X-Auth-Password",
+				"Access-Control-Allow-Methods": "GET, OPTIONS"
+			}
+		})
+	}
+	try {
+		let dbo = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
+		if(!dbo) {
+			Object.assign(thunderclap.dbo,await hashPassword(dboPassword,1000));
+			dbo = await thunderclap.putItem(thunderclap.dbo,{user:thunderclap.dbo});
+		}
+		/*const dbo1 = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
+		return new Response(JSON.stringify([dbo,dbo1]),{
+			headers:
+			{
+				"Content-Type":"text/plain",
+				"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+			}
+		});*/
+		//let userschema = await thunderclap.getSchema(User);
+		//if(!userschema) {
+		//const userschema = await thunderclap.putItem(new Schema(User),{user:thunderclap.dbo});
+		//}
+		body = decodeURIComponent(request.URL.search);
+		const command = JSON.parse(body.substring(1)),
+			fname = command.shift(),
+			args = command;
+		if(thunderclap[fname]) {
+			if(fname==="createUser") {
+				args.push({user:thunderclap.dbo});
+			} else {
+				const userName = request.headers.get("X-Auth-Username"),
+					password = request.headers.get("X-Auth-Password"),
+					user = await thunderclap.authUser(userName,password,{user:thunderclap.dbo}); // thunderclap.dbo;
+				if(!user) {
+					return new Response(null,{
+						status: 403,
+						headers:
+						{
+							"Content-Type":"text/plain",
+							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+						}
+					});
+				}
+				args.push({user});
+			}
+			return thunderclap[fname](...args)
+			.then((result) => {
+				const type = typeof(result);
+				if(result===undefined) result = "@undefined";
+				else if(result===Infinity) result = "@Infinity";
+				else if(result===-Infinity) result = "@-Infinity";
+				else if(type==="number" && isNaN(result)) result = "@NaN";
+				else if(result && type==="object") {
+					if(result instanceof Date) {
+						result = `@Date${result.getTime()}`;
+					}
+					if(result instanceof Error) {
+						return new Response(JSON.stringify(result.errors.map(error => error+"")),
+							{
+								status:422,
+								headers:
+								{
+									"Content-Type":"text/plain",
+									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+								}
+							});
+					}
+				}
+				//const response = new Response(JSON.stringify(result));
+				//response.body.pipeTo(writable);
+				return new Response(JSON.stringify(result),{
+					headers:
+					{
+						"Content-Type":"text/plain",
+						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+					}
+				});
+			});
+			//return new Response(readable,
+			//	{
+			//		headers:
+			//		{
+			//			"Content-Type":"text/plain",
+			//			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+			//		}
+			//	}
+			//)
+		}
+	} catch(e) {
+		body = JSON.stringify(e+body);
+		status = 500;
+	}
+	//return fetch(request);
+	const response = new Response(body,
+			{
+				headers:
+				{
+					"Status": status,
+					"Content-Type":"text/plain",
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+				}
+			}
+	);
+	return response;
+}
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uuid4 = __webpack_require__(0),
+		isSoul = __webpack_require__(4),
+		joqular = __webpack_require__(5),
+		hashPassword = __webpack_require__(9),
+		secure = __webpack_require__(12),
+		respond = __webpack_require__(15),
+		User = __webpack_require__(3),
+		Schema = __webpack_require__(2);
+	
+	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+	class Database {
+		constructor({namespace,request,dbo}) {
 			this.ctors = {};
 			this.request = request;
 			this.namespace = namespace;
+			this.dbo = dbo;
 			this.register(Object);
 			this.register(Array);
 			this.register(Date);
@@ -676,7 +882,7 @@ class Database {
 				return user;
 			}
 		}
-		async createUser(userName,password,options) {
+		async createUser(userName,password,options={}) {
 			const user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
 			return this.putItem(user,options);
@@ -728,10 +934,10 @@ class Database {
 								changed++;
 								node = {};
 							}
-							node[valuekey] || (node[valuekey] = {__keyCount__:0});
+							node[valuekey] || (node[valuekey] = {}); // __keyCount__:0
 							if(!node[valuekey][id]) {
 								node[valuekey][id] = true;
-								node[valuekey].__keyCount__++;
+								//node[valuekey].__keyCount__++;
 								await this.setItem(path,node,options);
 							}
 						}
@@ -744,14 +950,20 @@ class Database {
 			return this.namespace.getKeys(lastKey)
 		}
 		async putItem(object,options={}) {
+			if(!object || typeof(object)!=="object") {
+				const error = new Error();
+				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
+				return error;
+			}
 			let id = object["#"];
 			if(!id) {
 				id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
 			}
 			const cname = id.split("@")[0],
 				key =`${cname}@`,
+				user = options.user,
 				request = this.request;
-			await respond({key,when:"before",action:"put",data:object,user:options.user,request});
+			await respond.call(this,{key,when:"before",action:"put",data:object,user,request});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -762,29 +974,48 @@ class Database {
 					return error;
 				}
 			}
-			const {data,removed} = await secure({key,action:"write",user:options.user,data:object,request}),
-				root = (await this.getItem("!",{user:thunderclap.dbo})) || {},
-				original = await this.getItem(id,{user:this.dbo});
+			const {data,removed} = await secure.call(this,{key,action:"write",user,data:object,request});
 			if(!data) {
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
 			}
-			if(original && removed) {
-				removed.forEach((key) => {
-					if(original[key]!==undefined) {
-						data[key] = original[key];
+			const root = (await this.getItem("!",{user:this.dbo})) || {},
+				original = await this.getItem(id,{user:this.dbo});
+			if(original) {
+				if(removed) {
+					removed.forEach((key) => {
+						if(original[key]!==undefined) {
+							data[key] = original[key];
+						}
+					});
+				}
+				for(const property of Object.keys(original)) {
+					const value = data[property],
+						oldValue = original[property];
+					if(value!==oldValue) {
+						// need to add code to unindex the changes from original
+						// update({user,data,property,value,oldValue,request}) 
+						await respond.call(this,{key,when:"before",action:"update",data,property,value,oldValue,user,request});
 					}
-				});
+				}
 			}
-			// need to add code to unindex the changes from original
 			const count = await this.index(data,root,options);
 			if(count) {
-				await this.setItem("!",root,{user:thunderclap.dbo});
+				await this.setItem("!",root,{user:this.dbo});
 			}
 			await this.setItem(id,data,options,true);
+			for(const property of Object.keys(original||{})) {
+				const value = data[property],
+					oldValue = original[property];
+				if(value!==oldValue) {
+					setTimeout(() => {
+						respond.call(this,{key,when:"after",action:"update",data,property,value,oldValue,user,request});
+					});
+				}
+			}
 			setTimeout(() => {
-				respond({key,when:"after",action:"put",data,user:options.user,request});
+				respond.call(this,{key,when:"after",action:"put",data,user:options.user,request});
 			});
 			return data;
 		}
@@ -794,7 +1025,7 @@ class Database {
 				results = [],
 				keys;
 			const user = options.user,
-				root = await this.getItem("!",{user:thunderclap.dbo});
+				root = await this.getItem("!",{user:this.dbo});
 			if(!root) return results;
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
@@ -807,7 +1038,7 @@ class Database {
 				}
 				for(const key of keys) {
 					if(root[key]) {
-						const node = await this.getItem(`!${key}`,{user:thunderclap.dbo});
+						const node = await this.getItem(`!${key}`,{user:this.dbo});
 						if(node) {
 							if(value && type==="object") {
 								const valuecopy = Object.assign({},value);
@@ -926,27 +1157,40 @@ class Database {
 			} 
 			if(keyOrObject) {
 				const value = await this.getItem(keyOrObject,options),
-					root = type==="object" ? await this.getItem("!",{user:thunderclap.dbo}) : null,
-					object = root ? value : null,
+					root = type==="object" ? await this.getItem("!",{user:this.dbo}) : null,
 					action = "write",
 					user = options.user,
 					request = this.request;
-				if(object) {
-					const cname = keyOrObject.split("@")[0],
-						{data} = await secure({key:`${cname}@`,action,user,data:value,request,documentOnly:true});
-					if(data) {
+				if(value===undefined) {
+					return true;
+				}
+				if(root) {
+					const key = `${keyOrObject.split("@")[0]}@`;
+					await respond.call(this,{key,when:"before",action:"remove",data:value,user,request});
+					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
+					const {secured} = await secure({key,action,user,data:value,request,documentOnly:true});
+					if(secured) {
 						await this.namespace.delete(keyOrObject);
-						if(await this.unindex(object,root,options)) {
-							await this.setItem("!",root,{user:thunderclap.dbo});
+						if(await this.unindex(value,root,options)) {
+							await this.setItem("!",root,{user:this.dbo});
 						}
+						respond.call(this,{key,when:"after",action:"remove",data:value,user,request});
+						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						return true;
 					}
+					return false;
 				} else {
+					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
 					const {data} = await secure({key:keyOrObject,action,user,data:value,request,documentOnly:true});
-					if(data==="dummy") {
+					if(data===value) {
 						await this.namespace.delete(keyOrObject);
+						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						return true;
 					}
+					return false;
 				}
 			}
+			return false;
 		}
 		async setItem(key,data,{user}={},secured) {
 			if(!secured && key[0]!=="!") {
@@ -980,12 +1224,13 @@ class Database {
 								node = await this.getItem(path,options);
 							if(node[valuekey] && node[valuekey][id]) {
 								delete node[valuekey][id];
-								node[valuekey].__keyCount__--;
+								count++;
+								/*node[valuekey].__keyCount__--;
 								if(!node[valuekey].__keyCount__) {
 									delete node[valuekey];
 									root[key]--;
 									count++;
-								}
+								}*/
 								await this.setItem(path,node,options);
 							}
 						}
@@ -994,169 +1239,17 @@ class Database {
 			}
 			return count;
 		}
-	};
-	
-
-let thunderclap;
-addEventListener('fetch', event => {
-	const namespace = NAMESPACE,
-		request = event.request;
-	request.URL = new URL(request.url);
-	thunderclap = new Database({request,namespace});
-	thunderclap.dbo =  new User("dbo",{"#":"User@dbo",roles:{dbo:true}}); // should get pwd during build
-	event.respondWith(handleRequest(request));
-});
-
-async function handleRequest(request) {
-
-	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
-	  method: "POST",
-	  body:encodeURI(
-		"from=Excited User <syblackwell@anywhichway.com>&" +
-		"to=syblackwell@anywhichway.com&"+
-		"subject=Hello&"+
-		"text=Testing some Mailgun awesomeness!"
-	  ),
-	  headers: {
-	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
-	    "Content-Type": "application/x-www-form-urlencoded"
-	  }
-	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
-	.catch((e) => e.message+'Err');
-	return new Response(JSON.stringify(mail),{
-		headers:
-		{
-			"Content-Type":"text/plain",
-			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-		}
-	});*/
-	
-	
-	let body = "Not Found",
-		status = 404;
-	if(request.URL.pathname!=="/db.json") {
-		return fetch(request);
 	}
-	if(request.method==="OPTIONS") {
-		return new Response(null,{
-			headers: {
-				"Access-Control-Allow-Origin": "*",
-				"Access-Control-Allow-Headers": "X-Auth-Username,X-Auth-Password",
-				"Access-Control-Allow-Methods": "GET, OPTIONS"
-			}
-		})
-	}
-	try {
-		let dbo = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
-		if(!dbo) {
-			Object.assign(thunderclap.dbo,await hashPassword("dbo",1000));
-			dbo = await thunderclap.putItem(thunderclap.dbo,{user:thunderclap.dbo});
-		}
-		/*const dbo1 = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
-		return new Response(JSON.stringify([dbo,dbo1]),{
-			headers:
-			{
-				"Content-Type":"text/plain",
-				"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-			}
-		});*/
-		//let userschema = await thunderclap.getSchema(User);
-		//if(!userschema) {
-		//const userschema = await thunderclap.putItem(new Schema(User),{user:thunderclap.dbo});
-		//}
-		body = decodeURIComponent(request.URL.search);
-		const command = JSON.parse(body.substring(1)),
-			fname = command.shift(),
-			args = command;
-		if(thunderclap[fname]) {
-			if(fname==="createUser") {
-				args.push({user:thunderclap.dbo});
-			} else {
-				const userName = request.headers.get("X-Auth-Username"),
-					password = request.headers.get("X-Auth-Password"),
-					user = await thunderclap.authUser(userName,password,{user:thunderclap.dbo}); // thunderclap.dbo;
-				if(!user) {
-					return new Response(null,{
-						status: 403,
-						headers:
-						{
-							"Content-Type":"text/plain",
-							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-						}
-					});
-				}
-				args.push({user});
-			}
-			return thunderclap[fname](...args)
-			.then((result) => {
-				const type = typeof(result),
-					options = args.pop();
-				if(result===undefined) result = "@undefined";
-				else if(result===Infinity) result = "@Infinity";
-				else if(result===-Infinity) result = "@-Infinity";
-				else if(type==="number" && isNaN(result)) result = "@NaN";
-				else if(result && type==="object") {
-					if(result instanceof Date) {
-						result = `@Date${result.getTime()}`;
-					}
-					if(result instanceof Error) {
-						return new Response(JSON.stringify(result.errors.map(error => error+"")),
-							{
-								status:422,
-								headers:
-								{
-									"Content-Type":"text/plain",
-									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-								}
-							});
-					}
-				}
-				//const response = new Response(JSON.stringify(result));
-				//response.body.pipeTo(writable);
-				return new Response(JSON.stringify(result),{
-					headers:
-					{
-						"Content-Type":"text/plain",
-						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-					}
-				});
-			});
-			//return new Response(readable,
-			//	{
-			//		headers:
-			//		{
-			//			"Content-Type":"text/plain",
-			//			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-			//		}
-			//	}
-			//)
-		}
-	} catch(e) {
-		body = JSON.stringify(e+body);
-		status = 500;
-	}
-	//return fetch(request);
-	const response = new Response(body,
-			{
-				headers:
-				{
-					"Status": status,
-					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-				}
-			}
-	);
-	return response;
-}
-
+	module.exports = Database;
+}).call(this);
 
 /***/ }),
-/* 10 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(11),
-		roles = __webpack_require__(12),
+	const acl = __webpack_require__(13),
+		roles = __webpack_require__(14),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -1259,7 +1352,7 @@ async function handleRequest(request) {
 }).call(this)
 
 /***/ }),
-/* 11 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1290,7 +1383,7 @@ async function handleRequest(request) {
 			},
 			properties: { // only applies to objects
 				read: {
-					roles: ({action,user,object,key,request}) => user.roles.dbo, // example of using a function, only dbo's can get roles
+					roles: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName, // example of using a function, only dbo's can get roles
 					hash: ["dbo"], // only dbo's can read passwod hashes
 					salt: {
 						dbo: true // example of alternate control form, only dbo's can read password salts
@@ -1314,7 +1407,7 @@ async function handleRequest(request) {
 })();
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1326,11 +1419,11 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const triggers = __webpack_require__(14),
+	const triggers = __webpack_require__(16),
 		triggersKeys = Object.keys(triggers),
 		// compile triggers that are RegExp based
 		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
@@ -1369,26 +1462,27 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 14 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
 		"User@": {
 			before: {
-				async put({user,data,request}) {
+				put({user,data,request}) {
 					data.beforePut = true;
 				},
-				async update({user,data,property,value,oldValue,request}) {
+				update({user,data,property,value,oldValue,request}) {
 					
 				},
-				async remove({user,object,request}) {
+				remove({user,object,request}) {
 					
 				}
 			},
 			after: {
 				put({user,object,request}) {
-					
+					// might send e-mail
+					// call a webhook, etc.
 				},
 				update({user,object,property,value,oldValue,request}) {
 					
@@ -1402,48 +1496,11 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 17 */
 /***/ (function(module, exports) {
 
-(function() {
-	function bufferToHexString(buffer) {
-	    var s = '', h = '0123456789abcdef';
-	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
-	    return s;
-	}
-	async function hashPassword(password,iterations,salt) {
-		salt || (salt = crypto.getRandomValues(new Uint8Array(8)));
-	    const encoder = new TextEncoder('utf-8'),
-	    	passphraseKey = encoder.encode(password),
-	    	key = await crypto.subtle.importKey(
-			  'raw', 
-			  passphraseKey, 
-			  {name: 'PBKDF2'}, 
-			  false, 
-			  ['deriveBits', 'deriveKey']
-			),
-			webKey = await crypto.subtle.deriveKey(
-			    {
-			    	name: 'PBKDF2',
-			    	salt,
-			    	iterations,
-			    	hash: 'SHA-256'
-			    },
-			    key,
-			    // Don't actually need a cipher suite,
-			    // but api requires it is specified.
-			    { name: 'AES-CBC', length: 256 },
-			    true,
-			    [ "encrypt", "decrypt" ]
-			), 
-			buffer = await crypto.subtle.exportKey("raw", webKey);
-		return {
-			hash: bufferToHexString(buffer),
-			salt: bufferToHexString(salt)
-		}
-	}
-	module.exports = hashPassword;
-}).call(this)
+(function() { module.exports="dbo"; }).call(this) 
+
 
 /***/ })
 /******/ ]);

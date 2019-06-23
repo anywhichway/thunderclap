@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 16);
+/******/ 	return __webpack_require__(__webpack_require__.s = 18);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -148,6 +148,101 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	const Entity = __webpack_require__(1);
+	
+	class Schema extends Entity {
+		constructor(ctor,config=ctor.schema) {
+			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
+			super(config);
+		}
+		async validate(object,db) {
+			const errors = [];
+			for(const key of Object.keys(this)) {
+				if(key!=="#" && key!=="^") {
+					const validation = this[key];
+					for(const validationkey of Object.keys(validation)) {
+						if(typeof(Schema.validations[validationkey])!=="function") {
+							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
+						} else {
+							if(key==="*") {
+								for(const key of Object.keys(object)) {
+									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
+								}
+							} else {
+								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+							}
+												
+						}
+					}
+				}
+			}
+			return errors;
+		}
+		static create(config) {
+			const cname = config["#"].split("@")[1];
+			return new Schema(cname,config);
+		}
+	}
+	Schema.validations = {
+			noindex() {
+				// just a dummy function so it looks like a validation, used by other code to flag non-indexed properties
+			},
+			required(constraint,object,key,value,errors) {
+				if(constraint && value==null) {
+					errors.push(new TypeError(`'${key}' is required`));
+				}
+			},
+			type(constraint,object,key,value,errors) {
+				const type = typeof(value);
+				if(value!=null && type!==constraint) {
+					errors.push(new TypeError(`'${key}' expected type '${constraint}' not '${type}'`));
+				}
+			},
+			async unique(constraint,object,key,value,errors,db) {
+				if(constraint) {
+					const node = await db.getItem(`!${key}`),
+						valuekey = JSON.stringify(value);
+					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
+						errors.push(new TypeError(`'${key}' value '${value}' must be unique`));
+					}
+				}
+			}
+	}
+	module.exports = Schema;
+})();
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Entity = __webpack_require__(1);
+	
+	class User extends Entity {
+		constructor(userName,config) {
+			super(config);
+			this.userName = userName;
+			if(!this.roles) {
+				this.roles = {};
+			}
+			this.roles.user = true;
+		}
+		static create(config) {
+			return new User(config.userName,config);
+		}
+	}
+	User.schema = {
+		userName: {required:true, type: "string", unique:true},
+		roles: {type: "object"}
+	}
+	module.exports = User;
+})();
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
 	const uuid4 = __webpack_require__(0),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
@@ -163,14 +258,14 @@
 
 
 /***/ }),
-/* 3 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(4),
-		isSoul = __webpack_require__(2),
-		isInt = __webpack_require__(5),
-		isFloat = __webpack_require__(6),
+	const soundex = __webpack_require__(6),
+		isSoul = __webpack_require__(4),
+		isInt = __webpack_require__(7),
+		isFloat = __webpack_require__(8),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -516,7 +611,7 @@
 }).call(this);
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -526,7 +621,7 @@
 }).call(this);
 
 /***/ }),
-/* 5 */
+/* 7 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -534,107 +629,12 @@
 }).call(this)
 
 /***/ }),
-/* 6 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = (x) => typeof x === "number" && isFinite(x) && x % 1 !== 0;
 }).call(this)
-
-/***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Entity = __webpack_require__(1);
-	
-	class Schema extends Entity {
-		constructor(ctor,config=ctor.schema) {
-			config["#"] || (config["#"] = `Schema@${ctor.name||ctor}`);
-			super(config);
-		}
-		async validate(object,db) {
-			const errors = [];
-			for(const key of Object.keys(this)) {
-				if(key!=="#" && key!=="^") {
-					const validation = this[key];
-					for(const validationkey of Object.keys(validation)) {
-						if(typeof(Schema.validations[validationkey])!=="function") {
-							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
-						} else {
-							if(key==="*") {
-								for(const key of Object.keys(object)) {
-									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
-								}
-							} else {
-								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
-							}
-												
-						}
-					}
-				}
-			}
-			return errors;
-		}
-		static create(config) {
-			const cname = config["#"].split("@")[1];
-			return new Schema(cname,config);
-		}
-	}
-	Schema.validations = {
-			noindex() {
-				// just a dummy function so it looks like a validation, used by other code to flag non-indexed properties
-			},
-			required(constraint,object,key,value,errors) {
-				if(constraint && value==null) {
-					errors.push(new TypeError(`'${key}' is required`));
-				}
-			},
-			type(constraint,object,key,value,errors) {
-				const type = typeof(value);
-				if(value!=null && type!==constraint) {
-					errors.push(new TypeError(`'${key}' expected type '${constraint}' not '${type}'`));
-				}
-			},
-			async unique(constraint,object,key,value,errors,db) {
-				if(constraint) {
-					const node = await db.getItem(`!${key}`),
-						valuekey = JSON.stringify(value);
-					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
-						errors.push(new TypeError(`'${key}' value '${value}' must be unique`));
-					}
-				}
-			}
-	}
-	module.exports = Schema;
-})();
-
-/***/ }),
-/* 8 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Entity = __webpack_require__(1);
-	
-	class User extends Entity {
-		constructor(userName,config) {
-			super(config);
-			this.userName = userName;
-			if(!this.roles) {
-				this.roles = {};
-			}
-			this.roles.user = true;
-		}
-		static create(config) {
-			return new User(config.userName,config);
-		}
-	}
-	User.schema = {
-		userName: {required:true, type: "string", unique:true},
-		roles: {type: "object"}
-	}
-	module.exports = User;
-})();
 
 /***/ }),
 /* 9 */,
@@ -644,7 +644,9 @@
 /* 13 */,
 /* 14 */,
 /* 15 */,
-/* 16 */
+/* 16 */,
+/* 17 */,
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -656,13 +658,13 @@ Copyright AnyWhichWay, LLC 2019
 (function() {
 	"use strict"
 	const uuid4 = __webpack_require__(0),
-		joqular = __webpack_require__(3),
-		Schema = __webpack_require__(7),
-		User = __webpack_require__(8);
+		joqular = __webpack_require__(5),
+		Schema = __webpack_require__(2),
+		User = __webpack_require__(3);
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(17);
+		fetch = __webpack_require__(19);
 	}
 	
 	const fromSerializable = (data) => {
@@ -731,8 +733,12 @@ Copyright AnyWhichWay, LLC 2019
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user.username;
 			this.headers["X-Auth-Password"] = user.password;
-			this.register(Schema);
+			this.register(Object);
+			this.register(Array);
+			this.register(Date);
+			this.register(URL);
 			this.register(User);
+			this.register(Schema);
 		}
 		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
@@ -850,7 +856,7 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 17 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

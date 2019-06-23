@@ -26,7 +26,7 @@
 			},
 			properties: { // only applies to objects
 				read: {
-					roles: ({action,user,object,key,request}) => user.roles.dbo, // example of using a function, only dbo's can get roles
+					roles: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName, // example of using a function, only dbo's can get roles
 					hash: ["dbo"], // only dbo's can read passwod hashes
 					salt: {
 						dbo: true // example of alternate control form, only dbo's can read password salts

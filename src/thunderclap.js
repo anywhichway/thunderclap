@@ -82,8 +82,12 @@ Copyright AnyWhichWay, LLC 2019
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user.username;
 			this.headers["X-Auth-Password"] = user.password;
-			this.register(Schema);
+			this.register(Object);
+			this.register(Array);
+			this.register(Date);
+			this.register(URL);
 			this.register(User);
+			this.register(Schema);
 		}
 		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
