@@ -1,6 +1,6 @@
 # thunderclap
 
-Thunderclap is an indexed JSON database designed specifically for Cloudflare. It runs on top of the Cloudflare KV store. 
+Thunderclap is an indexed JSON database and function server designed specifically for Cloudflare. It runs on top of the Cloudflare KV store. 
 Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-powered-javascript-pattern-matching-273a0d77eab5) 
 (JavaScript Object Query Language), is similar to, but more extensive than, the query language associated with MongoDB. 
 In addition to having more predicates than MongoDB, JOQULAR extends pattern matching to object properties, e.g.
@@ -16,6 +16,8 @@ Thunderclap also supports:
 2) schema or schemaless operation
 
 3) triggers
+
+5) custom functions (with access control).
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
 modify the code for internal applications or public applications that are not primarily a means of providing Thunderclap
@@ -200,8 +202,8 @@ is less than 100K.
 
 # Security
 
-The Thunderclap security mechanisms support the application of role based read and write access rules at the object, 
-property and storage key level. 
+The Thunderclap security mechanisms support the application of role based read and write access rules for functions,
+objects, properties and storage keys. 
 
 If a user is not authorized read access to an object or key value, it will not be returned. If a user is not 
 authorized access to a particular property, the property will be stripped from the object before the
@@ -215,6 +217,8 @@ key or an entire object is not allowed, the write will simply fail and return `u
 At the moment, by default, all keys, objects, and properties are available for read and write unless specifically
 controlled in the `acl.js` file in the root of the Thunderclap repository. A future release will support defaulting
 to prevent read and write unless specifically permitted.
+
+If the user is not authorized to execute a function a 403 status will be returned.
 
 See the file `acl.js` for more detail.
 
@@ -236,6 +240,10 @@ To be written.
 
 To be written. See the file `triggers.js`.
 
+# Functions
+
+To be written. See the file `functions.js`.
+
 # History and Roadmap
 
 Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB development has been suspended for now, 
@@ -243,6 +251,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-24 v0.0.10a Custom function support added.
 
 2019-06-22 v0.0.9a Triggers on put, update, remove.
 

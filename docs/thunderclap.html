@@ -6,28 +6,22 @@ var db;
 function submit(event) {
 	event.preventDefault();
 	const config = {username:"",password:""},
-		endpoint = `${window.location.protocol}//${window.location.host}/db.json`;
+		endpoint = `${window.location.protocol}//${window.location.host}`;
 	Object.keys(config).forEach((key) => {
 		config[key] = document.getElementById(key).value;
 	});
-	const {username,password} = config;
-	db = new Thunderclap({endpoint,user:{username,password}});
-	const command = {fname:"",arg1:"",arg2:""};
-	Object.keys(command).forEach((key) => {
-		command[key] = document.getElementById(key).value;
-	});
-	const {fname,arg1,arg2} = command;
-	if(fname) {
-		const el = document.getElementById("console");
-		el.innerText = "";
-		Function("db",`return db.${fname}(${arg1},${arg2})`)(db)
-			.then((result => {
-				el.innerText = JSON.stringify(result);
+	const {username,password} = config,
+		thunderclap = new Thunderclap({endpoint,user:{username,password}}),
+		fname = document.getElementById("fname").value,
+		args = JSON.parse(`[${document.getElementById("args").value}]`),
+		stdout = document.getElementById("console");
+	thunderclap[fname](...args)
+		.then((result => {
+			stdout.innerText = JSON.stringify(result);
 			}))
-			.catch((e) => {
-				el.innerHTML = e.errors ? JSON.stringify(e.errors.map((e) => e+"")) : e+"";
-			});
-	}
+		.catch((e) => {
+			stdout.innerHTML = e.errors ? JSON.stringify(e.errors.map((e) => e+"")) : e+"";
+		});
 	return false;
 }
 </script>
@@ -37,19 +31,24 @@ Username:<input type="text" id="username" placeholder="username" required value=
 Password:<input type="password" id="password" required value="dbo"><br>
 <select id="fname">
 	<option></option>
-	<option>getItem</option>
-	<option>getSchema</option>
-	<option>putItem</option>
-	<option>query</option>
-	<option>removeItem</option>
-	<option>setItem</option>
-	<option>createUser</option>
 </select>
-<input type="text" id="arg1" placeholder="arg1">
-<input type="text" id="arg2" placeholder="arg2"><br>
+(<input type="text" id="args" style="width:300px" placeholder="comma separated arguments">)<br>
 <button onclick="submit(event)">Submit</button>
 <div id="console">
 
 </div>
+<script>
+const select = document.getElementById("fname"),
+	thunderclap = new Thunderclap();
+Object.keys(Object.getOwnPropertyDescriptors(Thunderclap.prototype))
+	.concat(Object.keys(Object.getOwnPropertyDescriptors(thunderclap)))
+	.forEach((key) => {
+		if(key!=="constructor" && typeof(thunderclap[key])==="function") {
+			const option = new Option(key,key);
+			select.appendChild(option);
+		}
+	});
+
+</script>
 </body>
 </html>

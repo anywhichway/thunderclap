@@ -4,20 +4,24 @@ let o1,
 	o2;
 
 describe("query",function() {
-	/*it("put nested item",async function() {
-		const object = await db.putItem({
-			date: TESTDATE,
-			name:"test",
-			low:-1,
-			middle:0,
-			high:1,
-			NaN: parseInt("a"),
-			minusInfinity: -Infinity,
-			plusInfinity: Infinity,
-			flag:true,
-			ssn:"555-55-5555",
-			ip:"127.0.0.1",
-			email: "someone@somewhere.com"});
+	it("put nested item",async function() {
+		let object = await db.getItem("Object@test");
+		if(!object) {
+			object = await db.putItem({
+				"#": "Object@test",
+				date: TESTDATE,
+				name:"test",
+				low:-1,
+				middle:0,
+				high:1,
+				NaN: parseInt("a"),
+				minusInfinity: -Infinity,
+				plusInfinity: Infinity,
+				flag:true,
+				ssn:"555-55-5555",
+				ip:"127.0.0.1",
+				email: "someone@somewhere.com"});
+		}
 		o1 = object; // save for deletion in final test
 		expect(object.date.getTime()).equal(TESTDATE.getTime()); 
 		expect(object.name).equal("test"); 
@@ -31,7 +35,7 @@ describe("query",function() {
 		expect(object.ssn).equal("555-55-5555");
 		expect(object.ip).equal("127.0.0.1");
 		expect(object.email).equal("someone@somewhere.com");
-	}).timeout(10000);*/
+	}).timeout(10000);
 	it("setItem primitive", async function() {
 		const value = await db.setItem("test","test");
 		expect(value).equal("test");

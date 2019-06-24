@@ -21,7 +21,7 @@
 	// if user is not permitted to take action, modifies data accordingly
 	async function secure({key,action,user,data,request,documentOnly}) {
 		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : []};
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
 		}
 		// assemble applicable rules
 		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {

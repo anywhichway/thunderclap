@@ -28,7 +28,7 @@ const expect = chai.expect;
 		username,
 		password;
 	function test() {
-		const endpoint = `${window.location.protocol}//${window.location.host}/db.json`;
+		const endpoint = `${window.location.protocol}//${window.location.host}`;
 		username = document.getElementById("username").value,
 		password = document.getElementById("password").value;
 		db = new Thunderclap({endpoint,user:{username,password}});

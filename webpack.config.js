@@ -34,7 +34,7 @@ const CLOUDFLARED = config.cloudflaredPath,
 	namespace = `${MODE==="development" ? DEV_NAMESPACE_ID : NAMESPACE_ID}`,
 	scriptName = `${MODE==="development"  ? DEV_HOST+"-" : ""}thunderclap-${HOSTNAME.split(".").join("-")}`,
 	metadataScript = `echo {"body_part":"script","bindings":[{"type":"kv_namespace","name":"NAMESPACE","namespace_id":"${namespace}"}]} > metadata.json`,
-	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@worker.js;type=application/javascript"`,
+	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@server.js;type=application/javascript"`,
 	putRoute = `curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -H "Content-type: application/json" -d "{\\"pattern\\": \\"${host}/*\\", \\"script\\":\\"${scriptName}\\"}"`;
 
 var liveServer = require("live-server");
@@ -84,7 +84,7 @@ module.exports = {
   output: {
 	  path: __dirname, //path.resolve(__dirname,ROOT),
 	  filename: (chunkData) => {
-		  return chunkData.chunk.name === "server" ? "worker.js" : `${ROOT}/[name].js`
+		  return chunkData.chunk.name === "server" ? "server.js" : `${ROOT}/[name].js`
 	  }
   },
   plugins: [

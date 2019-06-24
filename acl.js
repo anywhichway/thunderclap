@@ -6,6 +6,9 @@
 		securedTestWriteKey: { // for testing purposes
 			write: [] // no writes allowed
 		},
+		securedTestFunction: {
+			execute: []
+		},
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
 			read: ["dbo"],
 			write: ["dbo"]
@@ -39,7 +42,7 @@
 					// only the dbo and data subject can write a hash and salt
 					hash: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
 					salt: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
-					userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
+					//userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
 				},
 				filter: async function({action,user,object,key}) {
 					return true; // allows all other properties to be read or written, same as having no filter at all

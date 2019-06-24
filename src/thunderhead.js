@@ -5,12 +5,13 @@
 		hashPassword = require("./hash-password.js"),
 		secure = require("./secure.js"),
 		respond = require("./respond.js"),
+		functions = require("../functions.js"),
 		User = require("./user.js"),
 		Schema = require("./schema.js");
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
-	class Database {
+	class Thunderhead {
 		constructor({namespace,request,dbo}) {
 			this.ctors = {};
 			this.request = request;
@@ -73,12 +74,11 @@
 							const valuekey = `${JSON.stringify(value)}`,
 								path = `!${key}`;
 							if(!root[key]) {
-								root[key] = 0;
+								root[key] = true;
 								changed++;
 							}
 							let node = await this.getItem(path,options);
 							if(!node) {
-								root[key]++;
 								changed++;
 								node = {};
 							}
@@ -171,7 +171,9 @@
 			let ids,
 				count = 0,
 				results = [],
-				keys;
+				keys,
+				saveroot;
+			//return [{"test":"test"},this.dbo];
 			const user = options.user,
 				root = await this.getItem("!",{user:this.dbo});
 			if(!root) return results;
@@ -187,6 +189,11 @@
 				for(const key of keys) {
 					if(root[key]) {
 						const node = await this.getItem(`!${key}`,{user:this.dbo});
+						if(!node) {
+							delete root[key];
+							saveroot = true;
+							continue;
+						}
 						if(node) {
 							if(value && type==="object") {
 								const valuecopy = Object.assign({},value);
@@ -205,7 +212,9 @@
 										let testids = {};
 										delete valuecopy[predicate];
 										const secured = {};
+										let haskeys;
 										for(const valuekey in node) {
+											haskeys = true;
 											let value = JSON.parse(valuekey);
 											if(typeof(value)==="string" && value.startsWith("Date@")) {
 												value = new Date(parseInt(value.split("@")[1]));
@@ -222,6 +231,11 @@
 												}
 												Object.assign(testids,node[valuekey]);
 											}
+										}
+										if(!haskeys) {
+											delete root[key];
+											saveroot = true;
+											break;
 										}
 										if(!ids) {
 											ids = Object.assign({},testids);
@@ -275,6 +289,9 @@
 					}
 				}
 			}
+			if(saveroot) {
+				this.setItem("!",root,{user:this.dbo});
+			}
 			if(ids) {
 				for(const id in ids) {
 					const object = await this.getItem(id,options);
@@ -290,7 +307,6 @@
 					}
 				}
 			}
-			//results.push(keys)
 			return results;
 		}
 		register(ctor) {
@@ -388,5 +404,12 @@
 			return count;
 		}
 	}
-	module.exports = Database;
+	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
+	Object.keys(functions).forEach((fname) => {
+		if(!predefined.includes(fname)) {
+			const f = async (...args) => functions[fname].call(this.request,...args);
+			Object.defineProperty(Thunderhead.prototype,fname,{configurable:true,value:f})
+		}
+	});
+	module.exports = Thunderhead;
 }).call(this);

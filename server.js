@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 10);
+/******/ 	return __webpack_require__(__webpack_require__.s = 11);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -641,6 +641,21 @@
 /***/ (function(module, exports) {
 
 (function() {
+	module.exports = {
+		securedTestFunction() {
+			return "If you see this, there may be a security leak";
+		},
+		getDate() {
+			return new Date();
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports) {
+
+(function() {
 	function bufferToHexString(buffer) {
 	    var s = '', h = '0123456789abcdef';
 	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
@@ -681,7 +696,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -692,20 +707,20 @@ Copyright AnyWhichWay, LLC 2019
 
 const Schema = __webpack_require__(2),
 	User = __webpack_require__(3),
-	hashPassword = __webpack_require__(9),
-	Database = __webpack_require__(11),
-	dboPassword = __webpack_require__(17);
+	hashPassword = __webpack_require__(10),
+	Thunderhead = __webpack_require__(12),
+	dboPassword = __webpack_require__(18),
+	secure = __webpack_require__(13);
 
-let thunderclap;
+let thunderhead;
 addEventListener('fetch', event => {
-	const namespace = NAMESPACE,
-		request = event.request;
+	const request = event.request;
 	request.URL = new URL(request.url);
-	thunderclap = new Database({request,namespace,dbo: new User("dbo",{"#":"User@dbo",roles:{dbo:true}})});
-	event.respondWith(handleRequest(request));
+	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo: new User("dbo",{"#":"User@dbo",roles:{dbo:true}})});
+	event.respondWith(handleRequest({request}));
 });
 
-async function handleRequest(request) {
+async function handleRequest({request,response}) {
 	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
 	  method: "POST",
 	  body:encodeURI(
@@ -728,7 +743,6 @@ async function handleRequest(request) {
 		}
 	});*/
 	
-	
 	let body = "Not Found",
 		status = 404;
 	if(request.URL.pathname!=="/db.json") {
@@ -744,36 +758,57 @@ async function handleRequest(request) {
 		})
 	}
 	try {
-		let dbo = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
-		if(!dbo) {
-			Object.assign(thunderclap.dbo,await hashPassword(dboPassword,1000));
-			dbo = await thunderclap.putItem(thunderclap.dbo,{user:thunderclap.dbo});
-		}
-		/*const dbo1 = await thunderclap.getItem("User@dbo",{user:thunderclap.dbo});
-		return new Response(JSON.stringify([dbo,dbo1]),{
+		let dbo = await thunderhead.getItem("User@dbo",{user:thunderhead.dbo});
+		/*return new Response(JSON.stringify([dbo]),{
 			headers:
 			{
 				"Content-Type":"text/plain",
 				"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 			}
 		});*/
-		//let userschema = await thunderclap.getSchema(User);
+		if(!dbo) {
+			Object.assign(thunderhead.dbo,await hashPassword(dboPassword,1000));
+			dbo = await thunderhead.putItem(thunderhead.dbo,{user:thunderhead.dbo});
+			/*return new Response(JSON.stringify([dbo]),{
+				headers:
+				{
+					"Content-Type":"text/plain",
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+				}
+			});*/
+		}
+		//let userschema = await thunderhead.getSchema(User);
 		//if(!userschema) {
-		//const userschema = await thunderclap.putItem(new Schema(User),{user:thunderclap.dbo});
+		//const userschema = await thunderhead.putItem(new Schema(User),{user:thunderhead.dbo});
 		//}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
-			fname = command.shift(),
-			args = command;
-		if(thunderclap[fname]) {
+			fname = command[0],
+			args = command.slice(1);
+		/*return new Response(JSON.stringify(fname + " " + thunderhead[fname]),{
+			status: 200,
+			headers:
+			{
+				"Content-Type":"text/plain",
+				"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+			}
+		});*/
+		/*const value = await NAMESPACE.get(...args)
+		  if (value === null) {
+		    return new Response("Value not found", {status: 404})
+		  }
+		  return new Response(JSON.stringify(value));*/
+		if(thunderhead[fname]) {
 			if(fname==="createUser") {
-				args.push({user:thunderclap.dbo});
+				args.push({user:thunderhead.dbo});
 			} else {
+				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = await thunderclap.authUser(userName,password,{user:thunderclap.dbo}); // thunderclap.dbo;
+					user = await thunderhead.authUser(userName,password,{user:thunderhead.dbo}); // thunderhead.dbo;
+				request.user = user;
 				if(!user) {
-					return new Response(null,{
+					return new Response("null",{
 						status: 403,
 						headers:
 						{
@@ -782,9 +817,37 @@ async function handleRequest(request) {
 						}
 					});
 				}
+				//const user = await thunderhead.authUser("dbo","dbo",{user:thunderhead.dbo});
 				args.push({user});
 			}
-			return thunderclap[fname](...args)
+			const secured = await secure({key:fname,action:"execute",user:args[args.length-1].user,data:args,request});
+			if(!secured.data || secured.removed.length>0) {
+				return new Response("null",{
+					status: 403,
+					headers:
+					{
+						"Content-Type":"text/plain",
+						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+					}
+				});
+			}
+			/*return new Response(JSON.stringify(args),{
+				status: 200,
+				headers:
+				{
+					"Content-Type":"text/plain",
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+				}
+			});*/
+			/*return new Response(JSON.stringify([fname,...args] + thunderhead[fname]),{
+				status: 200,
+				headers:
+				{
+					"Content-Type":"text/plain",
+					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+				}
+			});*/
+			return thunderhead[fname](...args)
 			.then((result) => {
 				const type = typeof(result);
 				if(result===undefined) result = "@undefined";
@@ -793,7 +856,7 @@ async function handleRequest(request) {
 				else if(type==="number" && isNaN(result)) result = "@NaN";
 				else if(result && type==="object") {
 					if(result instanceof Date) {
-						result = `@Date${result.getTime()}`;
+						result = `Date@${result.getTime()}`;
 					}
 					if(result instanceof Error) {
 						return new Response(JSON.stringify(result.errors.map(error => error+"")),
@@ -826,17 +889,20 @@ async function handleRequest(request) {
 			//		}
 			//	}
 			//)
+		}  else {
+			status = 404;
+			body = "404 - Not Found";
 		}
 	} catch(e) {
 		body = JSON.stringify(e+body);
 		status = 500;
 	}
 	//return fetch(request);
-	const response = new Response(body,
+	return new Response(JSON.stringify(body),
 			{
+				status,
 				headers:
 				{
-					"Status": status,
 					"Content-Type":"text/plain",
 					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 				}
@@ -847,22 +913,23 @@ async function handleRequest(request) {
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	const uuid4 = __webpack_require__(0),
 		isSoul = __webpack_require__(4),
 		joqular = __webpack_require__(5),
-		hashPassword = __webpack_require__(9),
-		secure = __webpack_require__(12),
-		respond = __webpack_require__(15),
+		hashPassword = __webpack_require__(10),
+		secure = __webpack_require__(13),
+		respond = __webpack_require__(16),
+		functions = __webpack_require__(9),
 		User = __webpack_require__(3),
 		Schema = __webpack_require__(2);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
-	class Database {
+	class Thunderhead {
 		constructor({namespace,request,dbo}) {
 			this.ctors = {};
 			this.request = request;
@@ -925,12 +992,11 @@ async function handleRequest(request) {
 							const valuekey = `${JSON.stringify(value)}`,
 								path = `!${key}`;
 							if(!root[key]) {
-								root[key] = 0;
+								root[key] = true;
 								changed++;
 							}
 							let node = await this.getItem(path,options);
 							if(!node) {
-								root[key]++;
 								changed++;
 								node = {};
 							}
@@ -1023,7 +1089,9 @@ async function handleRequest(request) {
 			let ids,
 				count = 0,
 				results = [],
-				keys;
+				keys,
+				saveroot;
+			//return [{"test":"test"},this.dbo];
 			const user = options.user,
 				root = await this.getItem("!",{user:this.dbo});
 			if(!root) return results;
@@ -1039,6 +1107,11 @@ async function handleRequest(request) {
 				for(const key of keys) {
 					if(root[key]) {
 						const node = await this.getItem(`!${key}`,{user:this.dbo});
+						if(!node) {
+							delete root[key];
+							saveroot = true;
+							continue;
+						}
 						if(node) {
 							if(value && type==="object") {
 								const valuecopy = Object.assign({},value);
@@ -1057,7 +1130,9 @@ async function handleRequest(request) {
 										let testids = {};
 										delete valuecopy[predicate];
 										const secured = {};
+										let haskeys;
 										for(const valuekey in node) {
+											haskeys = true;
 											let value = JSON.parse(valuekey);
 											if(typeof(value)==="string" && value.startsWith("Date@")) {
 												value = new Date(parseInt(value.split("@")[1]));
@@ -1074,6 +1149,11 @@ async function handleRequest(request) {
 												}
 												Object.assign(testids,node[valuekey]);
 											}
+										}
+										if(!haskeys) {
+											delete root[key];
+											saveroot = true;
+											break;
 										}
 										if(!ids) {
 											ids = Object.assign({},testids);
@@ -1127,6 +1207,9 @@ async function handleRequest(request) {
 					}
 				}
 			}
+			if(saveroot) {
+				this.setItem("!",root,{user:this.dbo});
+			}
 			if(ids) {
 				for(const id in ids) {
 					const object = await this.getItem(id,options);
@@ -1142,7 +1225,6 @@ async function handleRequest(request) {
 					}
 				}
 			}
-			//results.push(keys)
 			return results;
 		}
 		register(ctor) {
@@ -1240,16 +1322,23 @@ async function handleRequest(request) {
 			return count;
 		}
 	}
-	module.exports = Database;
+	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
+	Object.keys(functions).forEach((fname) => {
+		if(!predefined.includes(fname)) {
+			const f = async (...args) => functions[fname].call(this.request,...args);
+			Object.defineProperty(Thunderhead.prototype,fname,{configurable:true,value:f})
+		}
+	});
+	module.exports = Thunderhead;
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(13),
-		roles = __webpack_require__(14),
+	const acl = __webpack_require__(14),
+		roles = __webpack_require__(15),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -1270,7 +1359,7 @@ async function handleRequest(request) {
 	// if user is not permitted to take action, modifies data accordingly
 	async function secure({key,action,user,data,request,documentOnly}) {
 		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : []};
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
 		}
 		// assemble applicable rules
 		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
@@ -1352,7 +1441,7 @@ async function handleRequest(request) {
 }).call(this)
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1362,6 +1451,9 @@ async function handleRequest(request) {
 		},
 		securedTestWriteKey: { // for testing purposes
 			write: [] // no writes allowed
+		},
+		securedTestFunction: {
+			execute: []
 		},
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
 			read: ["dbo"],
@@ -1396,7 +1488,7 @@ async function handleRequest(request) {
 					// only the dbo and data subject can write a hash and salt
 					hash: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
 					salt: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
-					userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
+					//userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
 				},
 				filter: async function({action,user,object,key}) {
 					return true; // allows all other properties to be read or written, same as having no filter at all
@@ -1407,7 +1499,7 @@ async function handleRequest(request) {
 })();
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1419,11 +1511,11 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const triggers = __webpack_require__(16),
+	const triggers = __webpack_require__(17),
 		triggersKeys = Object.keys(triggers),
 		// compile triggers that are RegExp based
 		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
@@ -1462,7 +1554,7 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1496,7 +1588,7 @@ async function handleRequest(request) {
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() { module.exports="dbo"; }).call(this) 

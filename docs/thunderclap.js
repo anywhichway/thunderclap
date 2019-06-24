@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 18);
+/******/ 	return __webpack_require__(__webpack_require__.s = 19);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -637,7 +637,21 @@
 }).call(this)
 
 /***/ }),
-/* 9 */,
+/* 9 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		securedTestFunction() {
+			return "If you see this, there may be a security leak";
+		},
+		getDate() {
+			return new Date();
+		}
+	}
+}).call(this);
+
+/***/ }),
 /* 10 */,
 /* 11 */,
 /* 12 */,
@@ -646,7 +660,8 @@
 /* 15 */,
 /* 16 */,
 /* 17 */,
-/* 18 */
+/* 18 */,
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -659,91 +674,52 @@ Copyright AnyWhichWay, LLC 2019
 	"use strict"
 	const uuid4 = __webpack_require__(0),
 		joqular = __webpack_require__(5),
+		toSerializable = __webpack_require__(20),
+		create = __webpack_require__(21),
 		Schema = __webpack_require__(2),
-		User = __webpack_require__(3);
+		User = __webpack_require__(3),
+		functions = __webpack_require__(9);
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(19);
+		fetch = __webpack_require__(23);
 	}
-	
-	const fromSerializable = (data) => {
-			const type = typeof(data);
-			if(data==="@undefined") {
-				return undefined;
-			}
-			if(data==="@Infinity") {
-				return Infinity;
-			}
-			if(data==="@-Infinity") {
-				return -Infinity;
-			}
-			if(data==="@NaN") {
-				return NaN;
-			}
-			if(type==="string") {
-				if(data.startsWith("Date@")) {
-					return new Date(parseInt(data.substring(5)));
-				}
-			}
-			if(data && type==="object") {
-				Object.keys(data).forEach((key) => {
-					data[key] = fromSerializable(data[key]);
-				});
-				if(data["^"]) {
-					data["^"] = fromSerializable(data["^"]);
-				}
-			}
-			return data;
-		},
-		toSerializable = (data) => {
-			const type = typeof(data);
-			if(data===undefined) {
-				return "@undefined";
-			}
-			if(data===Infinity) {
-				return "@Infinity";
-			}
-			if(data===-Infinity) {
-				return "@-Infinity";
-			}
-			if(type==="number" && isNaN(data)) {
-				return "@NaN";
-			}
-			if(data && type==="object") {
-				if(data instanceof Date) {
-					return `Date@${data.getTime()}`;
-				}
-				Object.keys(data).forEach((key) => {
-					data[key] = toSerializable(data[key]);
-				});
-				if(data["^"]) {
-					data["^"] = toSerializable(data["^"]);
-				}
-			}
-			return data;
-		};
 	
 	// "https://cloudworker.io/db.json";
 	//"https://us-central1-reasondb-d3f23.cloudfunctions.net/query/";
 	class Thunderclap  {
-		constructor({endpoint,user,headers={}}) {
+		constructor({endpoint,user,headers}={}) {
 			this.ctors = {};
 			this.endpoint = endpoint;
 			this.headers = Object.assign({},headers);
-			this.headers["X-Auth-Username"] = user.username;
-			this.headers["X-Auth-Password"] = user.password;
+			this.headers["X-Auth-Username"] = user ? user.username : "anonymous";
+			this.headers["X-Auth-Password"] = user ? user.password : "";
 			this.register(Object);
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			Object.keys(functions).forEach((key) => {
+				if(this[key]) {
+					throw new Error(`Attempt to redefine Thunderclap function: ${key}`);
+				}
+				const f = async (...args) => {
+					const signature = [key];
+					for(let i=0;i<functions[key].length;i++) {
+						signature.push(encodeURIComponent(JSON.stringify(toSerializable(arg[i]))))
+					}
+					return fetch(`${this.endpoint}/db.json?${JSON.stringify(signature)}`,{headers:this.headers})
+		    			.then((response) => response.json())
+		    			.then((data) => create(data,this.ctors))
+				}
+				Object.defineProperty(this,key,{enumerable:false,configurable:true,writable:true,value:f})
+			})
 		}
 		async createUser(userName,password,reAuth) {
-			return fetch(`${this.endpoint}?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
 	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
-	    	.then((data) => this.create(data))
+	    	.then((data) => create(data,this.ctors))
 	    	.then((user) => {
 	    		if(reAuth || !this.headers["X-Auth-Username"]) {
 	    			this.headers["X-Auth-Username"] = user.username;
@@ -753,18 +729,18 @@ Copyright AnyWhichWay, LLC 2019
 	    	});
 		}
 		async getItem(key) {
-		    return fetch(`${this.endpoint}?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
-		    	.then((data) => this.create(data));
+		    	.then((data) => create(data,this.ctors));
 		}
 		async getSchema(className) {
-		    return fetch(`${this.endpoint}?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
+		    return fetch(`${this.endpoint}/db.json?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
 		    	.then((response) => response.json())
-		    	.then((data) => this.create(data));
+		    	.then((data) => create(data,this.ctors));
 		}
 		async keys(lastKey) {
-			return fetch(`${this.endpoint}?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
 	    		.then((response) => response.json())
 		}
 		async putItem(object) {
@@ -785,49 +761,104 @@ Copyright AnyWhichWay, LLC 2019
 					throw error;
 				}
 			}	
-			return fetch(`${this.endpoint}?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
 				.then((response) => response.json())
-				.then((object) => this.create(object))
+				.then((object) => create(object,this.ctors))
 		}
 		async query(object,{verify,partial}={}) {
-			return fetch(`${this.endpoint}?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
 	    		.then((response) => response.json())
-	    		.then((objects) => objects.map((object) => this.create(object)))
+	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		register(ctor) {
-			if(ctor.name && ctor.name!=="anonymous") {
-				this.ctors[ctor.name] = ctor;
+			let name;
+			if(typeof(ctor)==="string") {
+				name = ctor;
+				ctor = Function(`return ${ctor}`);
+			} else {
+				name = ctor.name;
+			}
+			if(name && name!=="anonymous") {
+				return this.ctors[name] = ctor;
 			}
 		}
 		async removeItem(keyOrObject) {
-			return fetch(`${this.endpoint}?["removeItem",${encodeURIComponent(JSON.stringify(toSerializable(keyOrObject)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["removeItem",${encodeURIComponent(JSON.stringify(toSerializable(keyOrObject)))}]`,{headers:this.headers})
 				.then((response) => response.json())
-				.then((data) => this.create(data))
+				.then((data) => create(data,this.ctors))
 		}
 		async setItem(key,data) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
-				.then((data) => this.create(data));
+				.then((data) => create(data,this.ctors));
 		}
 		async setSchema(className,config) {
 			const object = new Schema(className,config);
 			return this.putItem(object);
 		}
-		create(data) {
+	}
+	
+	if(true) module.exports = Thunderclap;
+	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
+}).call(this);
+
+
+/***/ }),
+/* 20 */
+/***/ (function(module, exports) {
+
+(function() {
+	const toSerializable = (data) => {
+		const type = typeof(data);
+		if(data===undefined) {
+			return "@undefined";
+		}
+		if(data===Infinity) {
+			return "@Infinity";
+		}
+		if(data===-Infinity) {
+			return "@-Infinity";
+		}
+		if(type==="number" && isNaN(data)) {
+			return "@NaN";
+		}
+		if(data && type==="object") {
+			if(data instanceof Date) {
+				return `Date@${data.getTime()}`;
+			}
+			Object.keys(data).forEach((key) => {
+				data[key] = toSerializable(data[key]);
+			});
+			if(data["^"]) {
+				data["^"] = toSerializable(data["^"]);
+			}
+		}
+		return data;
+	};
+	module.exports = toSerializable;
+}).call(this);
+
+/***/ }),
+/* 21 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const fromSerializable = __webpack_require__(22),
+		create = (data,ctors={}) => {
 			const type = typeof(data);
 			if(type==="string") {
 				return fromSerializable(data);
 			}
 			if(!data || typeof(data)!=="object") return data;
-			Object.keys(data).forEach(key => data[key] = this.create(data[key]));
+			Object.keys(data).forEach(key => data[key] = create(data[key]));
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 				cname = typeof(id)==="string" ? id.split("@")[0] : null,
-				ctor = cname ? this.ctors[cname] : null;
+				ctor = cname ? ctors[cname] : null;
 			if(!ctor) {
 				return data;
 			}
@@ -849,14 +880,48 @@ Copyright AnyWhichWay, LLC 2019
 			}
 			return instance;
 		}
-	}
-	if(true) module.exports = Thunderclap;
-	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
+	module.exports = create;
 }).call(this);
 
+/***/ }),
+/* 22 */
+/***/ (function(module, exports) {
+
+(function() {
+	const fromSerializable = (data) => {
+		const type = typeof(data);
+		if(data==="@undefined") {
+			return undefined;
+		}
+		if(data==="@Infinity") {
+			return Infinity;
+		}
+		if(data==="@-Infinity") {
+			return -Infinity;
+		}
+		if(data==="@NaN") {
+			return NaN;
+		}
+		if(type==="string") {
+			if(data.startsWith("Date@")) {
+				return new Date(parseInt(data.substring(5)));
+			}
+		}
+		if(data && type==="object") {
+			Object.keys(data).forEach((key) => {
+				data[key] = fromSerializable(data[key]);
+			});
+			if(data["^"]) {
+				data["^"] = fromSerializable(data["^"]);
+			}
+		}
+		return data;
+	}
+	module.exports = fromSerializable;
+}).call(this);
 
 /***/ }),
-/* 19 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
