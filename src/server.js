@@ -7,6 +7,7 @@ Copyright AnyWhichWay, LLC 2019
 const Schema = require("./schema.js"),
 	User = require("./user.js"),
 	hashPassword = require("./hash-password.js"),
+	toSerializable = require("./to-serializable"),
 	Thunderhead = require("./thunderhead.js"),
 	dboPassword = require("../dbo.js"),
 	secure = require("./secure.js");
@@ -76,10 +77,12 @@ async function handleRequest({request,response}) {
 				}
 			});*/
 		}
-		//let userschema = await thunderhead.getSchema(User);
-		//if(!userschema) {
-		//const userschema = await thunderhead.putItem(new Schema(User),{user:thunderhead.dbo});
-		//}
+		let userschema = await thunderhead.getSchema(User);
+		if(!userschema) {
+			request.user = thunderhead.dbo;
+			const userschema = await thunderhead.putItem(new Schema(User));
+			request.user = undefined;
+		}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
 			fname = command[0],
@@ -98,14 +101,11 @@ async function handleRequest({request,response}) {
 		  }
 		  return new Response(JSON.stringify(value));*/
 		if(thunderhead[fname]) {
-			if(fname==="createUser") {
-				args.push({user:thunderhead.dbo});
-			} else {
+			if(fname!=="createUser") {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = await thunderhead.authUser(userName,password,{user:thunderhead.dbo}); // thunderhead.dbo;
-				request.user = user;
+					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
 						status: 403,
@@ -116,10 +116,10 @@ async function handleRequest({request,response}) {
 						}
 					});
 				}
-				//const user = await thunderhead.authUser("dbo","dbo",{user:thunderhead.dbo});
-				args.push({user});
+				request.user = Object.freeze(user);
 			}
-			const secured = await secure({key:fname,action:"execute",user:args[args.length-1].user,data:args,request});
+			Object.freeze(request);
+			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response("null",{
 					status: 403,
@@ -130,55 +130,32 @@ async function handleRequest({request,response}) {
 					}
 				});
 			}
-			/*return new Response(JSON.stringify(args),{
-				status: 200,
-				headers:
-				{
-					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-				}
-			});*/
-			/*return new Response(JSON.stringify([fname,...args] + thunderhead[fname]),{
-				status: 200,
-				headers:
-				{
-					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-				}
-			});*/
 			return thunderhead[fname](...args)
 			.then((result) => {
 				const type = typeof(result);
-				if(result===undefined) result = "@undefined";
-				else if(result===Infinity) result = "@Infinity";
-				else if(result===-Infinity) result = "@-Infinity";
-				else if(type==="number" && isNaN(result)) result = "@NaN";
-				else if(result && type==="object") {
-					if(result instanceof Date) {
-						result = `Date@${result.getTime()}`;
-					}
-					if(result instanceof Error) {
-						return new Response(JSON.stringify(result.errors.map(error => error+"")),
+				if(result && type==="object" && result instanceof Error) {
+					return new Response(JSON.stringify(result.errors.map(error => error+"")),
+						{
+							status:422,
+							headers:
 							{
-								status:422,
-								headers:
-								{
-									"Content-Type":"text/plain",
-									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-								}
-							});
-					}
+								"Content-Type":"text/plain",
+								"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+							}
+						});
 				}
+				const data = toSerializable(result,true);
 				//const response = new Response(JSON.stringify(result));
 				//response.body.pipeTo(writable);
-				return new Response(JSON.stringify(result),{
+				return new Response(JSON.stringify(data),{
 					headers:
 					{
 						"Content-Type":"text/plain",
 						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
-			});
+			})
+			.catch((e) => { throw e; });
 			//return new Response(readable,
 			//	{
 			//		headers:
@@ -193,7 +170,7 @@ async function handleRequest({request,response}) {
 			body = "404 - Not Found";
 		}
 	} catch(e) {
-		body = JSON.stringify(e+body);
+		body = JSON.stringify(`${body}\n${e+""}\n${e.stack}`);
 		status = 500;
 	}
 	//return fetch(request);

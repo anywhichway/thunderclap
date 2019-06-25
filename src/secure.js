@@ -19,7 +19,9 @@
 	
 	// applies acl rules for key and action
 	// if user is not permitted to take action, modifies data accordingly
-	async function secure({key,action,user,data,request,documentOnly}) {
+	async function secure({key,action,data,documentOnly}) {
+		const {request} = this,
+			{user} = request;
 		if(!user || !user.roles) {
 			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
 		}
@@ -34,7 +36,7 @@
 		for(const rule of rules) {
 			if(rule[action]) {
 				if(typeof(rule[action])==="function") {
-					if(!(await rule[action]({action,user,data,request}))) {
+					if(!(await rule[action].call(this,{action,user,data,request}))) {
 						return {removed};
 					}
 				} else {
@@ -45,7 +47,7 @@
 				}
 			}
 			if(rule.filter) {
-				data = await rule.filter({action,user,data,request});
+				data = await rule.filter.call(this,{action,user,data,request});
 				if(data==undefined) {
 					return {removed};
 				}
@@ -56,7 +58,7 @@
 					for(const key of Object.keys(properties)) {
 						if(data[key]!==undefined) {
 							if(typeof(properties[key])==="function") {
-								if(!(await properties[key]({action,user,object:data,key,request}))) {
+								if(!(await properties[key].call(this,{action,user,object:data,key,request}))) {
 									delete data[key];
 									removed.push(key);
 								}
@@ -72,7 +74,7 @@
 				}
 				if(rule.properties.filter) {
 					for(const key of Object.keys(data)) {
-						if(data[key]!==undefined && !(await rule.properties.filter({action,user,object:data,key,request}))) {
+						if(data[key]!==undefined && !(await rule.properties.filter.call(this,{action,user,object:data,key,request}))) {
 							delete data[key];
 							removed.push(key);
 						}

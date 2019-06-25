@@ -9,20 +9,22 @@
 		async validate(object,db) {
 			const errors = [];
 			for(const key of Object.keys(this)) {
-				if(key!=="#" && key!=="^") {
+				if(key!=="^") {
 					const validation = this[key];
-					for(const validationkey of Object.keys(validation)) {
-						if(typeof(Schema.validations[validationkey])!=="function") {
-							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
-						} else {
-							if(key==="*") {
-								for(const key of Object.keys(object)) {
-									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
-								}
+					if(validation && typeof(validation)==="object") {
+						for(const validationkey of Object.keys(validation)) {
+							if(typeof(Schema.validations[validationkey])!=="function") {
+								errors.push(new TypeError(`'${validationkey}' is not an available validation`));
 							} else {
-								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								if(key==="*") {
+									for(const key of Object.keys(object)) {
+										await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
+									}
+								} else {
+									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								}
+													
 							}
-												
 						}
 					}
 				}

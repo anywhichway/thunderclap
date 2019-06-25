@@ -6,8 +6,8 @@
 		securedTestWriteKey: { // for testing purposes
 			write: [] // no writes allowed
 		},
-		securedTestFunction: {
-			execute: []
+		securedTestFunction: { // for testing purposes
+			execute: [] // no execution allowed
 		},
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
 			read: ["dbo"],
@@ -50,4 +50,4 @@
 			}
 		}
 	}
-})();
+}).call(this);

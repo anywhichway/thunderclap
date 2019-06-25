@@ -1,7 +1,9 @@
 (function() {
-	const toSerializable = (data) => {
-		const type = typeof(data);
-		if(data===undefined) {
+	"use strict"
+	const toSerializable = (data,copy) => {
+		const type = typeof(data),
+			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
+		if(data===undefined || type==="Undefined") {
 			return "@undefined";
 		}
 		if(data===Infinity) {
@@ -18,13 +20,13 @@
 				return `Date@${data.getTime()}`;
 			}
 			Object.keys(data).forEach((key) => {
-				data[key] = toSerializable(data[key]);
+				clone[key] = toSerializable(data[key],copy);
 			});
 			if(data["^"]) {
-				data["^"] = toSerializable(data["^"]);
+				clone["^"] = toSerializable(data["^"],copy);
 			}
 		}
-		return data;
+		return clone;
 	};
 	module.exports = toSerializable;
 }).call(this);

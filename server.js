@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 11);
+/******/ 	return __webpack_require__(__webpack_require__.s = 13);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -158,20 +158,22 @@
 		async validate(object,db) {
 			const errors = [];
 			for(const key of Object.keys(this)) {
-				if(key!=="#" && key!=="^") {
+				if(key!=="^") {
 					const validation = this[key];
-					for(const validationkey of Object.keys(validation)) {
-						if(typeof(Schema.validations[validationkey])!=="function") {
-							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
-						} else {
-							if(key==="*") {
-								for(const key of Object.keys(object)) {
-									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
-								}
+					if(validation && typeof(validation)==="object") {
+						for(const validationkey of Object.keys(validation)) {
+							if(typeof(Schema.validations[validationkey])!=="function") {
+								errors.push(new TypeError(`'${validationkey}' is not an available validation`));
 							} else {
-								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								if(key==="*") {
+									for(const key of Object.keys(object)) {
+										await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
+									}
+								} else {
+									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								}
+													
 							}
-												
 						}
 					}
 				}
@@ -259,13 +261,50 @@
 
 /***/ }),
 /* 5 */
+/***/ (function(module, exports) {
+
+(function() {
+	"use strict"
+	const toSerializable = (data,copy) => {
+		const type = typeof(data),
+			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
+		if(data===undefined || type==="Undefined") {
+			return "@undefined";
+		}
+		if(data===Infinity) {
+			return "@Infinity";
+		}
+		if(data===-Infinity) {
+			return "@-Infinity";
+		}
+		if(type==="number" && isNaN(data)) {
+			return "@NaN";
+		}
+		if(data && type==="object") {
+			if(data instanceof Date) {
+				return `Date@${data.getTime()}`;
+			}
+			Object.keys(data).forEach((key) => {
+				clone[key] = toSerializable(data[key],copy);
+			});
+			if(data["^"]) {
+				clone["^"] = toSerializable(data["^"],copy);
+			}
+		}
+		return clone;
+	};
+	module.exports = toSerializable;
+}).call(this);
+
+/***/ }),
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(6),
+	const soundex = __webpack_require__(7),
 		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(7),
-		isFloat = __webpack_require__(8),
+		isInt = __webpack_require__(8),
+		isFloat = __webpack_require__(9),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -611,7 +650,7 @@
 }).call(this);
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -621,7 +660,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -629,7 +668,7 @@
 }).call(this)
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -637,7 +676,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -652,7 +691,7 @@
 }).call(this);
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -696,7 +735,117 @@
 }).call(this)
 
 /***/ }),
-/* 11 */
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const acl = __webpack_require__(15),
+		roles = __webpack_require__(16),
+		aclKeys = Object.keys(acl),
+		// compile rules that are RegExp based
+		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
+			const parts = key.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					aclRegExps.push({regexp:new RegExp(parts[1],parts[2]),rule:acl[key]})
+				} catch(e) {
+					aclLiterals[key] = acl[key];
+				}
+			} else {
+				aclLiterals[key] = acl[key];
+			}
+			return {aclRegExps,aclLiterals};
+		},{aclRegExps:[],aclLiterals:{}});
+	
+	// applies acl rules for key and action
+	// if user is not permitted to take action, modifies data accordingly
+	async function secure({key,action,data,documentOnly}) {
+		const {request} = this,
+			{user} = request;
+		if(!user || !user.roles) {
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
+		}
+		// assemble applicable rules
+		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
+				if(regexp.test(key)) {
+					accum.push(key);
+				}
+				return accum;
+			},[]).concat(aclLiterals[key]||[]),
+			removed = [];
+		for(const rule of rules) {
+			if(rule[action]) {
+				if(typeof(rule[action])==="function") {
+					if(!(await rule[action].call(this,{action,user,data,request}))) {
+						return {removed};
+					}
+				} else {
+					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
+					if(!roles.some((role) => user.roles[role])) {
+						return {removed};
+					}
+				}
+			}
+			if(rule.filter) {
+				data = await rule.filter.call(this,{action,user,data,request});
+				if(data==undefined) {
+					return {removed};
+				}
+			}
+			if(!documentOnly && rule.properties && data && typeof(data)==="object") {
+				const properties = rule.properties[action];
+				if(properties) {
+					for(const key of Object.keys(properties)) {
+						if(data[key]!==undefined) {
+							if(typeof(properties[key])==="function") {
+								if(!(await properties[key].call(this,{action,user,object:data,key,request}))) {
+									delete data[key];
+									removed.push(key);
+								}
+							} else {
+								const roles = Array.isArray(properties[key]) ?  properties[key] : Object.keys(properties[key]);
+								if(!roles.some((role) => user.roles[role])) {
+									delete data[key];
+									removed.push(key);
+								}
+							}
+						}
+					}
+				}
+				if(rule.properties.filter) {
+					for(const key of Object.keys(data)) {
+						if(data[key]!==undefined && !(await rule.properties.filter.call(this,{action,user,object:data,key,request}))) {
+							delete data[key];
+							removed.push(key);
+						}
+					}
+				}
+			}
+		}
+		return {data,removed};
+	}
+	secure.mapRoles = (user) => {
+		if(user && user.roles) {
+			let changes;
+			do {
+				changes = false;
+				Object.keys(roles).forEach((role) => {
+					if(user.roles[role]) {
+						Object.keys(roles[role]).forEach((childRole) => {
+							if(!user.roles[childRole]) {
+								changes = user.roles[childRole] = true;
+							}
+						})
+					}
+				});
+			} while(changes);
+		}
+	}
+	module.exports = secure;
+}).call(this)
+
+/***/ }),
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -707,10 +856,11 @@ Copyright AnyWhichWay, LLC 2019
 
 const Schema = __webpack_require__(2),
 	User = __webpack_require__(3),
-	hashPassword = __webpack_require__(10),
-	Thunderhead = __webpack_require__(12),
-	dboPassword = __webpack_require__(18),
-	secure = __webpack_require__(13);
+	hashPassword = __webpack_require__(11),
+	toSerializable = __webpack_require__(5),
+	Thunderhead = __webpack_require__(14),
+	dboPassword = __webpack_require__(19),
+	secure = __webpack_require__(12);
 
 let thunderhead;
 addEventListener('fetch', event => {
@@ -777,10 +927,12 @@ async function handleRequest({request,response}) {
 				}
 			});*/
 		}
-		//let userschema = await thunderhead.getSchema(User);
-		//if(!userschema) {
-		//const userschema = await thunderhead.putItem(new Schema(User),{user:thunderhead.dbo});
-		//}
+		let userschema = await thunderhead.getSchema(User);
+		if(!userschema) {
+			request.user = thunderhead.dbo;
+			const userschema = await thunderhead.putItem(new Schema(User));
+			request.user = undefined;
+		}
 		body = decodeURIComponent(request.URL.search);
 		const command = JSON.parse(body.substring(1)),
 			fname = command[0],
@@ -799,14 +951,11 @@ async function handleRequest({request,response}) {
 		  }
 		  return new Response(JSON.stringify(value));*/
 		if(thunderhead[fname]) {
-			if(fname==="createUser") {
-				args.push({user:thunderhead.dbo});
-			} else {
+			if(fname!=="createUser") {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = await thunderhead.authUser(userName,password,{user:thunderhead.dbo}); // thunderhead.dbo;
-				request.user = user;
+					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
 						status: 403,
@@ -817,10 +966,10 @@ async function handleRequest({request,response}) {
 						}
 					});
 				}
-				//const user = await thunderhead.authUser("dbo","dbo",{user:thunderhead.dbo});
-				args.push({user});
+				request.user = Object.freeze(user);
 			}
-			const secured = await secure({key:fname,action:"execute",user:args[args.length-1].user,data:args,request});
+			Object.freeze(request);
+			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response("null",{
 					status: 403,
@@ -831,55 +980,32 @@ async function handleRequest({request,response}) {
 					}
 				});
 			}
-			/*return new Response(JSON.stringify(args),{
-				status: 200,
-				headers:
-				{
-					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-				}
-			});*/
-			/*return new Response(JSON.stringify([fname,...args] + thunderhead[fname]),{
-				status: 200,
-				headers:
-				{
-					"Content-Type":"text/plain",
-					"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-				}
-			});*/
 			return thunderhead[fname](...args)
 			.then((result) => {
 				const type = typeof(result);
-				if(result===undefined) result = "@undefined";
-				else if(result===Infinity) result = "@Infinity";
-				else if(result===-Infinity) result = "@-Infinity";
-				else if(type==="number" && isNaN(result)) result = "@NaN";
-				else if(result && type==="object") {
-					if(result instanceof Date) {
-						result = `Date@${result.getTime()}`;
-					}
-					if(result instanceof Error) {
-						return new Response(JSON.stringify(result.errors.map(error => error+"")),
+				if(result && type==="object" && result instanceof Error) {
+					return new Response(JSON.stringify(result.errors.map(error => error+"")),
+						{
+							status:422,
+							headers:
 							{
-								status:422,
-								headers:
-								{
-									"Content-Type":"text/plain",
-									"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-								}
-							});
-					}
+								"Content-Type":"text/plain",
+								"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+							}
+						});
 				}
+				const data = toSerializable(result,true);
 				//const response = new Response(JSON.stringify(result));
 				//response.body.pipeTo(writable);
-				return new Response(JSON.stringify(result),{
+				return new Response(JSON.stringify(data),{
 					headers:
 					{
 						"Content-Type":"text/plain",
 						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
-			});
+			})
+			.catch((e) => { throw e; });
 			//return new Response(readable,
 			//	{
 			//		headers:
@@ -894,7 +1020,7 @@ async function handleRequest({request,response}) {
 			body = "404 - Not Found";
 		}
 	} catch(e) {
-		body = JSON.stringify(e+body);
+		body = JSON.stringify(`${body}\n${e+""}\n${e.stack}`);
 		status = 500;
 	}
 	//return fetch(request);
@@ -913,17 +1039,17 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	const uuid4 = __webpack_require__(0),
 		isSoul = __webpack_require__(4),
-		joqular = __webpack_require__(5),
-		hashPassword = __webpack_require__(10),
-		secure = __webpack_require__(13),
-		respond = __webpack_require__(16),
-		functions = __webpack_require__(9),
+		joqular = __webpack_require__(6),
+		hashPassword = __webpack_require__(11),
+		secure = __webpack_require__(12),
+		respond = __webpack_require__(17),
+		functions = __webpack_require__(10),
 		User = __webpack_require__(3),
 		Schema = __webpack_require__(2);
 	
@@ -935,47 +1061,57 @@ async function handleRequest({request,response}) {
 			this.request = request;
 			this.namespace = namespace;
 			this.dbo = dbo;
-			this.register(Object);
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
 		}
-		async authUser(userName,password,options) {
-			const user = (await this.query({userName},false,options))[0];
+		async authUser(userName,password) {
+			const request = this.request,
+				authed = request.user;
+			request.user = this.dbo;
+			const user = (await this.query({userName},false))[0];
+			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
 			}
 		}
-		async createUser(userName,password,options={}) {
-			const user = new User(userName);
+		async createUser(userName,password) {
+			let user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
-			return this.putItem(user,options);
+			const request = this.request,
+				authed = request.user;
+			request.user = this.dbo;
+			user = await this.putItem(user);
+			request.user = authed;
+			return user;
 		}
-		async getItem(key,{user}={}) {
+		async getItem(key) {
 			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
 				if(key[0]!=="!") {
-					const action = "read",
-						request = this.request;
+					const action = "read";
 					if(isSoul(data["#"],false)) {
 						const key = `${data["#"].split("@")[0]}@`,
-							secured = await secure({key,action,user,data,request});
+							secured = await secure.call(this,{key,action,data});
 						data = secured.data;
 					}
-					const secured = await secure({key,action,user,data,request});
+					const secured = await secure.call(this,{key,action,data});
 					data = secured.data;
 				}
 			}
 			return data==null ? undefined : data;
 		}
-		async getSchema(ctor,options) {
+		async getSchema(ctor) {
 			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
-				return new Schema(ctor.name||ctor,JSON.parse(data));
+				const secured = await secure.call(this,{key:"Schema",action:"read",data});
+				if(secured.data) {
+					return new Schema(ctor.name||ctor,JSON.parse(data));
+				}
 			}
 		}
 		async index(data,root,options={},recursing) {
@@ -995,7 +1131,7 @@ async function handleRequest({request,response}) {
 								root[key] = true;
 								changed++;
 							}
-							let node = await this.getItem(path,options);
+							let node = await this.getItem(path);
 							if(!node) {
 								changed++;
 								node = {};
@@ -1004,7 +1140,7 @@ async function handleRequest({request,response}) {
 							if(!node[valuekey][id]) {
 								node[valuekey][id] = true;
 								//node[valuekey].__keyCount__++;
-								await this.setItem(path,node,options);
+								await this.setItem(path,node);
 							}
 						}
 					}
@@ -1015,7 +1151,7 @@ async function handleRequest({request,response}) {
 		async keys(lastKey) {
 			return this.namespace.getKeys(lastKey)
 		}
-		async putItem(object,options={}) {
+		async putItem(object) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -1027,9 +1163,8 @@ async function handleRequest({request,response}) {
 			}
 			const cname = id.split("@")[0],
 				key =`${cname}@`,
-				user = options.user,
-				request = this.request;
-			await respond.call(this,{key,when:"before",action:"put",data:object,user,request});
+				options = {};
+			await respond.call(this,{key,when:"before",action:"put",data:object});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -1040,14 +1175,15 @@ async function handleRequest({request,response}) {
 					return error;
 				}
 			}
-			const {data,removed} = await secure.call(this,{key,action:"write",user,data:object,request});
+			let {data,removed} = await secure.call(this,{key,action:"write",data:object});
 			if(!data) {
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
 			}
-			const root = (await this.getItem("!",{user:this.dbo})) || {},
-				original = await this.getItem(id,{user:this.dbo});
+			const root = (await this.getItem("!")) || {};
+			const original = await this.getItem(id);
+			let changes;
 			if(original) {
 				if(removed) {
 					removed.forEach((key) => {
@@ -1061,28 +1197,27 @@ async function handleRequest({request,response}) {
 						oldValue = original[property];
 					if(value!==oldValue) {
 						// need to add code to unindex the changes from original
-						// update({user,data,property,value,oldValue,request}) 
-						await respond.call(this,{key,when:"before",action:"update",data,property,value,oldValue,user,request});
+						// update({user,data,property,value,oldValue,request})
+						changes || (changes = {});
+						changes[property] = oldValue;
 					}
+				}
+				if(changes) {
+					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
 			const count = await this.index(data,root,options);
 			if(count) {
-				await this.setItem("!",root,{user:this.dbo});
+				await this.setItem("!",root);
 			}
-			await this.setItem(id,data,options,true);
-			for(const property of Object.keys(original||{})) {
-				const value = data[property],
-					oldValue = original[property];
-				if(value!==oldValue) {
-					setTimeout(() => {
-						respond.call(this,{key,when:"after",action:"update",data,property,value,oldValue,user,request});
-					});
+			data = await this.setItem(id,data,true);
+			if(data!==undefined) {
+				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+				if(changes) {
+					await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
 				}
+				await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
 			}
-			setTimeout(() => {
-				respond.call(this,{key,when:"after",action:"put",data,user:options.user,request});
-			});
 			return data;
 		}
 		async query(pattern,partial,options={}) {
@@ -1092,8 +1227,7 @@ async function handleRequest({request,response}) {
 				keys,
 				saveroot;
 			//return [{"test":"test"},this.dbo];
-			const user = options.user,
-				root = await this.getItem("!",{user:this.dbo});
+			const root = await this.getItem("!");
 			if(!root) return results;
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
@@ -1141,7 +1275,7 @@ async function handleRequest({request,response}) {
 												// disallow index use by unauthorized users at document && property level
 												for(const id in node[valuekey]) {
 													const cname = id.split("@")[0],
-														{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
+														{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 													if(data==null || removed.length>0) {
 														delete node[valuekey][id];
 														secured[id] = true;
@@ -1181,7 +1315,7 @@ async function handleRequest({request,response}) {
 									const secured = {};
 									for(const id in node[valuekey]) {
 										const cname = id.split("@")[0],
-											{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
+											{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 										if(data==null || removed.length>0) {
 											delete node[valuekey][id];
 											secured[id] = true;
@@ -1208,7 +1342,7 @@ async function handleRequest({request,response}) {
 				}
 			}
 			if(saveroot) {
-				this.setItem("!",root,{user:this.dbo});
+				this.setItem("!",root);
 			}
 			if(ids) {
 				for(const id in ids) {
@@ -1232,41 +1366,45 @@ async function handleRequest({request,response}) {
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject,options={}) {
+		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject)==="object";
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			} 
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject,options),
-					root = type==="object" ? await this.getItem("!",{user:this.dbo}) : null,
-					action = "write",
-					user = options.user,
-					request = this.request;
+				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
+				const action = "write",
+					root = type==="object" ? await this.getItem("!") : null;
 				if(root) {
 					const key = `${keyOrObject.split("@")[0]}@`;
-					await respond.call(this,{key,when:"before",action:"remove",data:value,user,request});
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
-					const {secured} = await secure({key,action,user,data:value,request,documentOnly:true});
+					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
+						return false;
+					}
+					if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+						return false;
+					}
+					const {secured} = await secure.call(this,{key,action,data:value,documentOnly:true});
 					if(secured) {
 						await this.namespace.delete(keyOrObject);
 						if(await this.unindex(value,root,options)) {
-							await this.setItem("!",root,{user:this.dbo});
+							await this.setItem("!",root);
 						}
-						respond.call(this,{key,when:"after",action:"remove",data:value,user,request});
-						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
+						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
 						return true;
 					}
 					return false;
 				} else {
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
-					const {data} = await secure({key:keyOrObject,action,user,data:value,request,documentOnly:true});
+					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value});
+					const {data} = await secure.call(this,{key:keyOrObject,action,data:value,documentOnly:true});
 					if(data===value) {
 						await this.namespace.delete(keyOrObject);
-						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
 						return true;
 					}
 					return false;
@@ -1274,20 +1412,22 @@ async function handleRequest({request,response}) {
 			}
 			return false;
 		}
-		async setItem(key,data,{user}={},secured) {
+		async setItem(key,data,secured) {
 			if(!secured && key[0]!=="!") {
-				const action = "write",
-					request = this.request,
-					secured = await secure({key,action,user,data,request});
+				const action = "write";
+				await respond.call(this,{key,when:"before",action:"set",data});
+				const secured = await secure.call(this,{key,action,data});
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure({key,action,user,data,request});
+						secured = await secure.call(this,{key,action,data});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
 				await this.namespace.put(key,JSON.stringify(data));
+				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+				await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
 		}
@@ -1313,7 +1453,7 @@ async function handleRequest({request,response}) {
 									root[key]--;
 									count++;
 								}*/
-								await this.setItem(path,node,options);
+								await this.setItem(path,node);
 							}
 						}
 					}
@@ -1325,7 +1465,7 @@ async function handleRequest({request,response}) {
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
 	Object.keys(functions).forEach((fname) => {
 		if(!predefined.includes(fname)) {
-			const f = async (...args) => functions[fname].call(this.request,...args);
+			const f = async (...args) => functions[fname].call(this,...args);
 			Object.defineProperty(Thunderhead.prototype,fname,{configurable:true,value:f})
 		}
 	});
@@ -1333,115 +1473,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 13 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const acl = __webpack_require__(14),
-		roles = __webpack_require__(15),
-		aclKeys = Object.keys(acl),
-		// compile rules that are RegExp based
-		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
-			const parts = key.split("/");
-			if(parts.length===3 && parts[0]==="") {
-				try {
-					aclRegExps.push({regexp:new RegExp(parts[1],parts[2]),rule:acl[key]})
-				} catch(e) {
-					aclLiterals[key] = acl[key];
-				}
-			} else {
-				aclLiterals[key] = acl[key];
-			}
-			return {aclRegExps,aclLiterals};
-		},{aclRegExps:[],aclLiterals:{}});
-	
-	// applies acl rules for key and action
-	// if user is not permitted to take action, modifies data accordingly
-	async function secure({key,action,user,data,request,documentOnly}) {
-		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
-		}
-		// assemble applicable rules
-		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
-				if(regexp.test(key)) {
-					accum.push(key);
-				}
-				return accum;
-			},[]).concat(aclLiterals[key]||[]),
-			removed = [];
-		for(const rule of rules) {
-			if(rule[action]) {
-				if(typeof(rule[action])==="function") {
-					if(!(await rule[action]({action,user,data,request}))) {
-						return {removed};
-					}
-				} else {
-					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
-					if(!roles.some((role) => user.roles[role])) {
-						return {removed};
-					}
-				}
-			}
-			if(rule.filter) {
-				data = await rule.filter({action,user,data,request});
-				if(data==undefined) {
-					return {removed};
-				}
-			}
-			if(!documentOnly && rule.properties && data && typeof(data)==="object") {
-				const properties = rule.properties[action];
-				if(properties) {
-					for(const key of Object.keys(properties)) {
-						if(data[key]!==undefined) {
-							if(typeof(properties[key])==="function") {
-								if(!(await properties[key]({action,user,object:data,key,request}))) {
-									delete data[key];
-									removed.push(key);
-								}
-							} else {
-								const roles = Array.isArray(properties[key]) ?  properties[key] : Object.keys(properties[key]);
-								if(!roles.some((role) => user.roles[role])) {
-									delete data[key];
-									removed.push(key);
-								}
-							}
-						}
-					}
-				}
-				if(rule.properties.filter) {
-					for(const key of Object.keys(data)) {
-						if(data[key]!==undefined && !(await rule.properties.filter({action,user,object:data,key,request}))) {
-							delete data[key];
-							removed.push(key);
-						}
-					}
-				}
-			}
-		}
-		return {data,removed};
-	}
-	secure.mapRoles = (user) => {
-		if(user && user.roles) {
-			let changes;
-			do {
-				changes = false;
-				Object.keys(roles).forEach((role) => {
-					if(user.roles[role]) {
-						Object.keys(roles[role]).forEach((childRole) => {
-							if(!user.roles[childRole]) {
-								changes = user.roles[childRole] = true;
-							}
-						})
-					}
-				});
-			} while(changes);
-		}
-	}
-	module.exports = secure;
-}).call(this)
-
-/***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1452,8 +1484,8 @@ async function handleRequest({request,response}) {
 		securedTestWriteKey: { // for testing purposes
 			write: [] // no writes allowed
 		},
-		securedTestFunction: {
-			execute: []
+		securedTestFunction: { // for testing purposes
+			execute: [] // no execution allowed
 		},
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
 			read: ["dbo"],
@@ -1496,10 +1528,10 @@ async function handleRequest({request,response}) {
 			}
 		}
 	}
-})();
+}).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1511,11 +1543,11 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const triggers = __webpack_require__(17),
+	const triggers = __webpack_require__(18),
 		triggersKeys = Object.keys(triggers),
 		// compile triggers that are RegExp based
 		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
@@ -1532,9 +1564,11 @@ async function handleRequest({request,response}) {
 			return {triggersRegExps,triggersLiterals};
 		},{triggersRegExps:[],triggersLiterals:{}});
 		
-	async function respond({key,when,action,user,data,property,request}) {
+	async function respond({key,when,action,data,changes}) {
 		// assemble applicable triggers
-		const triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
+		const {request} = this,
+			{user} = request,
+			triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
 				if(regexp.test(key)) {
 					accum.push(key);
 				}
@@ -1543,9 +1577,9 @@ async function handleRequest({request,response}) {
 		for(const trigger of triggers) {
 			if(trigger[when] && trigger[when][action]) {
 				if(action==="before") {
-					await trigger[when][action]({action,user,data,property,request});
+					await trigger[when][action].call(this,{action,user,data,changes,request});
 				} else {
-					trigger[when][action]({action,user,data,property,request});
+					await trigger[when][action].call(this,{action,user,data,changes,request});
 				}
 			}
 		}
@@ -1554,24 +1588,51 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		"User@": {
-			before: {
+		"<keyOrRegExp>": {
+			before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
 				put({user,data,request}) {
-					data.beforePut = true;
+					// if data is an object, it can be modified
+					// if a value other than undefined is returned, it will replace the data
+					return true;
 				},
-				update({user,data,property,value,oldValue,request}) {
+				remove({user,data,request}) {
 					
+					return true;
+				}
+			},
+			after: { // will not be awaited, called via setTimeout
+				put({user,data,request}) {
+					// might send e-mail
+					// call a webhook, etc.
+					return true;
+				},
+				remove({user,data,request}) {
+					
+				}
+			}
+		},
+		"<className>@": {
+			before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
+				put({user,object,request}) {
+					// can modify the object
+					// if a value other than undefined is returned, it will replace the object
+					return true;
+				},
+				update({user,object,property,value,oldValue,request}) {
+					
+					return true;
 				},
 				remove({user,object,request}) {
 					
+					return true;
 				}
 			},
-			after: {
+			after: { // will not be awaited, called via setTimeout
 				put({user,object,request}) {
 					// might send e-mail
 					// call a webhook, etc.
@@ -1588,7 +1649,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports) {
 
 (function() { module.exports="dbo"; }).call(this) 

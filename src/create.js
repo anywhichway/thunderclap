@@ -6,7 +6,7 @@
 				return fromSerializable(data);
 			}
 			if(!data || typeof(data)!=="object") return data;
-			Object.keys(data).forEach(key => data[key] = create(data[key]));
+			Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 				cname = typeof(id)==="string" ? id.split("@")[0] : null,
 				ctor = cname ? ctors[cname] : null;
@@ -14,18 +14,18 @@
 				return data;
 			}
 			let instance;
-			if(ctor.create) {
+			if(ctor.name!=="Object" && ctor.create) {
 				instance = ctor.create(data);
 			} else {
 				instance = Object.create(ctor.prototype);
 				Object.assign(instance,data);
 			}
 			if(!instance["^"]) {
-				const meta = Object.assign({},data["^"]);
+				const meta = {id};
 				Object.defineProperty(instance,"^",{value:meta});
 			}
 			try {
-				Object.defineProperty(instance,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+				Object.defineProperty(instance,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
 			} catch(e) {
 				// ignore if already defined
 			}

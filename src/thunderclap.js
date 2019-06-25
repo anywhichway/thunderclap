@@ -28,7 +28,6 @@ Copyright AnyWhichWay, LLC 2019
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user ? user.username : "anonymous";
 			this.headers["X-Auth-Password"] = user ? user.password : "";
-			this.register(Object);
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
@@ -70,7 +69,8 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async getSchema(className) {
 		    return fetch(`${this.endpoint}/db.json?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
-		    	.then((response) => response.json())
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
 		async keys(lastKey) {
@@ -96,12 +96,14 @@ Copyright AnyWhichWay, LLC 2019
 				}
 			}	
 			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
-				.then((response) => response.json())
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((object) => create(object,this.ctors))
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
-	    		.then((response) => response.json())
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}

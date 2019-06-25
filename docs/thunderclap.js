@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 19);
+/******/ 	return __webpack_require__(__webpack_require__.s = 20);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -158,20 +158,22 @@
 		async validate(object,db) {
 			const errors = [];
 			for(const key of Object.keys(this)) {
-				if(key!=="#" && key!=="^") {
+				if(key!=="^") {
 					const validation = this[key];
-					for(const validationkey of Object.keys(validation)) {
-						if(typeof(Schema.validations[validationkey])!=="function") {
-							errors.push(new TypeError(`'${validationkey}' is not an available validation`));
-						} else {
-							if(key==="*") {
-								for(const key of Object.keys(object)) {
-									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
-								}
+					if(validation && typeof(validation)==="object") {
+						for(const validationkey of Object.keys(validation)) {
+							if(typeof(Schema.validations[validationkey])!=="function") {
+								errors.push(new TypeError(`'${validationkey}' is not an available validation`));
 							} else {
-								await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								if(key==="*") {
+									for(const key of Object.keys(object)) {
+										await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);
+									}
+								} else {
+									await Schema.validations[validationkey](validation[validationkey],object,key,object[key],errors,db);	
+								}
+													
 							}
-												
 						}
 					}
 				}
@@ -259,13 +261,50 @@
 
 /***/ }),
 /* 5 */
+/***/ (function(module, exports) {
+
+(function() {
+	"use strict"
+	const toSerializable = (data,copy) => {
+		const type = typeof(data),
+			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
+		if(data===undefined || type==="Undefined") {
+			return "@undefined";
+		}
+		if(data===Infinity) {
+			return "@Infinity";
+		}
+		if(data===-Infinity) {
+			return "@-Infinity";
+		}
+		if(type==="number" && isNaN(data)) {
+			return "@NaN";
+		}
+		if(data && type==="object") {
+			if(data instanceof Date) {
+				return `Date@${data.getTime()}`;
+			}
+			Object.keys(data).forEach((key) => {
+				clone[key] = toSerializable(data[key],copy);
+			});
+			if(data["^"]) {
+				clone["^"] = toSerializable(data["^"],copy);
+			}
+		}
+		return clone;
+	};
+	module.exports = toSerializable;
+}).call(this);
+
+/***/ }),
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(6),
+	const soundex = __webpack_require__(7),
 		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(7),
-		isFloat = __webpack_require__(8),
+		isInt = __webpack_require__(8),
+		isFloat = __webpack_require__(9),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -611,7 +650,7 @@
 }).call(this);
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -621,7 +660,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -629,7 +668,7 @@
 }).call(this)
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -637,7 +676,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -652,7 +691,6 @@
 }).call(this);
 
 /***/ }),
-/* 10 */,
 /* 11 */,
 /* 12 */,
 /* 13 */,
@@ -661,7 +699,8 @@
 /* 16 */,
 /* 17 */,
 /* 18 */,
-/* 19 */
+/* 19 */,
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -673,12 +712,12 @@ Copyright AnyWhichWay, LLC 2019
 (function() {
 	"use strict"
 	const uuid4 = __webpack_require__(0),
-		joqular = __webpack_require__(5),
-		toSerializable = __webpack_require__(20),
+		joqular = __webpack_require__(6),
+		toSerializable = __webpack_require__(5),
 		create = __webpack_require__(21),
 		Schema = __webpack_require__(2),
 		User = __webpack_require__(3),
-		functions = __webpack_require__(9);
+		functions = __webpack_require__(10);
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
@@ -694,7 +733,6 @@ Copyright AnyWhichWay, LLC 2019
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user ? user.username : "anonymous";
 			this.headers["X-Auth-Password"] = user ? user.password : "";
-			this.register(Object);
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
@@ -736,7 +774,8 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async getSchema(className) {
 		    return fetch(`${this.endpoint}/db.json?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
-		    	.then((response) => response.json())
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
 		async keys(lastKey) {
@@ -762,12 +801,14 @@ Copyright AnyWhichWay, LLC 2019
 				}
 			}	
 			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
-				.then((response) => response.json())
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((object) => create(object,this.ctors))
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
-	    		.then((response) => response.json())
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
@@ -809,41 +850,6 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 20 */
-/***/ (function(module, exports) {
-
-(function() {
-	const toSerializable = (data) => {
-		const type = typeof(data);
-		if(data===undefined) {
-			return "@undefined";
-		}
-		if(data===Infinity) {
-			return "@Infinity";
-		}
-		if(data===-Infinity) {
-			return "@-Infinity";
-		}
-		if(type==="number" && isNaN(data)) {
-			return "@NaN";
-		}
-		if(data && type==="object") {
-			if(data instanceof Date) {
-				return `Date@${data.getTime()}`;
-			}
-			Object.keys(data).forEach((key) => {
-				data[key] = toSerializable(data[key]);
-			});
-			if(data["^"]) {
-				data["^"] = toSerializable(data["^"]);
-			}
-		}
-		return data;
-	};
-	module.exports = toSerializable;
-}).call(this);
-
-/***/ }),
 /* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -855,7 +861,7 @@ Copyright AnyWhichWay, LLC 2019
 				return fromSerializable(data);
 			}
 			if(!data || typeof(data)!=="object") return data;
-			Object.keys(data).forEach(key => data[key] = create(data[key]));
+			Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
 			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 				cname = typeof(id)==="string" ? id.split("@")[0] : null,
 				ctor = cname ? ctors[cname] : null;
@@ -863,18 +869,18 @@ Copyright AnyWhichWay, LLC 2019
 				return data;
 			}
 			let instance;
-			if(ctor.create) {
+			if(ctor.name!=="Object" && ctor.create) {
 				instance = ctor.create(data);
 			} else {
 				instance = Object.create(ctor.prototype);
 				Object.assign(instance,data);
 			}
 			if(!instance["^"]) {
-				const meta = Object.assign({},data["^"]);
+				const meta = {id};
 				Object.defineProperty(instance,"^",{value:meta});
 			}
 			try {
-				Object.defineProperty(instance,"#",{get() { return this["^"]["#"]||this["^"].id; }});
+				Object.defineProperty(instance,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
 			} catch(e) {
 				// ignore if already defined
 			}

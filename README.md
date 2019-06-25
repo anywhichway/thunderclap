@@ -5,7 +5,7 @@ Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-power
 (JavaScript Object Query Language), is similar to, but more extensive than, the query language associated with MongoDB. 
 In addition to having more predicates than MongoDB, JOQULAR extends pattern matching to object properties, e.g.
 
-```
+```javascript
 {[/a.*/]:{$eq: 1}} // match all objects with properties starting with the letter "a" containing the value 1
 ```
 
@@ -120,7 +120,7 @@ serialized and de-serialized.
 
 ## JavaScript Client
 
-```
+```javascript
 <script src="thunderclap.js"></script>
 <script>
 const endpoint = "https://thunderclap.mydomain.com/db.json",
@@ -166,7 +166,7 @@ not indexed. The index is not partitioned per class, it spans all classes.
 At the moment one index is created for each unique property name, regardless of the class on which the property
 exists. This index entry is a nested map of values and then object ids with the property and value, e.g.
 
-```
+```javascript
 {
 	<value1>:
 	{
@@ -220,7 +220,65 @@ to prevent read and write unless specifically permitted.
 
 If the user is not authorized to execute a function a 403 status will be returned.
 
-See the file `acl.js` for more detail.
+The default `acl.js` file is show below.
+
+```javacript
+(function () {
+	module.exports = {
+		securedTestReadKey: { // for testing purposes
+			read: [] // no reads allowed
+		},
+		securedTestWriteKey: { // for testing purposes
+			write: [] // no writes allowed
+		},
+		securedTestFunction: { // for testing purposes
+			execute: [] // no execution allowed
+		},
+		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing may create a data inference leak
+			read: ["dbo"],
+			write: ["dbo"]
+		},
+		"User@": { // key to control, user <cname>@ for classes
+			
+			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
+			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
+			// a filter function can also be used
+			// action with be "read" or "write", not returning anything will result in denial
+			// not specifying a filter function will allow all read and write, unless controlled above
+			// a function with the same call signature can also be used as a property value above
+			filter: async function({action,user,data,request}) {
+				// very restrictive, don't return a user record unless requested by the dbo or data subject
+				if(user.roles.dbo || user.userName===data.userName) {
+					return data;
+				}
+			},
+			properties: { // only applies to objects
+				read: {
+					// example of using a function, only dbo's and data subjects can get roles
+					roles: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName, 
+					hash: ["dbo"], // only dbo's can read passwod hashes
+					salt: {
+						dbo: true // example of alternate control form, only dbo's can read password salts
+					}
+				},
+				write: {
+					password: {
+						// a propery named password can never be written
+					},
+					// only the dbo and data subject can write a hash and salt
+					hash: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
+					salt: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
+					//userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
+				},
+				filter: async function({action,user,object,key}) {
+					return true; // allows all other properties to be read or written, same as having no filter at all
+				}
+			}
+		}
+	}
+}).call(this);
+
+```
 
 Roles can also be established in a tree that is automatically applied at runtime. See the file `roles.js`.
 
@@ -238,11 +296,90 @@ To be written.
 
 # Triggers
 
-To be written. See the file `triggers.js`.
+Triggers can get invoked before and after key value or indexed object properties change or get deleted. The triggers are configure in 
+the file `triggers.js`. Any asynchronous triggers will be awaited. `before` triggers must return truthy for execution to
+continue, i.e. a before on set that returns false with result in the set aborting. `before` triggers are fired immediately
+before security checks. Triggers are not access controlled.
+
+```javascript
+(function() {
+	module.exports = {
+		"<keyOrRegExp>": {
+			before: { // user and request are frozen, data can be modified
+				put({user,data,request}) {
+					// if data is an object, it can be modified
+					// if a value other than undefined is returned, it will replace the data
+					return true;
+				},
+				remove({user,data,request}) {
+					
+					return true;
+				}
+			},
+			after: { // will not be awaited, called via setTimeout
+				put({user,data,request}) {
+					// might send e-mail
+					// call a webhook, etc.
+					
+				},
+				remove({user,data,request}) {
+					
+				}
+			}
+		},
+		"<className>@": {
+			before: { // user and request are frozen, data can be modified
+				put({user,object,request}) {
+					// can modify the object
+					// if a value other than undefined is returned, it will replace the object
+					return true;
+				},
+				update({user,object,property,value,oldValue,request}) {
+					
+					return true;
+				},
+				remove({user,object,request}) {
+					
+					return true;
+				}
+			},
+			after: { // will not be awaited, called via setTimeout
+				put({user,object,request}) {
+					// might send e-mail
+					// call a webhook, etc.
+				},
+				update({user,object,property,value,oldValue,request}) {
+					
+				},
+				remove({user,object,request}) {
+					
+				}
+			}
+		}
+	}
+}).call(this);
+```
 
 # Functions
 
-To be written. See the file `functions.js`.
+Exposing server functions to the JavaScript client in the browser is simple. Just define the functions in 
+the file `functions.js`. Any asynchronous functions will be awaited.
+
+```javascript
+(function() {
+	module.exports = {
+		securedTestFunction() {
+			return "If you see this, there may be a security leak";
+		},
+		getDate() {
+			return new Date();
+		}
+	}
+}).call(this);
+```
+
+The functions will automatically become available in the admin client `docs/thunderclap`. Function execution can
+be access controlled in `acl.js`.
 
 # History and Roadmap
 
@@ -251,6 +388,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-25 v0.0.11a Code optimizations and bug fixes.
 
 2019-06-24 v0.0.10a Custom function support added.
 

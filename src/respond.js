@@ -16,9 +16,11 @@
 			return {triggersRegExps,triggersLiterals};
 		},{triggersRegExps:[],triggersLiterals:{}});
 		
-	async function respond({key,when,action,user,data,property,request}) {
+	async function respond({key,when,action,data,changes}) {
 		// assemble applicable triggers
-		const triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
+		const {request} = this,
+			{user} = request,
+			triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
 				if(regexp.test(key)) {
 					accum.push(key);
 				}
@@ -27,9 +29,9 @@
 		for(const trigger of triggers) {
 			if(trigger[when] && trigger[when][action]) {
 				if(action==="before") {
-					await trigger[when][action]({action,user,data,property,request});
+					await trigger[when][action].call(this,{action,user,data,changes,request});
 				} else {
-					trigger[when][action]({action,user,data,property,request});
+					await trigger[when][action].call(this,{action,user,data,changes,request});
 				}
 			}
 		}

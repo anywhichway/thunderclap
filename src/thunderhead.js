@@ -17,47 +17,57 @@
 			this.request = request;
 			this.namespace = namespace;
 			this.dbo = dbo;
-			this.register(Object);
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
 		}
-		async authUser(userName,password,options) {
-			const user = (await this.query({userName},false,options))[0];
+		async authUser(userName,password) {
+			const request = this.request,
+				authed = request.user;
+			request.user = this.dbo;
+			const user = (await this.query({userName},false))[0];
+			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
 			}
 		}
-		async createUser(userName,password,options={}) {
-			const user = new User(userName);
+		async createUser(userName,password) {
+			let user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
-			return this.putItem(user,options);
+			const request = this.request,
+				authed = request.user;
+			request.user = this.dbo;
+			user = await this.putItem(user);
+			request.user = authed;
+			return user;
 		}
-		async getItem(key,{user}={}) {
+		async getItem(key) {
 			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
 				if(key[0]!=="!") {
-					const action = "read",
-						request = this.request;
+					const action = "read";
 					if(isSoul(data["#"],false)) {
 						const key = `${data["#"].split("@")[0]}@`,
-							secured = await secure({key,action,user,data,request});
+							secured = await secure.call(this,{key,action,data});
 						data = secured.data;
 					}
-					const secured = await secure({key,action,user,data,request});
+					const secured = await secure.call(this,{key,action,data});
 					data = secured.data;
 				}
 			}
 			return data==null ? undefined : data;
 		}
-		async getSchema(ctor,options) {
+		async getSchema(ctor) {
 			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
-				return new Schema(ctor.name||ctor,JSON.parse(data));
+				const secured = await secure.call(this,{key:"Schema",action:"read",data});
+				if(secured.data) {
+					return new Schema(ctor.name||ctor,JSON.parse(data));
+				}
 			}
 		}
 		async index(data,root,options={},recursing) {
@@ -77,7 +87,7 @@
 								root[key] = true;
 								changed++;
 							}
-							let node = await this.getItem(path,options);
+							let node = await this.getItem(path);
 							if(!node) {
 								changed++;
 								node = {};
@@ -86,7 +96,7 @@
 							if(!node[valuekey][id]) {
 								node[valuekey][id] = true;
 								//node[valuekey].__keyCount__++;
-								await this.setItem(path,node,options);
+								await this.setItem(path,node);
 							}
 						}
 					}
@@ -97,7 +107,7 @@
 		async keys(lastKey) {
 			return this.namespace.getKeys(lastKey)
 		}
-		async putItem(object,options={}) {
+		async putItem(object) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -109,9 +119,8 @@
 			}
 			const cname = id.split("@")[0],
 				key =`${cname}@`,
-				user = options.user,
-				request = this.request;
-			await respond.call(this,{key,when:"before",action:"put",data:object,user,request});
+				options = {};
+			await respond.call(this,{key,when:"before",action:"put",data:object});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -122,14 +131,15 @@
 					return error;
 				}
 			}
-			const {data,removed} = await secure.call(this,{key,action:"write",user,data:object,request});
+			let {data,removed} = await secure.call(this,{key,action:"write",data:object});
 			if(!data) {
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
 			}
-			const root = (await this.getItem("!",{user:this.dbo})) || {},
-				original = await this.getItem(id,{user:this.dbo});
+			const root = (await this.getItem("!")) || {};
+			const original = await this.getItem(id);
+			let changes;
 			if(original) {
 				if(removed) {
 					removed.forEach((key) => {
@@ -143,28 +153,27 @@
 						oldValue = original[property];
 					if(value!==oldValue) {
 						// need to add code to unindex the changes from original
-						// update({user,data,property,value,oldValue,request}) 
-						await respond.call(this,{key,when:"before",action:"update",data,property,value,oldValue,user,request});
+						// update({user,data,property,value,oldValue,request})
+						changes || (changes = {});
+						changes[property] = oldValue;
 					}
+				}
+				if(changes) {
+					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
 			const count = await this.index(data,root,options);
 			if(count) {
-				await this.setItem("!",root,{user:this.dbo});
+				await this.setItem("!",root);
 			}
-			await this.setItem(id,data,options,true);
-			for(const property of Object.keys(original||{})) {
-				const value = data[property],
-					oldValue = original[property];
-				if(value!==oldValue) {
-					setTimeout(() => {
-						respond.call(this,{key,when:"after",action:"update",data,property,value,oldValue,user,request});
-					});
+			data = await this.setItem(id,data,true);
+			if(data!==undefined) {
+				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+				if(changes) {
+					await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
 				}
+				await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
 			}
-			setTimeout(() => {
-				respond.call(this,{key,when:"after",action:"put",data,user:options.user,request});
-			});
 			return data;
 		}
 		async query(pattern,partial,options={}) {
@@ -174,8 +183,7 @@
 				keys,
 				saveroot;
 			//return [{"test":"test"},this.dbo];
-			const user = options.user,
-				root = await this.getItem("!",{user:this.dbo});
+			const root = await this.getItem("!");
 			if(!root) return results;
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
@@ -223,7 +231,7 @@
 												// disallow index use by unauthorized users at document && property level
 												for(const id in node[valuekey]) {
 													const cname = id.split("@")[0],
-														{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
+														{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 													if(data==null || removed.length>0) {
 														delete node[valuekey][id];
 														secured[id] = true;
@@ -263,7 +271,7 @@
 									const secured = {};
 									for(const id in node[valuekey]) {
 										const cname = id.split("@")[0],
-											{data,removed} = await secure({key:`${cname}@`,action:"read",user,data:{[key]:value},request:this.request});
+											{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 										if(data==null || removed.length>0) {
 											delete node[valuekey][id];
 											secured[id] = true;
@@ -290,7 +298,7 @@
 				}
 			}
 			if(saveroot) {
-				this.setItem("!",root,{user:this.dbo});
+				this.setItem("!",root);
 			}
 			if(ids) {
 				for(const id in ids) {
@@ -314,41 +322,45 @@
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject,options={}) {
+		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject)==="object";
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			} 
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject,options),
-					root = type==="object" ? await this.getItem("!",{user:this.dbo}) : null,
-					action = "write",
-					user = options.user,
-					request = this.request;
+				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
+				const action = "write",
+					root = type==="object" ? await this.getItem("!") : null;
 				if(root) {
 					const key = `${keyOrObject.split("@")[0]}@`;
-					await respond.call(this,{key,when:"before",action:"remove",data:value,user,request});
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
-					const {secured} = await secure({key,action,user,data:value,request,documentOnly:true});
+					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
+						return false;
+					}
+					if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+						return false;
+					}
+					const {secured} = await secure.call(this,{key,action,data:value,documentOnly:true});
 					if(secured) {
 						await this.namespace.delete(keyOrObject);
 						if(await this.unindex(value,root,options)) {
-							await this.setItem("!",root,{user:this.dbo});
+							await this.setItem("!",root);
 						}
-						respond.call(this,{key,when:"after",action:"remove",data:value,user,request});
-						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
+						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
 						return true;
 					}
 					return false;
 				} else {
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,user,request});
-					const {data} = await secure({key:keyOrObject,action,user,data:value,request,documentOnly:true});
+					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value});
+					const {data} = await secure.call(this,{key:keyOrObject,action,data:value,documentOnly:true});
 					if(data===value) {
 						await this.namespace.delete(keyOrObject);
-						respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:value,user,request});
+						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
 						return true;
 					}
 					return false;
@@ -356,20 +368,22 @@
 			}
 			return false;
 		}
-		async setItem(key,data,{user}={},secured) {
+		async setItem(key,data,secured) {
 			if(!secured && key[0]!=="!") {
-				const action = "write",
-					request = this.request,
-					secured = await secure({key,action,user,data,request});
+				const action = "write";
+				await respond.call(this,{key,when:"before",action:"set",data});
+				const secured = await secure.call(this,{key,action,data});
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure({key,action,user,data,request});
+						secured = await secure.call(this,{key,action,data});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
 				await this.namespace.put(key,JSON.stringify(data));
+				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+				await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
 		}
@@ -395,7 +409,7 @@
 									root[key]--;
 									count++;
 								}*/
-								await this.setItem(path,node,options);
+								await this.setItem(path,node);
 							}
 						}
 					}
@@ -407,7 +421,7 @@
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
 	Object.keys(functions).forEach((fname) => {
 		if(!predefined.includes(fname)) {
-			const f = async (...args) => functions[fname].call(this.request,...args);
+			const f = async (...args) => functions[fname].call(this,...args);
 			Object.defineProperty(Thunderhead.prototype,fname,{configurable:true,value:f})
 		}
 	});
