@@ -1,5 +1,5 @@
 (function() {
-	const uuid4 = require("./uuid4.js"),
+	const uid = require("./uid.js"),
 		isSoul = require("./is-soul.js"),
 		joqular = require("./joqular.js"),
 		hashPassword = require("./hash-password.js"),
@@ -7,7 +7,8 @@
 		respond = require("./respond.js"),
 		functions = require("../functions.js"),
 		User = require("./user.js"),
-		Schema = require("./schema.js");
+		Schema = require("./schema.js"),
+		keys = require("../keys.js");
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -22,6 +23,7 @@
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
 		}
 		async authUser(userName,password) {
 			const request = this.request,
@@ -48,7 +50,7 @@
 			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
-				if(key[0]!=="!") {
+				//if(key[0]!=="!") {
 					const action = "read";
 					if(isSoul(data["#"],false)) {
 						const key = `${data["#"].split("@")[0]}@`,
@@ -57,57 +59,64 @@
 					}
 					const secured = await secure.call(this,{key,action,data});
 					data = secured.data;
-				}
+				//}
 			}
 			return data==null ? undefined : data;
 		}
 		async getSchema(ctor) {
-			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
+			let data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
+				data = JSON.parse(data);
 				const secured = await secure.call(this,{key:"Schema",action:"read",data});
 				if(secured.data) {
-					return new Schema(ctor.name||ctor,JSON.parse(data));
+					return new Schema(ctor.name||ctor,data);
 				}
 			}
 		}
 		async index(data,root,options={},recursing) {
-			let changed = 0;
+			let rootchanged;
 			if(data && typeof(data)==="object" && data["#"]) {
 				const id = data["#"];
 				for(const key in data) {
-					if(!options.schema || !options.schema[key] || !options.schema[key].noindex) {
+					if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
 						const value = data[key],
 							type = typeof(value);
 						if(value && type==="object") {
-							changed += await this.index(value,root,options,true);
+							rootchanged += await this.index(value,root,options,true);
 						} else {
-							const valuekey = `${JSON.stringify(value)}`,
-								path = `!${key}`;
+							const valuekey = `${JSON.stringify(value)}`;
+							const keypath = `!${key}`;
 							if(!root[key]) {
-								root[key] = true;
-								changed++;
+								rootchanged = root[key] = true;
 							}
-							let node = await this.getItem(path);
+							let node = await this.namespace.get(keypath);
 							if(!node) {
-								changed++;
 								node = {};
+							} else {
+								node = JSON.parse(node);
 							}
-							node[valuekey] || (node[valuekey] = {}); // __keyCount__:0
-							if(!node[valuekey][id]) {
-								node[valuekey][id] = true;
-								//node[valuekey].__keyCount__++;
-								await this.setItem(path,node);
+							if(!node[valuekey]) {
+								node[valuekey] = true;
+								await this.namespace.put(keypath,JSON.stringify(node));
+							}
+							const valuepath = `${keypath}!${valuekey}`;
+							node = await this.namespace.get(valuepath);
+							if(!node) {
+								node = {};
+							} else {
+								node = JSON.parse(node);
+							}
+							if(!node[id]) {
+								node[id] = true;
+								await this.namespace.put(valuepath,JSON.stringify(node))
 							}
 						}
 					}
 				}
 			}
-			return changed;
+			return rootchanged;
 		}
-		async keys(lastKey) {
-			return this.namespace.getKeys(lastKey)
-		}
-		async putItem(object) {
+		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -115,11 +124,10 @@
 			}
 			let id = object["#"];
 			if(!id) {
-				id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
+				id = object["#"]  = `${object.constructor.name}@${uid()}`;
 			}
 			const cname = id.split("@")[0],
-				key =`${cname}@`,
-				options = {};
+				key =`${cname}@`;
 			await respond.call(this,{key,when:"before",action:"put",data:object});
 			let schema = await this.getSchema(cname);
 			if(schema) {
@@ -137,7 +145,12 @@
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
 			}
-			const root = (await this.getItem("!")) || {};
+			let root = await this.namespace.get("!");
+			if(!root) {
+				root = {};
+			} else {
+				root = JSON.parse(root);
+			}
 			const original = await this.getItem(id);
 			let changes;
 			if(original) {
@@ -162,11 +175,11 @@
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
-			const count = await this.index(data,root,options);
-			if(count) {
-				await this.setItem("!",root);
+			const changed = await this.index(data,root,options);
+			if(changed) {
+				await this.namespace.put("!",JSON.stringify(root));
 			}
-			data = await this.setItem(id,data,true);
+			data = await this.setItem(id,data,options,true);
 			if(data!==undefined) {
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				if(changes) {
@@ -183,8 +196,9 @@
 				keys,
 				saveroot;
 			//return [{"test":"test"},this.dbo];
-			const root = await this.getItem("!");
+			let root = await this.namespace.get("!");
 			if(!root) return results;
+			root = JSON.parse(root);
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
 					value = pattern[key],
@@ -196,93 +210,79 @@
 				}
 				for(const key of keys) {
 					if(root[key]) {
-						const node = await this.getItem(`!${key}`,{user:this.dbo});
-						if(!node) {
+						const keypath = `!${key}`;
+						let keynode = await this.namespace.get(keypath);
+						if(!keynode) {
 							delete root[key];
 							saveroot = true;
 							continue;
 						}
-						if(node) {
-							if(value && type==="object") {
-								const valuecopy = Object.assign({},value);
-								for(let [predicate,pvalue] of Object.entries(value)) {
-									if(predicate==="$return") continue;
-									const test = joqular.toTest(predicate);
-									if(predicate==="$search") {
+						keynode = JSON.parse(keynode);
+						if(value && type==="object") {
+							const valuecopy = Object.assign({},value);
+							for(let [predicate,pvalue] of Object.entries(value)) {
+								if(predicate==="$return") continue;
+								const test = joqular.toTest(predicate);
+								if(predicate==="$search") {
 
-									} else if(test) {
-										const ptype = typeof(pvalue);
-										if(ptype==="string") {
-											if(pvalue.startsWith("Date@")) {
-												pvalue = new Date(parseInt(pvalue.split("@")[1]));
-											}
+								} else if(test) {
+									const ptype = typeof(pvalue);
+									if(ptype==="string") {
+										if(pvalue.startsWith("Date@")) {
+											pvalue = new Date(parseInt(pvalue.split("@")[1]));
 										}
-										let testids = {};
-										delete valuecopy[predicate];
-										const secured = {};
-										let haskeys;
-										for(const valuekey in node) {
-											haskeys = true;
-											let value = JSON.parse(valuekey);
-											if(typeof(value)==="string" && value.startsWith("Date@")) {
-												value = new Date(parseInt(value.split("@")[1]));
+									}
+									let testids = {};
+									delete valuecopy[predicate];
+									const secured = {};
+									let haskeys;
+									for(const valuekey in keynode) {
+										haskeys = true;
+										let value = JSON.parse(valuekey);
+										if(typeof(value)==="string" && value.startsWith("Date@")) {
+											value = new Date(parseInt(value.split("@")[1]));
+										}
+										if(await test.call(keynode,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
+											// disallow index use by unauthorized users at document && property level
+											const valuepath = `${keypath}!${valuekey}`;
+											let valuenode = await this.namespace.get(valuepath);
+											if(!valuenode) {
+												delete keynode[valuekey];
+												await this.namespace.put(keypath,JSON.stringify(keynode));
+												continue;
 											}
-											if(await test.call(node,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
-												// disallow index use by unauthorized users at document && property level
-												for(const id in node[valuekey]) {
-													const cname = id.split("@")[0],
-														{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-													if(data==null || removed.length>0) {
-														delete node[valuekey][id];
-														secured[id] = true;
-													}
+											valuenode = JSON.parse(valuenode);
+											let haskeys;
+											for(const id in valuenode) {
+												haskeys = true;
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data==null || removed.length>0) {
+													delete valuenode[id];
+													secured[id] = true;
 												}
-												Object.assign(testids,node[valuekey]);
 											}
-										}
-										if(!haskeys) {
-											delete root[key];
-											saveroot = true;
-											break;
-										}
-										if(!ids) {
-											ids = Object.assign({},testids);
-											count = Object.keys(ids).length;
-											if(count===0) {
-												return [];
-											}
-										} else {
-											for(const id in ids) {
-												if(!secured[id] && !testids[id]) {
-													delete ids[id];
-													count--;
-													if(count<=0) {
-														return [];
-													}
-												}
+											if(haskeys) {
+												Object.assign(testids,valuenode);
+											} else {
+												this.namespace.delete(valuepath);
 											}
 										}
 									}
-								}
-							} else {
-								const valuekey = JSON.stringify(value);
-								if(node[valuekey]) {
-									// disallow index use by unauthorized users at document && property level
-									const secured = {};
-									for(const id in node[valuekey]) {
-										const cname = id.split("@")[0],
-											{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-										if(data==null || removed.length>0) {
-											delete node[valuekey][id];
-											secured[id] = true;
-										}
+									if(!haskeys) {
+										delete root[key];
+										saveroot = true;
+										break;
 									}
 									if(!ids) {
-										ids = Object.assign({},node[valuekey]);
+										ids = Object.assign({},testids);
 										count = Object.keys(ids).length;
+										if(count===0) {
+											return [];
+										}
 									} else {
 										for(const id in ids) {
-											if(!secured[id] && !node[valuekey][id]) {
+											if(!secured[id] && !testids[id]) {
 												delete ids[id];
 												count--;
 												if(count<=0) {
@@ -293,12 +293,53 @@
 									}
 								}
 							}
-						} 
+						} else {
+							const valuekey = JSON.stringify(value);
+							if(keynode[valuekey]) {
+								// disallow index use by unauthorized users at document && property level
+								const secured = {};
+								const valuepath = `${keypath}!${valuekey}`;
+								let valuenode = await this.namespace.get(valuepath);
+								if(!valuenode) {
+									delete keynode[valuekey];
+									await this.namespace.put(keypath,JSON.stringify(keynode));
+									return;
+								}
+								valuenode = JSON.parse(valuenode);
+								let haskeys;
+								for(const id in valuenode) {
+									haskeys = true;
+									const cname = id.split("@")[0],
+										{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+									if(data==null || removed.length>0) {
+										delete valuenode[id];
+										secured[id] = true;
+									}
+								}
+								if(!haskeys) {
+									return [];
+								}
+								if(!ids) {
+									ids = Object.assign({},valuenode);
+									count = Object.keys(ids).length;
+								} else {
+									for(const id in ids) {
+										if(!secured[id] && !valuenode[id]) {
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
 			if(saveroot) {
-				this.setItem("!",root);
+				this.namespace.set("!",JSON.stringify(root));
 			}
 			if(ids) {
 				for(const id in ids) {
@@ -323,52 +364,40 @@
 			}
 		}
 		async removeItem(keyOrObject) {
-			const type = typeof(keyOrObject)==="object";
+			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
-			} 
+			}
 			if(keyOrObject) {
 				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
 				const action = "write",
-					root = type==="object" ? await this.getItem("!") : null;
-				if(root) {
-					const key = `${keyOrObject.split("@")[0]}@`;
+					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
+				if(key) {
 					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
-						return false;
+						return "bad";
 					}
-					if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
-						return false;
-					}
-					const {secured} = await secure.call(this,{key,action,data:value,documentOnly:true});
-					if(secured) {
-						await this.namespace.delete(keyOrObject);
-						if(await this.unindex(value,root,options)) {
-							await this.setItem("!",root);
-						}
-						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+				}
+				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+					return false;
+				}
+				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
+				if(data && removed.length===0) {
+					await this.namespace.delete(keyOrObject);
+					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+					if(key) {
+						await this.unindex(value);
 						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
-						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
-						return true;
 					}
-					return false;
-				} else {
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value});
-					const {data} = await secure.call(this,{key:keyOrObject,action,data:value,documentOnly:true});
-					if(data===value) {
-						await this.namespace.delete(keyOrObject);
-						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
-						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
-						return true;
-					}
-					return false;
+					await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
+					return true;
 				}
 			}
 			return false;
 		}
-		async setItem(key,data,secured) {
+		async setItem(key,data,options={},secured) {
 			if(!secured && key[0]!=="!") {
 				const action = "write";
 				await respond.call(this,{key,when:"before",action:"set",data});
@@ -381,41 +410,43 @@
 				}
 			}
 			if(data!==undefined) {
-				await this.namespace.put(key,JSON.stringify(data));
+				await this.namespace.put(key,JSON.stringify(data),options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
-		}
-		async unindex(object,options,root={}) {
-			let count = 0;
+		} 
+		async unindex(object) {
 			if(object && typeof(object)==="object" && object["#"]) {
 				const id = object["#"];
 				for(const key in object) {
-					if(root[key]) {
-						const value = object[key];
-						if(value && typeof(value)==="object") {
-							count += await this.unindex(value,options,root);
-						} else {
-							const valuekey = `${JSON.stringify(value)}`,
-								path = `!${key}`,
-								node = await this.getItem(path,options);
-							if(node[valuekey] && node[valuekey][id]) {
-								delete node[valuekey][id];
-								count++;
-								/*node[valuekey].__keyCount__--;
-								if(!node[valuekey].__keyCount__) {
-									delete node[valuekey];
-									root[key]--;
-									count++;
-								}*/
-								await this.setItem(path,node);
+					if(key==="#") {
+						continue;
+					}
+					const value = object[key];
+					if(value && typeof(value)==="object") {
+						await this.unindex(value);
+					} else {
+						const valuekey = `${JSON.stringify(value)}`,
+							keypath = `!${key}`;
+						let keynode = await this.namespace.get(keypath);
+						if(keynode) {
+							keynode = JSON.parse(keynode);
+							if(keynode[valuekey]) {
+								const valuepath = `${keypath}!${valuekey}`;
+								let valuenode = await this.namespace.get(valuepath);
+								if(valuenode) {
+									valuenode = JSON.parse(valuenode);
+									if(valuenode[id]) {
+										delete valuenode[id];
+										await this.namespace.put(`${keypath}!${valuekey}`,JSON.stringify(valuenode));
+									}
+								}
 							}
 						}
 					}
 				}
 			}
-			return count;
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));

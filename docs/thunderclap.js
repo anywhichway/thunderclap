@@ -81,11 +81,37 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 20);
+/******/ 	return __webpack_require__(__webpack_require__.s = 22);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uuid4 = __webpack_require__(1);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uuid4()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -118,37 +144,11 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const uuid4 = __webpack_require__(0);
-	
-	class Entity {
-		constructor(config) {
-			Object.assign(this,config);
-			let id = this["#"];
-			if(!id) {
-				id = `${this.constructor.name}@${uuid4()}`;
-			}
-			const meta = {"#":id};
-			Object.defineProperty(this,"^",{value:meta});
-			try {
-				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
-			} catch(e) {
-				;
-			}
-		}
-	}
-	module.exports = Entity;
-}).call(this);
-
-/***/ }),
 /* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(0);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -218,7 +218,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(0);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -245,7 +245,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(0),
+	const uuid4 = __webpack_require__(1),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -285,10 +285,18 @@
 				return `Date@${data.getTime()}`;
 			}
 			Object.keys(data).forEach((key) => {
-				clone[key] = toSerializable(data[key],copy);
+				try {
+					clone[key] = toSerializable(data[key],copy);
+				} catch (e) {
+					;
+				}
 			});
 			if(data["^"]) {
-				clone["^"] = toSerializable(data["^"],copy);
+				try {
+					clone["^"] = toSerializable(data["^"],copy);
+				} catch(e) {
+					;
+				}
 			}
 		}
 		return clone;
@@ -298,13 +306,21 @@
 
 /***/ }),
 /* 6 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = () => Date.now().toString(36) +  Math.random().toString(36).substr(2,9);
+}).call(this)
+
+/***/ }),
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(7),
+	const soundex = __webpack_require__(8),
 		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(8),
-		isFloat = __webpack_require__(9),
+		isInt = __webpack_require__(9),
+		isFloat = __webpack_require__(10),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -650,7 +666,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -660,7 +676,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -668,7 +684,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -676,7 +692,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -691,7 +707,6 @@
 }).call(this);
 
 /***/ }),
-/* 11 */,
 /* 12 */,
 /* 13 */,
 /* 14 */,
@@ -700,7 +715,9 @@
 /* 17 */,
 /* 18 */,
 /* 19 */,
-/* 20 */
+/* 20 */,
+/* 21 */,
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -711,17 +728,17 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uuid4 = __webpack_require__(0),
-		joqular = __webpack_require__(6),
+	const uid = __webpack_require__(6),
+		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(5),
-		create = __webpack_require__(21),
+		create = __webpack_require__(23),
 		Schema = __webpack_require__(2),
 		User = __webpack_require__(3),
-		functions = __webpack_require__(10);
+		functions = __webpack_require__(11);
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(23);
+		fetch = __webpack_require__(25);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -729,6 +746,7 @@ Copyright AnyWhichWay, LLC 2019
 	class Thunderclap  {
 		constructor({endpoint,user,headers}={}) {
 			this.ctors = {};
+			this.schema = {};
 			this.endpoint = endpoint;
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user ? user.username : "anonymous";
@@ -778,20 +796,24 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
-		async keys(lastKey) {
-			return fetch(`${this.endpoint}/db.json?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
+		async keys(prefix,cursor) {
+			return fetch(`${this.endpoint}/db.json?["keys"${prefix ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""}${cursor ? ","+encodeURIComponent(JSON.stringify(cursor)) : ""}]`,{headers:this.headers})
 	    		.then((response) => response.json())
+	    		.then((array) => { this.keys.cursor = array.pop(); return array; })
 		}
-		async putItem(object) {
+		async putItem(object,options={}) {
 			this.register(object.constructor);
 			const data = Object.assign({},object);
 			let id = data["#"];
 			if(!id) {
-				id = data["#"]  = `${object.constructor.name}@${uuid4()}`;
+				id = data["#"]  = `${object.constructor.name}@${uid()}`;
 			}
 			const cname = id.split("@")[0];
-			let schema = await this.getSchema(cname);
-			if(schema) {
+			let schema = this.schema[cname];
+			if(!schema) {
+				this.schema[cname] = schema = await this.getSchema(cname) || "anonymous";
+			}
+			if(schema && schema!=="anonymous") {
 				schema = new Schema(cname,schema);
 				const errors = await schema.validate(object,this);
 				if(errors.length>0) {
@@ -800,7 +822,7 @@ Copyright AnyWhichWay, LLC 2019
 					throw error;
 				}
 			}	
-			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((object) => create(object,this.ctors))
@@ -829,11 +851,11 @@ Copyright AnyWhichWay, LLC 2019
 				.then((response) => response.json())
 				.then((data) => create(data,this.ctors))
 		}
-		async setItem(key,data) {
+		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}/db.json?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((data) => create(data,this.ctors));
@@ -850,11 +872,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 21 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(22),
+	const fromSerializable = __webpack_require__(24),
 		create = (data,ctors={}) => {
 			const type = typeof(data);
 			if(type==="string") {
@@ -890,7 +912,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 22 */
+/* 24 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -927,7 +949,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 23 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

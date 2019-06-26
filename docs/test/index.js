@@ -371,30 +371,47 @@ describe("query",function() {
 			errors = await schema.validate(data,db);
 		expect(errors.length>=1).equal(true);
 	});
-	it("1000 async setItem", function(done) {
-		for(let i=0;i<1000;i++) {
-			db.setItem(`key${i}`,i);
+	it("10 setItem", async function() {
+		for(let i=0;i<10;i++) {
+			await db.setItem(`key${i}`,i);
 		}
-		setTimeout(() => done(),3000)
-	}).timeout(4000);
-	it("100 getItem", async function() {
-		for(let i=900;i<1000;i++) {
+	}).timeout(11000);
+	it("10 getItem", async function() {
+		for(let i=0;i<10;i++) {
 			const value = await db.getItem(`key${i}`);
 			expect(value).equal(i);
 		}
-	}).timeout(20000);
-	it("1000 async removeItem", function(done) {
-		for(let i=0;i<1000;i++) {
-			db.removeItem(`key${i}`);
+	}).timeout(10000);
+	it("10 removeItem", async function() {
+		for(let i=0;i<10;i++) {
+			await db.removeItem(`key${i}`);
 		}
-		setTimeout(() => done(),3000)
-	}).timeout(4000);
-	it("100 getItem after remove", async function() {
-		for(let i=900;i<1000;i++) {
+	}).timeout(11000);
+	it("10 getItem after remove", async function() {
+		for(let i=0;i<10;i++) {
 			const value = await db.getItem(`key${i}`);
 			expect(value).equal(undefined);
 		}
 	}).timeout(20000);
+	it("10 putItem", async function() {
+		for(let i=0;i<10;i++) {
+			await db.putItem({id:i});
+		}
+	}).timeout(30000);
+	let results;
+	it("10 query", async function() {
+		results = await db.query({id:{$gte:0,$lte:99}});
+		expect(results.length>=10).equal(true);
+	}).timeout(100000);
+	it("10 removeItem", async function() {
+		for(const item of results) {
+			await db.removeItem(item);
+		}
+	}).timeout(100000);
+	it("10 query", async function() {
+		results = await db.query({id:{$gte:0,$lte:99}});
+		expect(results.length).equal(0);
+	}).timeout(100000);
 });
 
 

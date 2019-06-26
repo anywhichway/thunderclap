@@ -36,8 +36,27 @@ const CLOUDFLARED = config.cloudflaredPath,
 	metadataScript = `echo {"body_part":"script","bindings":[{"type":"kv_namespace","name":"NAMESPACE","namespace_id":"${namespace}"}]} > metadata.json`,
 	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@server.js;type=application/javascript"`,
 	putRoute = `curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -H "Content-type: application/json" -d "{\\"pattern\\": \\"${host}/*\\", \\"script\\":\\"${scriptName}\\"}"`;
+	//keysScript = `curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}"`;
+	keys = 
+	`(function() {
+		function getKeys(prefix,cursor) { 
+			return fetch(\`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000\${cursor ? "&cursor="+cursor : ""}\${prefix ? "&prefix="+prefix : ""}\`,
+				{headers:{"X-Auth-Email":"${EMAIL}","X-Auth-Key":"${AUTH_KEY}"}})
+				.then((result) => result.json())
+		}
+		module.exports = async function* keys(prefix,cursor) {
+			const {result,result_info} = await getKeys(prefix,cursor);
+			for(const key of result) {
+				yield key.name;
+			}
+			yield result_info.cursor;
+			//if(result_info.cursor) {
+			//	yield* keys(className,result_info.cursor);
+			//}
+		}
+	}).call(this)`;
 
-var liveServer = require("live-server");
+	var liveServer = require("live-server");
 
 var params = {
 	port: PORT, // Set the server port. Defaults to 8080.
@@ -56,11 +75,15 @@ console.log("live-server running on http://localhost:${PORT}");
 
 const tunnel = spawn(`${path.resolve(__dirname,CLOUDFLARED)}`,["--hostname",`${host}`,`http://localhost:${PORT}`],{shell:true});
 tunnel.stdout.on('data', function (data) {
-    process.stdout.write(data);
+   // process.stdout.write(data);
 });
 tunnel.stderr.on('data', function (data) {
     process.stderr.write(data);
 });	
+
+fs.writeFileSync(`${path.resolve(__dirname,"dbo.js")}`,`(function() { module.exports="${DBO_PASSWORD}"; }).call(this)`);
+fs.writeFileSync(`${path.resolve(__dirname,"keys.js")}`,keys);
+
 
 module.exports = {
   mode: "production",

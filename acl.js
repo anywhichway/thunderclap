@@ -13,6 +13,9 @@
 			read: ["dbo"],
 			write: ["dbo"]
 		},
+		keys: { // only dbo can list keys
+			execute: ["dbo"]
+		},
 		"User@": { // key to control, user <cname>@ for classes
 			
 			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read

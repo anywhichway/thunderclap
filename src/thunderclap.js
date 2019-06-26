@@ -6,7 +6,7 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uuid4 = require("./uuid4.js"),
+	const uid = require("./uid.js"),
 		joqular = require("./joqular.js"),
 		toSerializable = require("./to-serializable.js"),
 		create = require("./create.js"),
@@ -24,6 +24,7 @@ Copyright AnyWhichWay, LLC 2019
 	class Thunderclap  {
 		constructor({endpoint,user,headers}={}) {
 			this.ctors = {};
+			this.schema = {};
 			this.endpoint = endpoint;
 			this.headers = Object.assign({},headers);
 			this.headers["X-Auth-Username"] = user ? user.username : "anonymous";
@@ -73,20 +74,24 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
-		async keys(lastKey) {
-			return fetch(`${this.endpoint}/db.json?["keys",${encodeURIComponent(JSON.stringify(lastKey))}]`,{headers:this.headers})
+		async keys(prefix,cursor) {
+			return fetch(`${this.endpoint}/db.json?["keys"${prefix ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""}${cursor ? ","+encodeURIComponent(JSON.stringify(cursor)) : ""}]`,{headers:this.headers})
 	    		.then((response) => response.json())
+	    		.then((array) => { this.keys.cursor = array.pop(); return array; })
 		}
-		async putItem(object) {
+		async putItem(object,options={}) {
 			this.register(object.constructor);
 			const data = Object.assign({},object);
 			let id = data["#"];
 			if(!id) {
-				id = data["#"]  = `${object.constructor.name}@${uuid4()}`;
+				id = data["#"]  = `${object.constructor.name}@${uid()}`;
 			}
 			const cname = id.split("@")[0];
-			let schema = await this.getSchema(cname);
-			if(schema) {
+			let schema = this.schema[cname];
+			if(!schema) {
+				this.schema[cname] = schema = await this.getSchema(cname) || "anonymous";
+			}
+			if(schema && schema!=="anonymous") {
 				schema = new Schema(cname,schema);
 				const errors = await schema.validate(object,this);
 				if(errors.length>0) {
@@ -95,7 +100,7 @@ Copyright AnyWhichWay, LLC 2019
 					throw error;
 				}
 			}	
-			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((object) => create(object,this.ctors))
@@ -124,11 +129,11 @@ Copyright AnyWhichWay, LLC 2019
 				.then((response) => response.json())
 				.then((data) => create(data,this.ctors))
 		}
-		async setItem(key,data) {
+		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
 			}
-			return fetch(`${this.endpoint}/db.json?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["setItem",${encodeURIComponent(JSON.stringify(key))},${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((data) => create(data,this.ctors));

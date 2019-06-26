@@ -35,7 +35,7 @@ Thunderclap is currently in ALPHA because:
 
 3) Although there are many unit tests, application level functional testing has been limited
 
-4) The source code could do with a lot more documentation
+4) The source code could do with a lot more comments
 
 5) Project structure does not currently have a clean separation between what people might want to change
 for their own use vs submit as a pull request. In general changes to file in the `src` directory are
@@ -70,7 +70,9 @@ You will need to populate a file `thunderclap.json` with many of your Cloudflare
 `thunderclap.template.json` to `thunderclap.json` and replace the placeholder values. This will contain secret keys,
 so you may want to move it out of your project directory to avoid having it checked-in. The `thunderclap` script in
 `webpack.config.js` assumes the file is up one level in the directory tree. If you do leave it in the project
-directory it will still be found, but .gitignore is configured to not check it in. 
+directory it will still be found, but .gitignore is configured to not check it in. .gitignore is also set to ignore 
+`dbo.js`, which contains the default `dbo` password and `keys.js` which contains a function definition for iterating
+over keys on the server that requires special credentials. None of this data is built into the browser software.
 
 You will need to edit `webpack.config.js` if you wish to put `thunderclap.json` elsewhere or load keys from 
 environment variables.
@@ -137,23 +139,24 @@ use. If `reAuth` is truthy, the Thunderclap instance will also be re-bound to th
 control and account creation logic on the server to prevent the creation of un-authorized accounts. See the section 
 Security.
 
-`any async setItem(string key,any value)` - sets the `key` to `value`. If the `value` is an object it is NOT indexed.
-
-`any async putItem(object value)` - adds a unique id on property "#" if one does not exist, indexes the object and 
-stores it with `setItem` using the id as the key. In most cases the unique id will be of the form 
-`<className>@xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.
-
 `any async getItem(string key)` - gets the value at `key`. Returns `undefined` if no value exists.
+
+`Array async keys(classNameOrPrefix)` - returns an Array of all keys in database than match the className or prefix. This
+will be enhanced to limit the size to 1000 or less and add support for picking up on the last key.
+
+`any async putItem(object value,options={})` - adds a unique id on property "#" if one does not exist, indexes the object and 
+stores it with `setItem` using the id as the key. In most cases the unique id will be of the form 
+`<className>@xxxxxxxxxxxxx`.
 
 `boolean async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the key and data are removed from the database so long as the user has 
 the appropriate privileges. If the key exists but can't be removed the function returns `false`. If the key does not exist
 or removal succeeds, the function returns `true`.
 
-`Array async query(object JOQULARExpression)` - uses the index to find matching objects. See the unit
-test `file docs/test/index.js` to understand the currently supported JOQULAR expressions and examples.
+`any async setItem(string key,any value,options={})` - sets the `key` to `value`. If the `value` is an object it is 
+NOT indexed. Options can have one of two members: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 
-
+curl -X GET "https://api.cloudflare.com/client/v4/accounts/92dcaefc91ea9f8eb9632c01148179af/storage/kv/namespaces/d67b2cf619c74499b033404eea6dbe2a/keys?limit=1000 -H "X-Auth-Email:syblackwell@anywhichway.com" -H "X-Auth-Key:bb03a6b1c8604b0541f84cf2b70ea9c45953c"
 ## CURL Requests 
 
 To be written
@@ -184,21 +187,14 @@ exists. This index entry is a nested map of values and then object ids with the 
 
 The root index node can be accessed via `getItem("!")`. Currently this is open to all, but it will be restricted
 to the role `dbo` in the future. To get at a property index, just add the property name, e.g. `getItem("!userName")`.
-Of course, you usually don't have to do this because the JOQULAR pattern processing engine in the worker script 
-does it for you.
+To get at a value index, add a strinfied value, e.g. `getItem("!userName!\"joe64\"")`. Of course, you usually don't
+have to do this because the JOQULAR pattern processing engine in the worker script does it for you. Also, only users
+with the role `dbo` can directly query indexes.
 
-With the above, it is certainly possible to create an index that would be larger than the allowed RAM for a 
-Cloudflare Worker.
-
-At the expense of some additional reads, splitting the indexes so that each value is a separate entry in the 
-KV store is certainly possible, and has been done in prototypes outside the scope of Cloudflare. The
-node will then be reached something like this, `getItem("!userName!\"joe\"")`. 
-
-This transition will be made with a move to BETA assuming performance is not hugely impacted. Conservatively, 50% of RAM will allow for 
-terminal index nodes that contain references to 50,000,000 to 75,000,000 objects associated with a single property 
-and value, e.g. 50,000,000 people called "joe". Only one terminal index node at a time is loaded by Thunderclap. 
-The remaining RAM can be allocated to query results and code. Currently, the total size of Thuderclap worker code 
-is less than 100K.
+Conservatively, 50% of the 128MB RAM will allow for terminal index nodes that contain references to approximately
+3,200,000 objects associated with a single property and value, e.g. 3,200,000 people called "joe". 
+Only one terminal index node at a time is loaded by Thunderclap. The remaining RAM can be allocated to query results 
+and code. Currently, the total size of Thuderclap worker code is less than 100K.
 
 # Security
 
@@ -388,6 +384,9 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-26 v0.0.12a Indexing now extends to 3 levels to provide more data spread. Sub-objects still not 
+indexed as direct paths. Added support for expiring keys and listing keys.
 
 2019-06-25 v0.0.11a Code optimizations and bug fixes.
 

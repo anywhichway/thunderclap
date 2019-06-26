@@ -29,12 +29,14 @@
 		for(const trigger of triggers) {
 			if(trigger[when] && trigger[when][action]) {
 				if(action==="before") {
-					await trigger[when][action].call(this,{action,user,data,changes,request});
-				} else {
-					await trigger[when][action].call(this,{action,user,data,changes,request});
+					if(!(await trigger[when][action].call(this,{action,user,data,changes,request}))) {
+						return false;
+					}
 				}
+				await trigger[when][action].call(this,{action,user,data,changes,request})
 			}
 		}
+		return true
 	}
 	module.exports = respond;
 }).call(this);

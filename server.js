@@ -81,11 +81,37 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 13);
+/******/ 	return __webpack_require__(__webpack_require__.s = 14);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uuid4 = __webpack_require__(1);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uuid4()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -118,37 +144,11 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const uuid4 = __webpack_require__(0);
-	
-	class Entity {
-		constructor(config) {
-			Object.assign(this,config);
-			let id = this["#"];
-			if(!id) {
-				id = `${this.constructor.name}@${uuid4()}`;
-			}
-			const meta = {"#":id};
-			Object.defineProperty(this,"^",{value:meta});
-			try {
-				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
-			} catch(e) {
-				;
-			}
-		}
-	}
-	module.exports = Entity;
-}).call(this);
-
-/***/ }),
 /* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(0);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -218,7 +218,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(0);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -245,7 +245,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(0),
+	const uuid4 = __webpack_require__(1),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -285,10 +285,18 @@
 				return `Date@${data.getTime()}`;
 			}
 			Object.keys(data).forEach((key) => {
-				clone[key] = toSerializable(data[key],copy);
+				try {
+					clone[key] = toSerializable(data[key],copy);
+				} catch (e) {
+					;
+				}
 			});
 			if(data["^"]) {
-				clone["^"] = toSerializable(data["^"],copy);
+				try {
+					clone["^"] = toSerializable(data["^"],copy);
+				} catch(e) {
+					;
+				}
 			}
 		}
 		return clone;
@@ -298,13 +306,21 @@
 
 /***/ }),
 /* 6 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = () => Date.now().toString(36) +  Math.random().toString(36).substr(2,9);
+}).call(this)
+
+/***/ }),
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(7),
+	const soundex = __webpack_require__(8),
 		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(8),
-		isFloat = __webpack_require__(9),
+		isInt = __webpack_require__(9),
+		isFloat = __webpack_require__(10),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -650,7 +666,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -660,7 +676,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -668,7 +684,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -676,7 +692,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -691,7 +707,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -735,12 +751,12 @@
 }).call(this)
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(15),
-		roles = __webpack_require__(16),
+	const acl = __webpack_require__(16),
+		roles = __webpack_require__(17),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -845,7 +861,7 @@
 }).call(this)
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -856,11 +872,11 @@ Copyright AnyWhichWay, LLC 2019
 
 const Schema = __webpack_require__(2),
 	User = __webpack_require__(3),
-	hashPassword = __webpack_require__(11),
+	hashPassword = __webpack_require__(12),
 	toSerializable = __webpack_require__(5),
-	Thunderhead = __webpack_require__(14),
-	dboPassword = __webpack_require__(19),
-	secure = __webpack_require__(12);
+	Thunderhead = __webpack_require__(15),
+	dboPassword = __webpack_require__(21),
+	secure = __webpack_require__(13);
 
 let thunderhead;
 addEventListener('fetch', event => {
@@ -908,7 +924,7 @@ async function handleRequest({request,response}) {
 		})
 	}
 	try {
-		let dbo = await thunderhead.getItem("User@dbo",{user:thunderhead.dbo});
+		let dbo = await thunderhead.namespace.get("User@dbo");
 		/*return new Response(JSON.stringify([dbo]),{
 			headers:
 			{
@@ -918,7 +934,7 @@ async function handleRequest({request,response}) {
 		});*/
 		if(!dbo) {
 			Object.assign(thunderhead.dbo,await hashPassword(dboPassword,1000));
-			dbo = await thunderhead.putItem(thunderhead.dbo,{user:thunderhead.dbo});
+			dbo = await thunderhead.putItem(thunderhead.dbo);
 			/*return new Response(JSON.stringify([dbo]),{
 				headers:
 				{
@@ -958,7 +974,7 @@ async function handleRequest({request,response}) {
 					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
-						status: 403,
+						status: 401,
 						headers:
 						{
 							"Content-Type":"text/plain",
@@ -968,7 +984,7 @@ async function handleRequest({request,response}) {
 				}
 				request.user = Object.freeze(user);
 			}
-			Object.freeze(request);
+			//Object.freeze(request);
 			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response("null",{
@@ -979,6 +995,21 @@ async function handleRequest({request,response}) {
 						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
+			}
+			if(fname==="keys") {
+				const results = [];
+				for await(const key of thunderhead.keys(...args)) {
+					results.push(key);
+				}
+				return new Response(JSON.stringify(results),
+					{
+						status:200,
+						headers:
+						{
+							"Content-Type":"text/plain",
+							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+						}
+					})
 			}
 			return thunderhead[fname](...args)
 			.then((result) => {
@@ -1039,19 +1070,20 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(0),
+	const uid = __webpack_require__(6),
 		isSoul = __webpack_require__(4),
-		joqular = __webpack_require__(6),
-		hashPassword = __webpack_require__(11),
-		secure = __webpack_require__(12),
-		respond = __webpack_require__(17),
-		functions = __webpack_require__(10),
+		joqular = __webpack_require__(7),
+		hashPassword = __webpack_require__(12),
+		secure = __webpack_require__(13),
+		respond = __webpack_require__(18),
+		functions = __webpack_require__(11),
 		User = __webpack_require__(3),
-		Schema = __webpack_require__(2);
+		Schema = __webpack_require__(2),
+		keys = __webpack_require__(20);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1066,6 +1098,7 @@ async function handleRequest({request,response}) {
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
 		}
 		async authUser(userName,password) {
 			const request = this.request,
@@ -1092,7 +1125,7 @@ async function handleRequest({request,response}) {
 			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
-				if(key[0]!=="!") {
+				//if(key[0]!=="!") {
 					const action = "read";
 					if(isSoul(data["#"],false)) {
 						const key = `${data["#"].split("@")[0]}@`,
@@ -1101,57 +1134,64 @@ async function handleRequest({request,response}) {
 					}
 					const secured = await secure.call(this,{key,action,data});
 					data = secured.data;
-				}
+				//}
 			}
 			return data==null ? undefined : data;
 		}
 		async getSchema(ctor) {
-			const data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
+			let data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
+				data = JSON.parse(data);
 				const secured = await secure.call(this,{key:"Schema",action:"read",data});
 				if(secured.data) {
-					return new Schema(ctor.name||ctor,JSON.parse(data));
+					return new Schema(ctor.name||ctor,data);
 				}
 			}
 		}
 		async index(data,root,options={},recursing) {
-			let changed = 0;
+			let rootchanged;
 			if(data && typeof(data)==="object" && data["#"]) {
 				const id = data["#"];
 				for(const key in data) {
-					if(!options.schema || !options.schema[key] || !options.schema[key].noindex) {
+					if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
 						const value = data[key],
 							type = typeof(value);
 						if(value && type==="object") {
-							changed += await this.index(value,root,options,true);
+							rootchanged += await this.index(value,root,options,true);
 						} else {
-							const valuekey = `${JSON.stringify(value)}`,
-								path = `!${key}`;
+							const valuekey = `${JSON.stringify(value)}`;
+							const keypath = `!${key}`;
 							if(!root[key]) {
-								root[key] = true;
-								changed++;
+								rootchanged = root[key] = true;
 							}
-							let node = await this.getItem(path);
+							let node = await this.namespace.get(keypath);
 							if(!node) {
-								changed++;
 								node = {};
+							} else {
+								node = JSON.parse(node);
 							}
-							node[valuekey] || (node[valuekey] = {}); // __keyCount__:0
-							if(!node[valuekey][id]) {
-								node[valuekey][id] = true;
-								//node[valuekey].__keyCount__++;
-								await this.setItem(path,node);
+							if(!node[valuekey]) {
+								node[valuekey] = true;
+								await this.namespace.put(keypath,JSON.stringify(node));
+							}
+							const valuepath = `${keypath}!${valuekey}`;
+							node = await this.namespace.get(valuepath);
+							if(!node) {
+								node = {};
+							} else {
+								node = JSON.parse(node);
+							}
+							if(!node[id]) {
+								node[id] = true;
+								await this.namespace.put(valuepath,JSON.stringify(node))
 							}
 						}
 					}
 				}
 			}
-			return changed;
+			return rootchanged;
 		}
-		async keys(lastKey) {
-			return this.namespace.getKeys(lastKey)
-		}
-		async putItem(object) {
+		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -1159,11 +1199,10 @@ async function handleRequest({request,response}) {
 			}
 			let id = object["#"];
 			if(!id) {
-				id = object["#"]  = `${object.constructor.name}@${uuid4()}`;
+				id = object["#"]  = `${object.constructor.name}@${uid()}`;
 			}
 			const cname = id.split("@")[0],
-				key =`${cname}@`,
-				options = {};
+				key =`${cname}@`;
 			await respond.call(this,{key,when:"before",action:"put",data:object});
 			let schema = await this.getSchema(cname);
 			if(schema) {
@@ -1181,7 +1220,12 @@ async function handleRequest({request,response}) {
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
 			}
-			const root = (await this.getItem("!")) || {};
+			let root = await this.namespace.get("!");
+			if(!root) {
+				root = {};
+			} else {
+				root = JSON.parse(root);
+			}
 			const original = await this.getItem(id);
 			let changes;
 			if(original) {
@@ -1206,11 +1250,11 @@ async function handleRequest({request,response}) {
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
-			const count = await this.index(data,root,options);
-			if(count) {
-				await this.setItem("!",root);
+			const changed = await this.index(data,root,options);
+			if(changed) {
+				await this.namespace.put("!",JSON.stringify(root));
 			}
-			data = await this.setItem(id,data,true);
+			data = await this.setItem(id,data,options,true);
 			if(data!==undefined) {
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				if(changes) {
@@ -1227,8 +1271,9 @@ async function handleRequest({request,response}) {
 				keys,
 				saveroot;
 			//return [{"test":"test"},this.dbo];
-			const root = await this.getItem("!");
+			let root = await this.namespace.get("!");
 			if(!root) return results;
+			root = JSON.parse(root);
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
 					value = pattern[key],
@@ -1240,93 +1285,79 @@ async function handleRequest({request,response}) {
 				}
 				for(const key of keys) {
 					if(root[key]) {
-						const node = await this.getItem(`!${key}`,{user:this.dbo});
-						if(!node) {
+						const keypath = `!${key}`;
+						let keynode = await this.namespace.get(keypath);
+						if(!keynode) {
 							delete root[key];
 							saveroot = true;
 							continue;
 						}
-						if(node) {
-							if(value && type==="object") {
-								const valuecopy = Object.assign({},value);
-								for(let [predicate,pvalue] of Object.entries(value)) {
-									if(predicate==="$return") continue;
-									const test = joqular.toTest(predicate);
-									if(predicate==="$search") {
+						keynode = JSON.parse(keynode);
+						if(value && type==="object") {
+							const valuecopy = Object.assign({},value);
+							for(let [predicate,pvalue] of Object.entries(value)) {
+								if(predicate==="$return") continue;
+								const test = joqular.toTest(predicate);
+								if(predicate==="$search") {
 
-									} else if(test) {
-										const ptype = typeof(pvalue);
-										if(ptype==="string") {
-											if(pvalue.startsWith("Date@")) {
-												pvalue = new Date(parseInt(pvalue.split("@")[1]));
-											}
+								} else if(test) {
+									const ptype = typeof(pvalue);
+									if(ptype==="string") {
+										if(pvalue.startsWith("Date@")) {
+											pvalue = new Date(parseInt(pvalue.split("@")[1]));
 										}
-										let testids = {};
-										delete valuecopy[predicate];
-										const secured = {};
-										let haskeys;
-										for(const valuekey in node) {
-											haskeys = true;
-											let value = JSON.parse(valuekey);
-											if(typeof(value)==="string" && value.startsWith("Date@")) {
-												value = new Date(parseInt(value.split("@")[1]));
+									}
+									let testids = {};
+									delete valuecopy[predicate];
+									const secured = {};
+									let haskeys;
+									for(const valuekey in keynode) {
+										haskeys = true;
+										let value = JSON.parse(valuekey);
+										if(typeof(value)==="string" && value.startsWith("Date@")) {
+											value = new Date(parseInt(value.split("@")[1]));
+										}
+										if(await test.call(keynode,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
+											// disallow index use by unauthorized users at document && property level
+											const valuepath = `${keypath}!${valuekey}`;
+											let valuenode = await this.namespace.get(valuepath);
+											if(!valuenode) {
+												delete keynode[valuekey];
+												await this.namespace.put(keypath,JSON.stringify(keynode));
+												continue;
 											}
-											if(await test.call(node,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
-												// disallow index use by unauthorized users at document && property level
-												for(const id in node[valuekey]) {
-													const cname = id.split("@")[0],
-														{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-													if(data==null || removed.length>0) {
-														delete node[valuekey][id];
-														secured[id] = true;
-													}
+											valuenode = JSON.parse(valuenode);
+											let haskeys;
+											for(const id in valuenode) {
+												haskeys = true;
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data==null || removed.length>0) {
+													delete valuenode[id];
+													secured[id] = true;
 												}
-												Object.assign(testids,node[valuekey]);
 											}
-										}
-										if(!haskeys) {
-											delete root[key];
-											saveroot = true;
-											break;
-										}
-										if(!ids) {
-											ids = Object.assign({},testids);
-											count = Object.keys(ids).length;
-											if(count===0) {
-												return [];
-											}
-										} else {
-											for(const id in ids) {
-												if(!secured[id] && !testids[id]) {
-													delete ids[id];
-													count--;
-													if(count<=0) {
-														return [];
-													}
-												}
+											if(haskeys) {
+												Object.assign(testids,valuenode);
+											} else {
+												this.namespace.delete(valuepath);
 											}
 										}
 									}
-								}
-							} else {
-								const valuekey = JSON.stringify(value);
-								if(node[valuekey]) {
-									// disallow index use by unauthorized users at document && property level
-									const secured = {};
-									for(const id in node[valuekey]) {
-										const cname = id.split("@")[0],
-											{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-										if(data==null || removed.length>0) {
-											delete node[valuekey][id];
-											secured[id] = true;
-										}
+									if(!haskeys) {
+										delete root[key];
+										saveroot = true;
+										break;
 									}
 									if(!ids) {
-										ids = Object.assign({},node[valuekey]);
+										ids = Object.assign({},testids);
 										count = Object.keys(ids).length;
+										if(count===0) {
+											return [];
+										}
 									} else {
 										for(const id in ids) {
-											if(!secured[id] && !node[valuekey][id]) {
+											if(!secured[id] && !testids[id]) {
 												delete ids[id];
 												count--;
 												if(count<=0) {
@@ -1337,12 +1368,53 @@ async function handleRequest({request,response}) {
 									}
 								}
 							}
-						} 
+						} else {
+							const valuekey = JSON.stringify(value);
+							if(keynode[valuekey]) {
+								// disallow index use by unauthorized users at document && property level
+								const secured = {};
+								const valuepath = `${keypath}!${valuekey}`;
+								let valuenode = await this.namespace.get(valuepath);
+								if(!valuenode) {
+									delete keynode[valuekey];
+									await this.namespace.put(keypath,JSON.stringify(keynode));
+									return;
+								}
+								valuenode = JSON.parse(valuenode);
+								let haskeys;
+								for(const id in valuenode) {
+									haskeys = true;
+									const cname = id.split("@")[0],
+										{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+									if(data==null || removed.length>0) {
+										delete valuenode[id];
+										secured[id] = true;
+									}
+								}
+								if(!haskeys) {
+									return [];
+								}
+								if(!ids) {
+									ids = Object.assign({},valuenode);
+									count = Object.keys(ids).length;
+								} else {
+									for(const id in ids) {
+										if(!secured[id] && !valuenode[id]) {
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
 			if(saveroot) {
-				this.setItem("!",root);
+				this.namespace.set("!",JSON.stringify(root));
 			}
 			if(ids) {
 				for(const id in ids) {
@@ -1367,52 +1439,40 @@ async function handleRequest({request,response}) {
 			}
 		}
 		async removeItem(keyOrObject) {
-			const type = typeof(keyOrObject)==="object";
+			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
-			} 
+			}
 			if(keyOrObject) {
 				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
 				const action = "write",
-					root = type==="object" ? await this.getItem("!") : null;
-				if(root) {
-					const key = `${keyOrObject.split("@")[0]}@`;
+					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
+				if(key) {
 					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
-						return false;
+						return "bad";
 					}
-					if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
-						return false;
-					}
-					const {secured} = await secure.call(this,{key,action,data:value,documentOnly:true});
-					if(secured) {
-						await this.namespace.delete(keyOrObject);
-						if(await this.unindex(value,root,options)) {
-							await this.setItem("!",root);
-						}
-						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+				}
+				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+					return false;
+				}
+				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
+				if(data && removed.length===0) {
+					await this.namespace.delete(keyOrObject);
+					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
+					if(key) {
+						await this.unindex(value);
 						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
-						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
-						return true;
 					}
-					return false;
-				} else {
-					await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value});
-					const {data} = await secure.call(this,{key:keyOrObject,action,data:value,documentOnly:true});
-					if(data===value) {
-						await this.namespace.delete(keyOrObject);
-						const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
-						await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
-						return true;
-					}
-					return false;
+					await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
+					return true;
 				}
 			}
 			return false;
 		}
-		async setItem(key,data,secured) {
+		async setItem(key,data,options={},secured) {
 			if(!secured && key[0]!=="!") {
 				const action = "write";
 				await respond.call(this,{key,when:"before",action:"set",data});
@@ -1425,41 +1485,43 @@ async function handleRequest({request,response}) {
 				}
 			}
 			if(data!==undefined) {
-				await this.namespace.put(key,JSON.stringify(data));
+				await this.namespace.put(key,JSON.stringify(data),options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
-		}
-		async unindex(object,options,root={}) {
-			let count = 0;
+		} 
+		async unindex(object) {
 			if(object && typeof(object)==="object" && object["#"]) {
 				const id = object["#"];
 				for(const key in object) {
-					if(root[key]) {
-						const value = object[key];
-						if(value && typeof(value)==="object") {
-							count += await this.unindex(value,options,root);
-						} else {
-							const valuekey = `${JSON.stringify(value)}`,
-								path = `!${key}`,
-								node = await this.getItem(path,options);
-							if(node[valuekey] && node[valuekey][id]) {
-								delete node[valuekey][id];
-								count++;
-								/*node[valuekey].__keyCount__--;
-								if(!node[valuekey].__keyCount__) {
-									delete node[valuekey];
-									root[key]--;
-									count++;
-								}*/
-								await this.setItem(path,node);
+					if(key==="#") {
+						continue;
+					}
+					const value = object[key];
+					if(value && typeof(value)==="object") {
+						await this.unindex(value);
+					} else {
+						const valuekey = `${JSON.stringify(value)}`,
+							keypath = `!${key}`;
+						let keynode = await this.namespace.get(keypath);
+						if(keynode) {
+							keynode = JSON.parse(keynode);
+							if(keynode[valuekey]) {
+								const valuepath = `${keypath}!${valuekey}`;
+								let valuenode = await this.namespace.get(valuepath);
+								if(valuenode) {
+									valuenode = JSON.parse(valuenode);
+									if(valuenode[id]) {
+										delete valuenode[id];
+										await this.namespace.put(`${keypath}!${valuekey}`,JSON.stringify(valuenode));
+									}
+								}
 							}
 						}
 					}
 				}
 			}
-			return count;
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
@@ -1473,7 +1535,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1490,6 +1552,9 @@ async function handleRequest({request,response}) {
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
 			read: ["dbo"],
 			write: ["dbo"]
+		},
+		keys: { // only dbo can list keys
+			execute: ["dbo"]
 		},
 		"User@": { // key to control, user <cname>@ for classes
 			
@@ -1531,7 +1596,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1543,11 +1608,11 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const triggers = __webpack_require__(18),
+	const triggers = __webpack_require__(19),
 		triggersKeys = Object.keys(triggers),
 		// compile triggers that are RegExp based
 		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
@@ -1577,18 +1642,20 @@ async function handleRequest({request,response}) {
 		for(const trigger of triggers) {
 			if(trigger[when] && trigger[when][action]) {
 				if(action==="before") {
-					await trigger[when][action].call(this,{action,user,data,changes,request});
-				} else {
-					await trigger[when][action].call(this,{action,user,data,changes,request});
+					if(!(await trigger[when][action].call(this,{action,user,data,changes,request}))) {
+						return false;
+					}
 				}
+				await trigger[when][action].call(this,{action,user,data,changes,request})
 			}
 		}
+		return true
 	}
 	module.exports = respond;
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1597,19 +1664,18 @@ async function handleRequest({request,response}) {
 			before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
 				put({user,data,request}) {
 					// if data is an object, it can be modified
-					// if a value other than undefined is returned, it will replace the data
-					return true;
+					return true; // return true to continue processing
 				},
 				remove({user,data,request}) {
 					
-					return true;
+					return true; // return true to continue processing
 				}
 			},
-			after: { // will not be awaited, called via setTimeout
+			after: { // will be awaited if asynchronous
 				put({user,data,request}) {
 					// might send e-mail
 					// call a webhook, etc.
-					return true;
+					
 				},
 				remove({user,data,request}) {
 					
@@ -1620,8 +1686,7 @@ async function handleRequest({request,response}) {
 			before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
 				put({user,object,request}) {
 					// can modify the object
-					// if a value other than undefined is returned, it will replace the object
-					return true;
+					return true; // return true to continue processing
 				},
 				update({user,object,property,value,oldValue,request}) {
 					
@@ -1632,7 +1697,7 @@ async function handleRequest({request,response}) {
 					return true;
 				}
 			},
-			after: { // will not be awaited, called via setTimeout
+			after: { // will be awaited if asynchronous
 				put({user,object,request}) {
 					// might send e-mail
 					// call a webhook, etc.
@@ -1649,11 +1714,32 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports) {
 
-(function() { module.exports="dbo"; }).call(this) 
+(function() {
+		function getKeys(prefix,cursor) { 
+			return fetch(`https://api.cloudflare.com/client/v4/accounts/92dcaefc91ea9f8eb9632c01148179af/storage/kv/namespaces/d67b2cf619c74499b033404eea6dbe2a/keys?limit=1000${cursor ? "&cursor="+cursor : ""}${prefix ? "&prefix="+prefix : ""}`,
+				{headers:{"X-Auth-Email":"syblackwell@anywhichway.com","X-Auth-Key":"bb03a6b1c8604b0541f84cf2b70ea9c45953c"}})
+				.then((result) => result.json())
+		}
+		module.exports = async function* keys(prefix,cursor) {
+			const {result,result_info} = await getKeys(prefix,cursor);
+			for(const key of result) {
+				yield key.name;
+			}
+			yield result_info;
+			//if(result_info.cursor) {
+			//	yield* keys(className,result_info.cursor);
+			//}
+		}
+	}).call(this)
 
+/***/ }),
+/* 21 */
+/***/ (function(module, exports) {
+
+(function() { module.exports="dbo"; }).call(this)
 
 /***/ })
 /******/ ]);

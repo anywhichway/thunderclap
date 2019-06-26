@@ -22,6 +22,7 @@ function submit(event) {
 		.catch((e) => {
 			stdout.innerHTML = e.errors ? JSON.stringify(e.errors.map((e) => e+"")) : e+"";
 		});
+	db = thunderclap;
 	return false;
 }
 </script>

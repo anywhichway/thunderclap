@@ -20,10 +20,18 @@
 				return `Date@${data.getTime()}`;
 			}
 			Object.keys(data).forEach((key) => {
-				clone[key] = toSerializable(data[key],copy);
+				try {
+					clone[key] = toSerializable(data[key],copy);
+				} catch (e) {
+					;
+				}
 			});
 			if(data["^"]) {
-				clone["^"] = toSerializable(data["^"],copy);
+				try {
+					clone["^"] = toSerializable(data["^"],copy);
+				} catch(e) {
+					;
+				}
 			}
 		}
 		return clone;

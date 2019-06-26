@@ -58,7 +58,7 @@ async function handleRequest({request,response}) {
 		})
 	}
 	try {
-		let dbo = await thunderhead.getItem("User@dbo",{user:thunderhead.dbo});
+		let dbo = await thunderhead.namespace.get("User@dbo");
 		/*return new Response(JSON.stringify([dbo]),{
 			headers:
 			{
@@ -68,7 +68,7 @@ async function handleRequest({request,response}) {
 		});*/
 		if(!dbo) {
 			Object.assign(thunderhead.dbo,await hashPassword(dboPassword,1000));
-			dbo = await thunderhead.putItem(thunderhead.dbo,{user:thunderhead.dbo});
+			dbo = await thunderhead.putItem(thunderhead.dbo);
 			/*return new Response(JSON.stringify([dbo]),{
 				headers:
 				{
@@ -108,7 +108,7 @@ async function handleRequest({request,response}) {
 					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
-						status: 403,
+						status: 401,
 						headers:
 						{
 							"Content-Type":"text/plain",
@@ -118,7 +118,7 @@ async function handleRequest({request,response}) {
 				}
 				request.user = Object.freeze(user);
 			}
-			Object.freeze(request);
+			//Object.freeze(request);
 			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response("null",{
@@ -129,6 +129,21 @@ async function handleRequest({request,response}) {
 						"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
 					}
 				});
+			}
+			if(fname==="keys") {
+				const results = [];
+				for await(const key of thunderhead.keys(...args)) {
+					results.push(key);
+				}
+				return new Response(JSON.stringify(results),
+					{
+						status:200,
+						headers:
+						{
+							"Content-Type":"text/plain",
+							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
+						}
+					})
 			}
 			return thunderhead[fname](...args)
 			.then((result) => {
