@@ -1,7 +1,7 @@
 # thunderclap
 
-Thunderclap is an indexed JSON database and function server designed specifically for Cloudflare. It runs on top of the Cloudflare KV store. 
-Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-powered-javascript-pattern-matching-273a0d77eab5) 
+Thunderclap is an indexed JSON database and function server designed specifically for Cloudflare. It runs on top of the
+Cloudflare KV store. Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-powered-javascript-pattern-matching-273a0d77eab5) 
 (JavaScript Object Query Language), is similar to, but more extensive than, the query language associated with MongoDB. 
 In addition to having more predicates than MongoDB, JOQULAR extends pattern matching to object properties, e.g.
 
@@ -17,6 +17,8 @@ Thunderclap also supports:
 
 3) triggers
 
+4) inline analytics and hooks
+
 5) custom functions (with access control).
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
@@ -29,7 +31,8 @@ monitoring and operation of Thunderclap as a service.
 
 Thunderclap is currently in ALPHA because:
 
-1) Workers KV from Cloudflare just came out of beta
+1) Workers KV from Cloudflare recently came out of beta and is missing a few key features that are "patched" by 
+Thunderclap.
 
 2) Security measures are incomplete and have not yet been vetted by a third party
 
@@ -40,6 +43,10 @@ Thunderclap is currently in ALPHA because:
 5) Project structure does not currently have a clean separation between what people might want to change
 for their own use vs submit as a pull request. In general changes to file in the `src` directory are
 candidates for pull requests and with the exception of this README those outside are not.
+
+6) It has not been performance tuned.
+
+6) It could do with contributors!
 
 ## Installation and Deployment
 
@@ -141,8 +148,20 @@ Security.
 
 `any async getItem(string key)` - gets the value at `key`. Returns `undefined` if no value exists.
 
-`Array async keys(classNameOrPrefix)` - returns an Array of all keys in database than match the className or prefix. This
-will be enhanced to limit the size to 1000 or less and add support for picking up on the last key.
+`boolean async hasKey(string key,boolean startsWith)` - COMMING SOON
+
+`Array async keys(classNameOrPrefix)` - returns an Array of the next 1000 keys in database than match the className or prefix every time it is called.
+You can use a loop to process all keys:
+
+```
+	let keys;
+	do {
+		keys = await mythunder.keys();
+		keys.forEach((key) => dosomething(key));
+	} while(keys.length>0)
+```
+
+If you abort early you should `delete mythunder.keys.cursor` or next time you call `keys` it will pick up where it left off.
 
 `any async putItem(object value,options={})` - adds a unique id on property "#" if one does not exist, indexes the object and 
 stores it with `setItem` using the id as the key. In most cases the unique id will be of the form 
@@ -167,7 +186,8 @@ All properties of objects inserted using `putItem` are indexed. Objects that are
 not indexed. The index is not partitioned per class, it spans all classes.
 
 At the moment one index is created for each unique property name, regardless of the class on which the property
-exists. This index entry is a nested map of values and then object ids with the property and value, e.g.
+exists.  Atlthoug not directly accessible as such, this index entry is effectively a nested map of values and 
+then object ids with the property and value, e.g.
 
 ```javascript
 {
@@ -187,14 +207,31 @@ exists. This index entry is a nested map of values and then object ids with the 
 
 The root index node can be accessed via `getItem("!")`. Currently this is open to all, but it will be restricted
 to the role `dbo` in the future. To get at a property index, just add the property name, e.g. `getItem("!userName")`.
-To get at a value index, add a strinfied value, e.g. `getItem("!userName!\"joe64\"")`. Of course, you usually don't
+To get at a value index, add a stringfied value, e.g. `getItem("!userName!\"joe64\"")`. Of course, you usually don't
 have to do this because the JOQULAR pattern processing engine in the worker script does it for you. Also, only users
 with the role `dbo` can directly query indexes.
 
-Conservatively, 50% of the 128MB RAM will allow for terminal index nodes that contain references to approximately
-3,200,000 objects associated with a single property and value, e.g. 3,200,000 people called "joe". 
-Only one terminal index node at a time is loaded by Thunderclap. The remaining RAM can be allocated to query results 
-and code. Currently, the total size of Thuderclap worker code is less than 100K.
+The physical size limit of a `thunderclap` database is the same as that of Cloudflare KV Store minus the size of 
+the index records.
+
+The portion of the 128MB of RAM used for indexes in each Cloudflare KV hosting a `thunderclap` is:
+
+```
+  (character size of all the property names + the number of property names)
++ (size of all property values as strings for the property being tested at any given moment)
+```
+
+Property names are relatively few in practice unless the names themselves are used for unique values. Let's assume 1,000
+at 8 characters each. Except for unique keys, numbers, date/time values, and locations property values also tend to be 
+greater in number but still not huge. Let's assume 10,000,000 at 8 characters each.
+
+```
+  ((1,000 * 8) + 1,000)
++ (5,000,000 * 8)
+= 48MB
+```
+
+We have an architecture that will reduce the RAM usage; howvever, it may also negatively impact performance.
 
 # Security
 
@@ -297,63 +334,113 @@ the file `triggers.js`. Any asynchronous triggers will be awaited. `before` trig
 continue, i.e. a before on set that returns false with result in the set aborting. `before` triggers are fired immediately
 before security checks. Triggers are not access controlled.
 
+Triggers can be executed in the browser, a service worker, or the cloud.
+
 ```javascript
 (function() {
 	module.exports = {
-		"<keyOrRegExp>": {
-			before: { // user and request are frozen, data can be modified
-				put({user,data,request}) {
-					// if data is an object, it can be modified
-					// if a value other than undefined is returned, it will replace the data
-					return true;
+		browser: {
+		
+		},
+		cloud: {
+			"<keyOrRegExp>": {
+				before: { // user and request are frozen, data can be modified
+					put({user,data,request}) {
+						// if data is an object, it can be modified
+						// if a value other than undefined is returned, it will replace the data
+						return true;
+					},
+					remove({user,data,request}) {
+						
+						return true;
+					}
 				},
-				remove({user,data,request}) {
-					
-					return true;
+				after: { // will not be awaited, called via setTimeout
+					put({user,data,request}) {
+						// might send e-mail
+						// call a webhook, etc.
+						
+					},
+					remove({user,data,request}) {
+						
+					}
 				}
 			},
-			after: { // will not be awaited, called via setTimeout
-				put({user,data,request}) {
-					// might send e-mail
-					// call a webhook, etc.
-					
+			"<className>@": {
+				before: { // user and request are frozen, data can be modified
+					put({user,object,request}) {
+						// can modify the object
+						// if a value other than undefined is returned, it will replace the object
+						return true;
+					},
+					update({user,object,property,value,oldValue,request}) {
+						
+						return true;
+					},
+					remove({user,object,request}) {
+						
+						return true;
+					}
 				},
-				remove({user,data,request}) {
-					
+				after: { // will not be awaited, called via setTimeout
+					put({user,object,request}) {
+						// might send e-mail
+						// call a webhook, etc.
+					},
+					update({user,object,property,value,oldValue,request}) {
+						
+					},
+					remove({user,object,request}) {
+						
+					}
 				}
 			}
 		},
-		"<className>@": {
-			before: { // user and request are frozen, data can be modified
-				put({user,object,request}) {
-					// can modify the object
-					// if a value other than undefined is returned, it will replace the object
-					return true;
-				},
-				update({user,object,property,value,oldValue,request}) {
-					
-					return true;
-				},
-				remove({user,object,request}) {
-					
-					return true;
-				}
-			},
-			after: { // will not be awaited, called via setTimeout
-				put({user,object,request}) {
-					// might send e-mail
-					// call a webhook, etc.
-				},
-				update({user,object,property,value,oldValue,request}) {
-					
-				},
-				remove({user,object,request}) {
-					
-				}
-			}
+		worker: {
+		
 		}
 	}
 }).call(this);
+```
+# Inline Analytics & Hooks
+
+Inline analytics and hooks are facilitated by the use of JOQULAR patterns and tranform or hook calls in the file `when.js`.
+The transforms and hooks can be invoked from the browser, a service worker, or in the cloud; they are not currently access
+controlled. Below is an example.
+
+```javascript
+(function() {
+	module.exports = {
+		browser: [
+			{
+				when: {testWhenBrowser:{$eq:true}},
+				transform: async (data,pattern) => {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call: async (data,pattern) => {
+					
+				}
+			}
+		],
+		cloud: [
+			{
+				when: {testWhen:{$eq:true}},
+				transform: async (data,pattern) => {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call: async (data,pattern) => {
+					
+				}
+			}
+		],
+		worker: [
+			
+		]
+	}
+}).call(this);
+
 ```
 
 # Functions
@@ -384,6 +471,12 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-06-30 v0.0.14a Ehanced triggers and functions to allow browser, service worker, or cloud execution. 
+Added `when` capability. Service worker support will operate once service workers are generated during the
+build process.
+
+2019-06-26 v0.0.13a Indexing optimized to reeuce RAM usage. Substantive performance drop.
 
 2019-06-26 v0.0.12a Indexing now extends to 3 levels to provide more data spread. Sub-objects still not 
 indexed as direct paths. Added support for expiring keys and listing keys.

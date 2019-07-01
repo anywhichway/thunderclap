@@ -1,31 +1,18 @@
 (function() {
-	const triggers = require("../triggers.js"),
+	var triggers,
 		triggersKeys = Object.keys(triggers),
-		// compile triggers that are RegExp based
-		{triggersRegExps,triggersLiterals} = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
-			const parts = key.split("/");
-			if(parts.length===3 && parts[0]==="") {
-				try {
-					triggersRegExps.push({regexp:new RegExp(parts[1],parts[2]),trigger:triggers[key]})
-				} catch(e) {
-					triggersLiterals[key] = triggers[key];
-				}
-			} else {
-				triggersLiterals[key] = triggers[key];
-			}
-			return {triggersRegExps,triggersLiterals};
-		},{triggersRegExps:[],triggersLiterals:{}});
+		compiled;
 		
 	async function respond({key,when,action,data,changes}) {
 		// assemble applicable triggers
 		const {request} = this,
 			{user} = request,
-			triggers = triggersRegExps.reduce((accum,{regexp,trigger}) => {
+			triggers = compiled.triggersRegExps.reduce((accum,{regexp,trigger}) => {
 				if(regexp.test(key)) {
 					accum.push(key);
 				}
 				return accum;
-			},[]).concat(triggersLiterals[key]||[]);
+			},[]).concat(compiled.triggersLiterals[key]||[]);
 		for(const trigger of triggers) {
 			if(trigger[when] && trigger[when][action]) {
 				if(action==="before") {
@@ -38,5 +25,22 @@
 		}
 		return true
 	}
-	module.exports = respond;
+	module.exports = (type) => {
+		triggers = require("../triggers.js")[type],
+		triggersKeys = Object.keys(triggers),
+		complied = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
+			const parts = key.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					triggersRegExps.push({regexp:new RegExp(parts[1],parts[2]),trigger:triggers[key]})
+				} catch(e) {
+					triggersLiterals[key] = triggers[key];
+				}
+			} else {
+				triggersLiterals[key] = triggers[key];
+			}
+			return {triggersRegExps,triggersLiterals};
+		},{triggersRegExps:[],triggersLiterals:{}});
+		return respond;
+	};
 }).call(this);

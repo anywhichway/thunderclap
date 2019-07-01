@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 22);
+/******/ 	return __webpack_require__(__webpack_require__.s = 23);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -697,17 +697,60 @@
 
 (function() {
 	module.exports = {
-		securedTestFunction() {
-			return "If you see this, there may be a security leak";
+		browser: [
+			{
+				when: {testWhenBrowser:{$eq:true}},
+				transform: async (data,pattern) => {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call: async (data,pattern) => {
+					
+				}
+			}
+		],
+		cloud: [
+			{
+				when: {testWhen:{$eq:true}},
+				transform: async (data,pattern) => {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call: async (data,pattern) => {
+					
+				}
+			}
+		],
+		worker: [
+			
+		]
+	}
+}).call(this);
+
+/***/ }),
+/* 12 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		browser: {
+			
 		},
-		getDate() {
-			return new Date();
+		cloud: {
+			securedTestFunction() {
+				return "If you see this, there may be a security leak";
+			},
+			getDate() {
+				return new Date();
+			}
+		},
+		worker: {
+			
 		}
 	}
 }).call(this);
 
 /***/ }),
-/* 12 */,
 /* 13 */,
 /* 14 */,
 /* 15 */,
@@ -717,7 +760,8 @@
 /* 19 */,
 /* 20 */,
 /* 21 */,
-/* 22 */
+/* 22 */,
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -731,14 +775,15 @@ Copyright AnyWhichWay, LLC 2019
 	const uid = __webpack_require__(6),
 		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(5),
-		create = __webpack_require__(23),
+		create = __webpack_require__(24),
 		Schema = __webpack_require__(2),
 		User = __webpack_require__(3),
-		functions = __webpack_require__(11);
+		functions = __webpack_require__(12).browser,
+		when = __webpack_require__(11).browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(25);
+		fetch = __webpack_require__(26);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -797,14 +842,25 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => create(data,this.ctors));
 		}
 		async keys(prefix,cursor) {
+			if(!cursor) {
+				cursor = this.keys.cursor;
+			}
 			return fetch(`${this.endpoint}/db.json?["keys"${prefix ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""}${cursor ? ","+encodeURIComponent(JSON.stringify(cursor)) : ""}]`,{headers:this.headers})
 	    		.then((response) => response.json())
-	    		.then((array) => { this.keys.cursor = array.pop(); return array; })
+	    		.then((array) => { 
+	    			const cursor = array.pop();
+	    			if(!cursor) {
+	    				delete this.keys.cursor;
+	    			} else {
+	    				this.keys.cursor = cursor;
+	    			}
+	    			return array;
+	    		})
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
-			const data = Object.assign({},object);
-			let id = data["#"];
+			let data = Object.assign({},object),
+				id = data["#"];
 			if(!id) {
 				id = data["#"]  = `${object.constructor.name}@${uid()}`;
 			}
@@ -821,11 +877,31 @@ Copyright AnyWhichWay, LLC 2019
 					error.errors = errors;
 					throw error;
 				}
-			}	
-			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
+			}
+			const matches = when.reduce((accum,item) => {
+				if(joqular.matches(item.when,object)) {
+					accum.push(item);
+				}
+				return accum;
+			},[]);
+			for(const match of matches) {
+				if(match.transform) {
+					data = await match.transform.call(this,data,match.when);
+				}
+			}
+			if(!data || typeof(data)!=="object") {
+				return;
+			}
+			const result = fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
-				.then((object) => create(object,this.ctors))
+				.then((object) => create(object,this.ctors));
+			for(const match of matches) {
+				if(match.call) {
+					data = await match.call.call(this,await result,match.when);
+				}
+			}
+			return result;
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
@@ -872,11 +948,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(24),
+	const fromSerializable = __webpack_require__(25),
 		create = (data,ctors={}) => {
 			const type = typeof(data);
 			if(type==="string") {
@@ -912,7 +988,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -949,7 +1025,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

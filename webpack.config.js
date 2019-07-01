@@ -34,9 +34,9 @@ const CLOUDFLARED = config.cloudflaredPath,
 	namespace = `${MODE==="development" ? DEV_NAMESPACE_ID : NAMESPACE_ID}`,
 	scriptName = `${MODE==="development"  ? DEV_HOST+"-" : ""}thunderclap-${HOSTNAME.split(".").join("-")}`,
 	metadataScript = `echo {"body_part":"script","bindings":[{"type":"kv_namespace","name":"NAMESPACE","namespace_id":"${namespace}"}]} > metadata.json`,
-	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@server.js;type=application/javascript"`,
+	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@cloud.js;type=application/javascript"`,
 	putRoute = `curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -H "Content-type: application/json" -d "{\\"pattern\\": \\"${host}/*\\", \\"script\\":\\"${scriptName}\\"}"`;
-	//keysScript = `curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}"`;
+	keysScript = `curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}"`;
 	keys = 
 	`(function() {
 		function getKeys(prefix,cursor) { 
@@ -44,15 +44,14 @@ const CLOUDFLARED = config.cloudflaredPath,
 				{headers:{"X-Auth-Email":"${EMAIL}","X-Auth-Key":"${AUTH_KEY}"}})
 				.then((result) => result.json())
 		}
-		module.exports = async function* keys(prefix,cursor) {
-			const {result,result_info} = await getKeys(prefix,cursor);
-			for(const key of result) {
-				yield key.name;
+		module.exports = async function keys(prefix,cursor) {
+			if(cursor!=="") {
+				let {result,result_info} = await getKeys(prefix,cursor);
+				result = result.map((item) => item.name);
+				result.push(result_info.cursor);
+				return result;
 			}
-			yield result_info.cursor;
-			//if(result_info.cursor) {
-			//	yield* keys(className,result_info.cursor);
-			//}
+			return [];
 		}
 	}).call(this)`;
 
@@ -101,19 +100,19 @@ module.exports = {
   watch: true,
   context: path.resolve(__dirname, "src"),
   entry: {
-	server: "./server.js" ,
+	cloud: "./cloud.js" ,
 	thunderclap: "./thunderclap.js"
   },
   output: {
 	  path: __dirname, //path.resolve(__dirname,ROOT),
 	  filename: (chunkData) => {
-		  return chunkData.chunk.name === "server" ? "server.js" : `${ROOT}/[name].js`
+		  return chunkData.chunk.name === "cloud" ? "cloud.js" : `${ROOT}/[name].js`
 	  }
   },
   plugins: [
 	  new WebpackShellPlugin({
 		  //onBuildStart:[`echo (function() { module.exports="${DBO_PASSWORD}"; }).call(this) > dbo.js`],
-		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}`],
+		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}`], //  && ${keysScript}
 		  dev: false
 	  }),
 	  // this ignore is not working

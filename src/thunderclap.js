@@ -12,7 +12,8 @@ Copyright AnyWhichWay, LLC 2019
 		create = require("./create.js"),
 		Schema = require("./schema.js"),
 		User = require("./user.js"),
-		functions = require("../functions.js");
+		functions = require("../functions.js").browser,
+		when = require("../when.js").browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
@@ -75,14 +76,25 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => create(data,this.ctors));
 		}
 		async keys(prefix,cursor) {
+			if(!cursor) {
+				cursor = this.keys.cursor;
+			}
 			return fetch(`${this.endpoint}/db.json?["keys"${prefix ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""}${cursor ? ","+encodeURIComponent(JSON.stringify(cursor)) : ""}]`,{headers:this.headers})
 	    		.then((response) => response.json())
-	    		.then((array) => { this.keys.cursor = array.pop(); return array; })
+	    		.then((array) => { 
+	    			const cursor = array.pop();
+	    			if(!cursor) {
+	    				delete this.keys.cursor;
+	    			} else {
+	    				this.keys.cursor = cursor;
+	    			}
+	    			return array;
+	    		})
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
-			const data = Object.assign({},object);
-			let id = data["#"];
+			let data = Object.assign({},object),
+				id = data["#"];
 			if(!id) {
 				id = data["#"]  = `${object.constructor.name}@${uid()}`;
 			}
@@ -99,11 +111,31 @@ Copyright AnyWhichWay, LLC 2019
 					error.errors = errors;
 					throw error;
 				}
-			}	
-			return fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
+			}
+			const matches = when.reduce((accum,item) => {
+				if(joqular.matches(item.when,object)) {
+					accum.push(item);
+				}
+				return accum;
+			},[]);
+			for(const match of matches) {
+				if(match.transform) {
+					data = await match.transform.call(this,data,match.when);
+				}
+			}
+			if(!data || typeof(data)!=="object") {
+				return;
+			}
+			const result = fetch(`${this.endpoint}/db.json?["putItem",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
-				.then((object) => create(object,this.ctors))
+				.then((object) => create(object,this.ctors));
+			for(const match of matches) {
+				if(match.call) {
+					data = await match.call.call(this,await result,match.when);
+				}
+			}
+			return result;
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})

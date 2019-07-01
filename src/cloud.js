@@ -130,21 +130,6 @@ async function handleRequest({request,response}) {
 					}
 				});
 			}
-			if(fname==="keys") {
-				const results = [];
-				for await(const key of thunderhead.keys(...args)) {
-					results.push(key);
-				}
-				return new Response(JSON.stringify(results),
-					{
-						status:200,
-						headers:
-						{
-							"Content-Type":"text/plain",
-							"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-						}
-					})
-			}
 			return thunderhead[fname](...args)
 			.then((result) => {
 				const type = typeof(result);

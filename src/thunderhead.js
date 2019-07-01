@@ -4,11 +4,12 @@
 		joqular = require("./joqular.js"),
 		hashPassword = require("./hash-password.js"),
 		secure = require("./secure.js"),
-		respond = require("./respond.js"),
-		functions = require("../functions.js"),
+		respond = require("./respond.js")("cloud"),
 		User = require("./user.js"),
 		Schema = require("./schema.js"),
-		keys = require("../keys.js");
+		keys = require("../keys.js"),
+		when = require("../when.js").cloud,
+		functions = require("../functions.js").cloud;
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -29,6 +30,7 @@
 			const request = this.request,
 				authed = request.user;
 			request.user = this.dbo;
+			//return this.dbo;
 			const user = (await this.query({userName},false))[0];
 			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
@@ -87,7 +89,7 @@
 							const valuekey = `${JSON.stringify(value)}`;
 							const keypath = `!${key}`;
 							if(!root[key]) {
-								rootchanged = root[key] = true;
+								rootchanged = root[key] = 1;
 							}
 							let node = await this.namespace.get(keypath);
 							if(!node) {
@@ -96,10 +98,13 @@
 								node = JSON.parse(node);
 							}
 							if(!node[valuekey]) {
-								node[valuekey] = true;
+								node[valuekey] = 1;
 								await this.namespace.put(keypath,JSON.stringify(node));
 							}
-							const valuepath = `${keypath}!${valuekey}`;
+							
+							await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
+							 
+							/*const valuepath = `${keypath}!${valuekey}`;
 							node = await this.namespace.get(valuepath);
 							if(!node) {
 								node = {};
@@ -107,14 +112,14 @@
 								node = JSON.parse(node);
 							}
 							if(!node[id]) {
-								node[id] = true;
+								node[id] = 1;
 								await this.namespace.put(valuepath,JSON.stringify(node))
-							}
+							}*/
 						}
 					}
 				}
 			}
-			return rootchanged;
+			return !!rootchanged;
 		}
 		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
@@ -144,6 +149,17 @@
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
 				return error;
+			}
+			const matches = when.reduce((accum,item) => {
+				if(joqular.matches(item.when,object)) {
+					accum.push(item);
+				}
+				return accum;
+			},[]);
+			for(const match of matches) {
+				if(match.transform) {
+					data = await match.transform.call(this,data,match.when);
+				}
 			}
 			let root = await this.namespace.get("!");
 			if(!root) {
@@ -186,6 +202,11 @@
 					await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
 				}
 				await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
+				for(const match of matches) {
+					if(match.call) {
+						await match.call(this,data,match.when);
+					}
+				}
 			}
 			return data;
 		}
@@ -244,8 +265,25 @@
 										}
 										if(await test.call(keynode,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 											// disallow index use by unauthorized users at document && property level
-											const valuepath = `${keypath}!${valuekey}`;
-											let valuenode = await this.namespace.get(valuepath);
+											const valuepath = `${keypath}!${valuekey}!`,
+												len = valuepath.length,
+												 valuenode = {};
+											let keys, cursor, haskeys;
+											do {
+												keys = await this.keys(valuepath,cursor);
+												cursor = keys.pop();
+												for(const key of keys) {
+													const id = key.substring(len),
+														cname = id.split("@")[0],
+														{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+													if(data && removed.length===0) {
+														valuenode[id] = true;
+											 			haskeys = true;
+												    }
+												}
+											} while(keys.length>0);
+											 
+											/*let valuenode = await this.namespace.get(valuepath);
 											if(!valuenode) {
 												delete keynode[valuekey];
 												await this.namespace.put(keypath,JSON.stringify(keynode));
@@ -261,7 +299,7 @@
 													delete valuenode[id];
 													secured[id] = true;
 												}
-											}
+											}*/
 											if(haskeys) {
 												Object.assign(testids,valuenode);
 											} else {
@@ -282,7 +320,7 @@
 										}
 									} else {
 										for(const id in ids) {
-											if(!secured[id] && !testids[id]) {
+											if(!testids[id]) { // !secured[id] && 
 												delete ids[id];
 												count--;
 												if(count<=0) {
@@ -297,9 +335,25 @@
 							const valuekey = JSON.stringify(value);
 							if(keynode[valuekey]) {
 								// disallow index use by unauthorized users at document && property level
-								const secured = {};
-								const valuepath = `${keypath}!${valuekey}`;
-								let valuenode = await this.namespace.get(valuepath);
+								//const secured = {};
+								const valuepath = `${keypath}!${valuekey}!`,
+									len = valuepath.length,
+									 valuenode = {};
+								let keys, cursor, haskeys;
+								do {
+									keys = await this.keys(valuepath,cursor);
+									cursor = keys.pop();
+									for(const key of keys) {
+										const id = key.substring(len),
+											cname = id.split("@")[0],
+											{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+										if(data && removed.length===0) {
+											valuenode[id] = true;
+								 			haskeys = true;
+									    }
+									}
+								} while(keys.length>0);
+								/*let valuenode = await this.namespace.get(valuepath);
 								if(!valuenode) {
 									delete keynode[valuekey];
 									await this.namespace.put(keypath,JSON.stringify(keynode));
@@ -315,7 +369,7 @@
 										delete valuenode[id];
 										secured[id] = true;
 									}
-								}
+								}*/
 								if(!haskeys) {
 									return [];
 								}
@@ -324,7 +378,7 @@
 									count = Object.keys(ids).length;
 								} else {
 									for(const id in ids) {
-										if(!secured[id] && !valuenode[id]) {
+										if(!valuenode[id]) { //!secured[id] && 
 											delete ids[id];
 											count--;
 											if(count<=0) {
@@ -420,6 +474,7 @@
 			if(object && typeof(object)==="object" && object["#"]) {
 				const id = object["#"];
 				for(const key in object) {
+					// just loop through deleting these `${keypath}!${valuekey}!${id}`;
 					if(key==="#") {
 						continue;
 					}

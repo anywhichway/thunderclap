@@ -371,6 +371,11 @@ describe("query",function() {
 			errors = await schema.validate(data,db);
 		expect(errors.length>=1).equal(true);
 	});
+	it("test when", async function() {
+		const item = await db.putItem({testWhen: true,deletedProperty:true});
+		expect(item.testWhen).equal(true);
+		expect(item.deleteProperty).equal(undefined);
+	});
 	it("10 setItem", async function() {
 		for(let i=0;i<10;i++) {
 			await db.setItem(`key${i}`,i);
