@@ -7,9 +7,9 @@
 		respond = require("./respond.js")("cloud"),
 		User = require("./user.js"),
 		Schema = require("./schema.js"),
-		keys = require("../keys.js"),
 		when = require("../when.js").cloud,
-		functions = require("../functions.js").cloud;
+		functions = require("../functions.js").cloud,
+		keys = require("../keys.js");
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -24,7 +24,9 @@
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
-			Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
+			require("./cloudflare-kv-extensions")(this);
+			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
+			
 		}
 		async authUser(userName,password) {
 			const request = this.request,
@@ -48,20 +50,24 @@
 			request.user = authed;
 			return user;
 		}
+		async delete(key) {
+			return this.removeItem(key);
+		}
+		async get(key) {
+			return this.getItem(key);
+		}
 		async getItem(key) {
 			let data = await this.namespace.get(key);
 			if(data) {
 				data = JSON.parse(data);
-				//if(key[0]!=="!") {
-					const action = "read";
-					if(isSoul(data["#"],false)) {
-						const key = `${data["#"].split("@")[0]}@`,
-							secured = await secure.call(this,{key,action,data});
-						data = secured.data;
-					}
-					const secured = await secure.call(this,{key,action,data});
+				const action = "read";
+				if(isSoul(data["#"],false)) {
+					const key = `${data["#"].split("@")[0]}@`,
+						secured = await secure.call(this,{key,action,data});
 					data = secured.data;
-				//}
+				}
+				const secured = await secure.call(this,{key,action,data});
+				data = secured.data;
 			}
 			return data==null ? undefined : data;
 		}
@@ -102,9 +108,9 @@
 								await this.namespace.put(keypath,JSON.stringify(node));
 							}
 							
-							await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
+							//await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
 							 
-							/*const valuepath = `${keypath}!${valuekey}`;
+							const valuepath = `${keypath}!${valuekey}`;
 							node = await this.namespace.get(valuepath);
 							if(!node) {
 								node = {};
@@ -114,12 +120,15 @@
 							if(!node[id]) {
 								node[id] = 1;
 								await this.namespace.put(valuepath,JSON.stringify(node))
-							}*/
+							}
 						}
 					}
 				}
 			}
 			return !!rootchanged;
+		}
+		async put(key,value) {
+			return this.put(key,value);
 		}
 		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
@@ -265,12 +274,12 @@
 										}
 										if(await test.call(keynode,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 											// disallow index use by unauthorized users at document && property level
-											const valuepath = `${keypath}!${valuekey}!`,
-												len = valuepath.length,
-												 valuenode = {};
-											let keys, cursor, haskeys;
-											do {
-												keys = await this.keys(valuepath,cursor);
+											const valuepath = `${keypath}!${valuekey}`,
+												//valuenode = {},
+												len = valuepath.length;
+											let valuenode = {}, keys, cursor, haskeys;
+											/*do {
+												keys = await this.keys(valuepath+"!",{cursor});
 												cursor = keys.pop();
 												for(const key of keys) {
 													const id = key.substring(len),
@@ -281,16 +290,14 @@
 											 			haskeys = true;
 												    }
 												}
-											} while(keys.length>0);
-											 
-											/*let valuenode = await this.namespace.get(valuepath);
+											} while(keys.length>0 && cursor);*/
+											valuenode = await this.namespace.get(valuepath);
 											if(!valuenode) {
 												delete keynode[valuekey];
 												await this.namespace.put(keypath,JSON.stringify(keynode));
 												continue;
 											}
 											valuenode = JSON.parse(valuenode);
-											let haskeys;
 											for(const id in valuenode) {
 												haskeys = true;
 												const cname = id.split("@")[0],
@@ -299,7 +306,7 @@
 													delete valuenode[id];
 													secured[id] = true;
 												}
-											}*/
+											}
 											if(haskeys) {
 												Object.assign(testids,valuenode);
 											} else {
@@ -320,7 +327,7 @@
 										}
 									} else {
 										for(const id in ids) {
-											if(!testids[id]) { // !secured[id] && 
+											if(!secured[id] && !testids[id]) { //  
 												delete ids[id];
 												count--;
 												if(count<=0) {
@@ -335,13 +342,13 @@
 							const valuekey = JSON.stringify(value);
 							if(keynode[valuekey]) {
 								// disallow index use by unauthorized users at document && property level
-								//const secured = {};
-								const valuepath = `${keypath}!${valuekey}!`,
-									len = valuepath.length,
-									 valuenode = {};
+								const secured = {},
+									valuepath = `${keypath}!${valuekey}`,
+								 	// valuenode = {},
+									len = valuepath.length;
 								let keys, cursor, haskeys;
-								do {
-									keys = await this.keys(valuepath,cursor);
+								/*do {
+									keys = await this.keys(valuepath+"!",{cursor});
 									cursor = keys.pop();
 									for(const key of keys) {
 										const id = key.substring(len),
@@ -352,15 +359,15 @@
 								 			haskeys = true;
 									    }
 									}
-								} while(keys.length>0);
-								/*let valuenode = await this.namespace.get(valuepath);
+									break;
+								} while(keys.length>0 && cursor);*/
+								let valuenode = await this.namespace.get(valuepath);
 								if(!valuenode) {
 									delete keynode[valuekey];
 									await this.namespace.put(keypath,JSON.stringify(keynode));
 									return;
 								}
 								valuenode = JSON.parse(valuenode);
-								let haskeys;
 								for(const id in valuenode) {
 									haskeys = true;
 									const cname = id.split("@")[0],
@@ -369,7 +376,7 @@
 										delete valuenode[id];
 										secured[id] = true;
 									}
-								}*/
+								}
 								if(!haskeys) {
 									return [];
 								}
@@ -378,7 +385,7 @@
 									count = Object.keys(ids).length;
 								} else {
 									for(const id in ids) {
-										if(!valuenode[id]) { //!secured[id] && 
+										if(!secured[id] && !valuenode[id]) { // 
 											delete ids[id];
 											count--;
 											if(count<=0) {
@@ -466,7 +473,7 @@
 			if(data!==undefined) {
 				await this.namespace.put(key,JSON.stringify(data),options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				await respond.call(this,{key,when:"after",action:"set",data:frozen});
+				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
 		} 
@@ -491,6 +498,7 @@
 								const valuepath = `${keypath}!${valuekey}`;
 								let valuenode = await this.namespace.get(valuepath);
 								if(valuenode) {
+									// if we revert to three level index, this needs to be enhanced
 									valuenode = JSON.parse(valuenode);
 									if(valuenode[id]) {
 										delete valuenode[id];

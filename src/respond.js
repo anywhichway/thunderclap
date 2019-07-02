@@ -1,6 +1,6 @@
 (function() {
-	var triggers,
-		triggersKeys = Object.keys(triggers),
+	let triggers,
+		triggersKeys,
 		compiled;
 		
 	async function respond({key,when,action,data,changes}) {
@@ -28,7 +28,7 @@
 	module.exports = (type) => {
 		triggers = require("../triggers.js")[type],
 		triggersKeys = Object.keys(triggers),
-		complied = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
+		compiled = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
 			const parts = key.split("/");
 			if(parts.length===3 && parts[0]==="") {
 				try {

@@ -146,11 +146,15 @@ use. If `reAuth` is truthy, the Thunderclap instance will also be re-bound to th
 control and account creation logic on the server to prevent the creation of un-authorized accounts. See the section 
 Security.
 
+`undefined async clear(string prefix)` -
+
+`Array async entries(string prefix,{number batchSize,string cursor})` - 
+
 `any async getItem(string key)` - gets the value at `key`. Returns `undefined` if no value exists.
 
-`boolean async hasKey(string key,boolean startsWith)` - COMMING SOON
+`boolean async hasKey(string key)` - 
 
-`Array async keys(classNameOrPrefix)` - returns an Array of the next 1000 keys in database than match the className or prefix every time it is called.
+`Array async keys(classNameOrPrefix,{number batchSize,string cursor,boolean expanded})` - returns an Array of the next 1000 keys in database than match the className or prefix every time it is called.
 You can use a loop to process all keys:
 
 ```
@@ -174,6 +178,8 @@ or removal succeeds, the function returns `true`.
 
 `any async setItem(string key,any value,options={})` - sets the `key` to `value`. If the `value` is an object it is 
 NOT indexed. Options can have one of two members: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
+
+`Array async values(string prefix,{number batchSize,string cursor})` - 
 
 curl -X GET "https://api.cloudflare.com/client/v4/accounts/92dcaefc91ea9f8eb9632c01148179af/storage/kv/namespaces/d67b2cf619c74499b033404eea6dbe2a/keys?limit=1000 -H "X-Auth-Email:syblackwell@anywhichway.com" -H "X-Auth-Key:bb03a6b1c8604b0541f84cf2b70ea9c45953c"
 ## CURL Requests 
@@ -471,6 +477,10 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-07-02 v0.0.15a Added `clear(prefix)`, `entries(prefix,options)`, `hasKey(key)`, `values(prefix,options)`.
+All are limited to dbo access. Reverted to two level index for now to address performance. Limits number of 
+entries per index due to 128MB limit of Workers.
 
 2019-06-30 v0.0.14a Ehanced triggers and functions to allow browser, service worker, or cloud execution. 
 Added `when` capability. Service worker support will operate once service workers are generated during the

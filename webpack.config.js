@@ -37,8 +37,15 @@ const CLOUDFLARED = config.cloudflaredPath,
 	putScript = `curl -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/scripts/${scriptName}" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -F "metadata=@metadata.json;type=application/json" -F "script=@cloud.js;type=application/javascript"`,
 	putRoute = `curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}" -H "Content-type: application/json" -d "{\\"pattern\\": \\"${host}/*\\", \\"script\\":\\"${scriptName}\\"}"`;
 	keysScript = `curl -X GET "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000" -H "X-Auth-Email:${EMAIL}" -H "X-Auth-Key:${AUTH_KEY}"`;
-	keys = 
-	`(function() {
+	keys = `(function() {
+		module.exports = {
+		 accountId: "${ACCOUNT_ID}",
+		 namespaceId: "${namespace}",
+		 authEmail: "${EMAIL}",
+		 authKey: "${AUTH_KEY}"
+		}
+	}).call(this)`;
+	/*`(function() {
 		function getKeys(prefix,cursor) { 
 			return fetch(\`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000\${cursor ? "&cursor="+cursor : ""}\${prefix ? "&prefix="+prefix : ""}\`,
 				{headers:{"X-Auth-Email":"${EMAIL}","X-Auth-Key":"${AUTH_KEY}"}})
@@ -53,7 +60,7 @@ const CLOUDFLARED = config.cloudflaredPath,
 			}
 			return [];
 		}
-	}).call(this)`;
+	}).call(this)`;*/
 
 	var liveServer = require("live-server");
 

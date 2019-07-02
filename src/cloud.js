@@ -105,7 +105,7 @@ async function handleRequest({request,response}) {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
+					user = thunderhead.dbo; //await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
 						status: 401,

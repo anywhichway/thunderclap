@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 23);
+/******/ 	return __webpack_require__(__webpack_require__.s = 24);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -761,7 +761,8 @@
 /* 20 */,
 /* 21 */,
 /* 22 */,
-/* 23 */
+/* 23 */,
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -775,7 +776,7 @@ Copyright AnyWhichWay, LLC 2019
 	const uid = __webpack_require__(6),
 		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(5),
-		create = __webpack_require__(24),
+		create = __webpack_require__(25),
 		Schema = __webpack_require__(2),
 		User = __webpack_require__(3),
 		functions = __webpack_require__(12).browser,
@@ -783,7 +784,7 @@ Copyright AnyWhichWay, LLC 2019
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(26);
+		fetch = __webpack_require__(27);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -817,6 +818,10 @@ Copyright AnyWhichWay, LLC 2019
 				Object.defineProperty(this,key,{enumerable:false,configurable:true,writable:true,value:f})
 			})
 		}
+		async clear(key="") {
+			return fetch(`${this.endpoint}/db.json?["clear",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
+		}
 		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
 	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
@@ -828,6 +833,25 @@ Copyright AnyWhichWay, LLC 2019
 	    		}
 	    		return user;
 	    	});
+		}
+		async entries(prefix="",options) {
+			if(!options) {
+				options = this.keys.options || {};
+			}
+			return fetch(`${this.endpoint}/db.json?["entries"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
+	    		.then((array) => { 
+	    			const cursor = array.pop();
+	    			if(!cursor) {
+	    				delete this.keys.options;
+	    			} else {
+	    				if(!this.keys.options) {
+	    					this.keys.options = options;
+	    				}
+	    				this.keys.options.cursor = cursor;
+	    			}
+	    			return array;
+	    		})
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -841,18 +865,28 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
-		async keys(prefix,cursor) {
-			if(!cursor) {
-				cursor = this.keys.cursor;
+		async hasKey(key) {
+			if(key) {
+				return fetch(`${this.endpoint}/db.json?["hasKey",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
 			}
-			return fetch(`${this.endpoint}/db.json?["keys"${prefix ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""}${cursor ? ","+encodeURIComponent(JSON.stringify(cursor)) : ""}]`,{headers:this.headers})
+			return false;
+		}
+		async keys(prefix="",options) {
+			if(!options) {
+				options = this.keys.options || {};
+			}
+			return fetch(`${this.endpoint}/db.json?["keys"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
 	    		.then((response) => response.json())
 	    		.then((array) => { 
 	    			const cursor = array.pop();
 	    			if(!cursor) {
-	    				delete this.keys.cursor;
+	    				delete this.keys.options;
 	    			} else {
-	    				this.keys.cursor = cursor;
+	    				if(!this.keys.options) {
+	    					this.keys.options = options;
+	    				}
+	    				this.keys.options.cursor = cursor;
 	    			}
 	    			return array;
 	    		})
@@ -940,6 +974,25 @@ Copyright AnyWhichWay, LLC 2019
 			const object = new Schema(className,config);
 			return this.putItem(object);
 		}
+		async values(prefix="",options) {
+			if(!options) {
+				options = this.keys.options || {};
+			}
+			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
+	    		.then((response) => response.json())
+	    		.then((array) => { 
+	    			const cursor = array.pop();
+	    			if(!cursor) {
+	    				delete this.keys.options;
+	    			} else {
+	    				if(!this.keys.options) {
+	    					this.keys.options = options;
+	    				}
+	    				this.keys.options.cursor = cursor;
+	    			}
+	    			return array;
+	    		})
+		}
 	}
 	
 	if(true) module.exports = Thunderclap;
@@ -948,11 +1001,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(25),
+	const fromSerializable = __webpack_require__(26),
 		create = (data,ctors={}) => {
 			const type = typeof(data);
 			if(type==="string") {
@@ -988,7 +1041,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1025,7 +1078,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

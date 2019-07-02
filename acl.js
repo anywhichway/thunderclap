@@ -13,10 +13,19 @@
 			read: ["dbo"],
 			write: ["dbo"]
 		},
+		clear: { // only dbo can clear
+			execute: ["dbo"]
+		},
+		entries: { // only dbo can list entries
+			execute: ["dbo"]
+		},
 		keys: { // only dbo can list keys
 			execute: ["dbo"]
 		},
-		"User@": { // key to control, user <cname>@ for classes
+		values: { // only dbo can list values
+			execute: ["dbo"]
+		},
+		"User@": { // key to control, use <cname>@ for classes
 			
 			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
 			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
