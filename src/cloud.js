@@ -9,7 +9,7 @@ const Schema = require("./schema.js"),
 	hashPassword = require("./hash-password.js"),
 	toSerializable = require("./to-serializable"),
 	Thunderhead = require("./thunderhead.js"),
-	dboPassword = require("../dbo.js"),
+	dboPassword = require("../keys.js").dboPassword,
 	secure = require("./secure.js");
 
 let thunderhead;
@@ -105,7 +105,7 @@ async function handleRequest({request,response}) {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = thunderhead.dbo; //await thunderhead.authUser(userName,password); // thunderhead.dbo;
+					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
 						status: 401,

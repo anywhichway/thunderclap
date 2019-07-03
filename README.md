@@ -139,6 +139,14 @@ const endpoint = "https://thunderclap.mydomain.com/db.json",
 </script>
 ```
 
+`undefined async clear(string prefix="")` - Deletes items whose keys start with `prefix`. By default it can only be 
+called by a user with the `dbo` role.
+
+`string async changePassword(string userName,string password,string oldPassword)` - Changes the password from
+`oldPassword` to `password` for the user with name `userName` and old password `oldPassword`. If `password` is not 
+provided, a random 10 character password is generated. If the currently authenticated user has the role `dbo` and 
+is not the user for whom the password wis being changed, `oldPassword` can be omitted.
+
 `User async createUser(string userName,string password,reAuth)` - creates a user. The password is stored on the server
 as an SHA-256 hash and salt. `createUser` can be called even if Thunderclap is started without a username and password. 
 If this is done and `createUser` succeeds, the Thunderclap instance is bound to the new user for immediate authenticated 
@@ -146,42 +154,47 @@ use. If `reAuth` is truthy, the Thunderclap instance will also be re-bound to th
 control and account creation logic on the server to prevent the creation of un-authorized accounts. See the section 
 Security.
 
-`undefined async clear(string prefix)` -
-
-`Array async entries(string prefix,{number batchSize,string cursor})` - 
-
-`any async getItem(string key)` - gets the value at `key`. Returns `undefined` if no value exists.
-
-`boolean async hasKey(string key)` - 
-
-`Array async keys(classNameOrPrefix,{number batchSize,string cursor,boolean expanded})` - returns an Array of the next 1000 keys in database than match the className or prefix every time it is called.
-You can use a loop to process all keys:
+`Array async entries(string prefix="",{number batchSize,string cursor})` - Returns an array or arrays for keys,
+values and expirations of of data with keys that start with `prifix`., e.g. `entries("Person@")` might return:
 
 ```
-	let keys;
+[["Person@jxmc9cc1kswqak4ga",{"name":"joe"},1562147669820],["Person@jxmcnqkx9irjhrz4p",{"name":"joe"},1562147669820]]
+```
+
+It can be used in a loop just like `keys` below.
+
+`any async getItem(string key)` - Gets the value at `key`. Returns `undefined` if no value exists.
+
+`boolean async hasKey(string key)` - Returns `true` is `key` exists.
+
+`Array async keys(prefix="",{number batchSize,string cursor,boolean expanded})` - Returns an Array of the next `batchSize`
+keys in database than match the `prefix` every time it is called. By default it can only be called by a user with the 
+`dbo` role. You can use a loop to process all keys:
+
+```
+	let cursor;
 	do {
-		keys = await mythunder.keys();
+		keys = await mythunder.keys("",{cursor});
+		cursor = keys.pop();
 		keys.forEach((key) => dosomething(key));
-	} while(keys.length>0)
+	} while(cursor && keys.length>0)
 ```
 
-If you abort early you should `delete mythunder.keys.cursor` or next time you call `keys` it will pick up where it left off.
-
-`any async putItem(object value,options={})` - adds a unique id on property "#" if one does not exist, indexes the object and 
+`any async putItem(object value,options={})` - Adds a unique id on property "#" if one does not exist, indexes the object and 
 stores it with `setItem` using the id as the key. In most cases the unique id will be of the form 
 `<className>@xxxxxxxxxxxxx`.
 
-`boolean async removeItem(string|object keyOrObject) - removes the keyOrObject. If the argument is an indexed object 
+`boolean async removeItem(string|object keyOrObject) - Removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the key and data are removed from the database so long as the user has 
 the appropriate privileges. If the key exists but can't be removed the function returns `false`. If the key does not exist
 or removal succeeds, the function returns `true`.
 
-`any async setItem(string key,any value,options={})` - sets the `key` to `value`. If the `value` is an object it is 
+`any async setItem(string key,any value,options={})` - Sets the `key` to `value`. If the `value` is an object it is 
 NOT indexed. Options can have one of two members: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 
-`Array async values(string prefix,{number batchSize,string cursor})` - 
+`Array async values(string prefix="",{number batchSize,string cursor})` - Returns all the data associated with keys that
+start with `prefix`. By default it can only be called by a user with the `dbo` role. It can be used in a loop just like `keys` above.
 
-curl -X GET "https://api.cloudflare.com/client/v4/accounts/92dcaefc91ea9f8eb9632c01148179af/storage/kv/namespaces/d67b2cf619c74499b033404eea6dbe2a/keys?limit=1000 -H "X-Auth-Email:syblackwell@anywhichway.com" -H "X-Auth-Key:bb03a6b1c8604b0541f84cf2b70ea9c45953c"
 ## CURL Requests 
 
 To be written
@@ -211,8 +224,8 @@ then object ids with the property and value, e.g.
 }
 ```
 
-The root index node can be accessed via `getItem("!")`. Currently this is open to all, but it will be restricted
-to the role `dbo` in the future. To get at a property index, just add the property name, e.g. `getItem("!userName")`.
+The root index node can be accessed via `getItem("!")`. Direct access is restricted to users with the role `dbo`
+To get at a property index, just add the property name, e.g. `getItem("!userName")`.
 To get at a value index, add a stringfied value, e.g. `getItem("!userName!\"joe64\"")`. Of course, you usually don't
 have to do this because the JOQULAR pattern processing engine in the worker script does it for you. Also, only users
 with the role `dbo` can directly query indexes.
@@ -237,7 +250,9 @@ greater in number but still not huge. Let's assume 10,000,000 at 8 characters ea
 = 48MB
 ```
 
-We have an architecture that will reduce the RAM usage; howvever, it may also negatively impact performance.
+We have tested an architecture that will reduce the RAM usage and allow for as much storage as physically possible by the
+underlying Cloudflare KV store; howvever, it also negatively impacts performance. A final decision on which to use has 
+not been made. We may make it configurable.
 
 # Security
 
@@ -276,6 +291,18 @@ The default `acl.js` file is show below.
 		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing may create a data inference leak
 			read: ["dbo"],
 			write: ["dbo"]
+		},
+		clear: { // only dbo can clear
+			execute: ["dbo"]
+		},
+		entries: { // only dbo can list entries
+			execute: ["dbo"]
+		},
+		keys: { // only dbo can list keys
+			execute: ["dbo"]
+		},
+		values: { // only dbo can list values
+			execute: ["dbo"]
 		},
 		"User@": { // key to control, user <cname>@ for classes
 			
@@ -316,18 +343,16 @@ The default `acl.js` file is show below.
 		}
 	}
 }).call(this);
-
 ```
 
 Roles can also be established in a tree that is automatically applied at runtime. See the file `roles.js`.
 
-When Thunderclap is first initialized, a special user `User@dbo` with the user name `dbo` and password `dbo` is created
-with the role `dbo`. In the future, it will be possible to set the password wiht the dev tools.
+When Thunderclap is first initialized, a special user `User@dbo` with the user name `dbo` the role `dbo` and the
+dbo password defined in `thunderclap.json` is created. It also has the unique id `User@dbo`.
 
-You can create additional accounts with the `createUser` method documented above.
+You can create additional accounts with the `createUser` and change passwords with the `changePassword` 
+methods documented above.
 
-It is not currently possible to change passwords, part of the reason for the Alpha status
-of the project.
 
 # Schema
 
@@ -478,9 +503,11 @@ includes the addition of graph queries a la GunDB, full-text indexing, and joins
 
 # Change Log (reverse chronological order)
 
+2019-07-03 v0.0.16a Added `changePassword(userName,password,oldPassword)`.
+
 2019-07-02 v0.0.15a Added `clear(prefix)`, `entries(prefix,options)`, `hasKey(key)`, `values(prefix,options)`.
 All are limited to dbo access. Reverted to two level index for now to address performance. Limits number of 
-entries per index due to 128MB limit of Workers.
+entries per index due to 128MB limit of Cloudflare Workers.
 
 2019-06-30 v0.0.14a Ehanced triggers and functions to allow browser, service worker, or cloud execution. 
 Added `when` capability. Service worker support will operate once service workers are generated during the

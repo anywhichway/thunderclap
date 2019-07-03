@@ -755,6 +755,20 @@
 /***/ (function(module, exports) {
 
 (function() {
+		module.exports = {
+		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
+		 namespaceId: "ce8a7b45989d456eabb1b39f6b79db81",
+		 authEmail: "syblackwell@anywhichway.com",
+		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
+		 dboPassword: "dbo"
+		}
+	}).call(this)
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports) {
+
+(function() {
 	function bufferToHexString(buffer) {
 	    var s = '', h = '0123456789abcdef';
 	    (new Uint8Array(buffer)).forEach((v) => { s += h[v >> 4] + h[v & 15]; });
@@ -795,7 +809,7 @@
 }).call(this)
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -905,19 +919,6 @@
 }).call(this)
 
 /***/ }),
-/* 15 */
-/***/ (function(module, exports) {
-
-(function() {
-		module.exports = {
-		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "ce8a7b45989d456eabb1b39f6b79db81",
-		 authEmail: "syblackwell@anywhichway.com",
-		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c"
-		}
-	}).call(this)
-
-/***/ }),
 /* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -929,11 +930,11 @@ Copyright AnyWhichWay, LLC 2019
 
 const Schema = __webpack_require__(2),
 	User = __webpack_require__(3),
-	hashPassword = __webpack_require__(13),
+	hashPassword = __webpack_require__(14),
 	toSerializable = __webpack_require__(5),
 	Thunderhead = __webpack_require__(17),
-	dboPassword = __webpack_require__(23),
-	secure = __webpack_require__(14);
+	dboPassword = __webpack_require__(13).dboPassword,
+	secure = __webpack_require__(15);
 
 let thunderhead;
 addEventListener('fetch', event => {
@@ -1028,7 +1029,7 @@ async function handleRequest({request,response}) {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
-					user = thunderhead.dbo; //await thunderhead.authUser(userName,password); // thunderhead.dbo;
+					user = await thunderhead.authUser(userName,password); // thunderhead.dbo;
 				if(!user) {
 					return new Response("null",{
 						status: 401,
@@ -1119,14 +1120,14 @@ async function handleRequest({request,response}) {
 	const uid = __webpack_require__(6),
 		isSoul = __webpack_require__(4),
 		joqular = __webpack_require__(7),
-		hashPassword = __webpack_require__(13),
-		secure = __webpack_require__(14),
+		hashPassword = __webpack_require__(14),
+		secure = __webpack_require__(15),
 		respond = __webpack_require__(20)("cloud"),
 		User = __webpack_require__(3),
 		Schema = __webpack_require__(2),
 		when = __webpack_require__(11).cloud,
 		functions = __webpack_require__(12).cloud,
-		keys = __webpack_require__(15);
+		keys = __webpack_require__(13);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1143,7 +1144,6 @@ async function handleRequest({request,response}) {
 			this.register(Schema);
 			__webpack_require__(22)(this);
 			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
-			
 		}
 		async authUser(userName,password) {
 			const request = this.request,
@@ -1155,6 +1155,25 @@ async function handleRequest({request,response}) {
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
+			}
+		}
+		async changePassword(userName,password,oldPassword) {
+			const authed = this.request.user;
+			let user = await this.authUser(userName,oldPassword);
+			if(authed.userName===userName && !user) {
+				return "fail";
+			}
+			if(user || authed.roles.dbo) {
+				if(!password) {
+					password = Math.random().toString(36).substr(2,10);
+				}
+				if(!user) {
+					user = (await this.query({userName},false))[0];
+					if(!user) return;
+				}
+				Object.assign(user,await hashPassword(password,1000));
+				await this.putItem(user);
+				return password;
 			}
 		}
 		async createUser(userName,password) {
@@ -1845,7 +1864,7 @@ async function handleRequest({request,response}) {
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(15),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(13),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})
@@ -1909,12 +1928,6 @@ async function handleRequest({request,response}) {
 		Object.assign(namespace,methods);
 	}
 }).call(this);
-
-/***/ }),
-/* 23 */
-/***/ (function(module, exports) {
-
-(function() { module.exports="dbo"; }).call(this)
 
 /***/ })
 /******/ ]);

@@ -26,7 +26,6 @@
 			this.register(Schema);
 			require("./cloudflare-kv-extensions")(this);
 			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
-			
 		}
 		async authUser(userName,password) {
 			const request = this.request,
@@ -38,6 +37,25 @@
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
 				return user;
+			}
+		}
+		async changePassword(userName,password,oldPassword) {
+			const authed = this.request.user;
+			let user = await this.authUser(userName,oldPassword);
+			if(authed.userName===userName && !user) {
+				return "fail";
+			}
+			if(user || authed.roles.dbo) {
+				if(!password) {
+					password = Math.random().toString(36).substr(2,10);
+				}
+				if(!user) {
+					user = (await this.query({userName},false))[0];
+					if(!user) return;
+				}
+				Object.assign(user,await hashPassword(password,1000));
+				await this.putItem(user);
+				return password;
 			}
 		}
 		async createUser(userName,password) {

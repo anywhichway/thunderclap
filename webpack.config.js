@@ -42,7 +42,8 @@ const CLOUDFLARED = config.cloudflaredPath,
 		 accountId: "${ACCOUNT_ID}",
 		 namespaceId: "${namespace}",
 		 authEmail: "${EMAIL}",
-		 authKey: "${AUTH_KEY}"
+		 authKey: "${AUTH_KEY}",
+		 dboPassword: "${DBO_PASSWORD}"
 		}
 	}).call(this)`;
 	/*`(function() {
@@ -87,9 +88,7 @@ tunnel.stderr.on('data', function (data) {
     process.stderr.write(data);
 });	
 
-fs.writeFileSync(`${path.resolve(__dirname,"dbo.js")}`,`(function() { module.exports="${DBO_PASSWORD}"; }).call(this)`);
 fs.writeFileSync(`${path.resolve(__dirname,"keys.js")}`,keys);
-
 
 module.exports = {
   mode: "production",

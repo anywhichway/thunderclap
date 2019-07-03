@@ -55,6 +55,17 @@ Copyright AnyWhichWay, LLC 2019
 			return fetch(`${this.endpoint}/db.json?["clear",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
 	    		.then((response) => response.json())
 		}
+		async changePassword(userName,password="",oldPassword="") {
+			return fetch(`${this.endpoint}/db.json?["changePassword",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))},${encodeURIComponent(JSON.stringify(oldPassword))}]`,{headers:this.headers})
+	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
+	    	.then((data) => create(data,this.ctors))
+	    	.then((password) => {
+	    		if(password && this.headers["X-Auth-Username"]===userName) {
+	    			this.headers["X-Auth-Password"] = password;
+	    		}
+	    		return password;
+	    	});
+		}
 		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
 	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
@@ -67,24 +78,9 @@ Copyright AnyWhichWay, LLC 2019
 	    		return user;
 	    	});
 		}
-		async entries(prefix="",options) {
-			if(!options) {
-				options = this.keys.options || {};
-			}
+		async entries(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["entries"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
-	    		.then((array) => { 
-	    			const cursor = array.pop();
-	    			if(!cursor) {
-	    				delete this.keys.options;
-	    			} else {
-	    				if(!this.keys.options) {
-	    					this.keys.options = options;
-	    				}
-	    				this.keys.options.cursor = cursor;
-	    			}
-	    			return array;
-	    		})
+	    		.then((response) => response.json());
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -105,24 +101,9 @@ Copyright AnyWhichWay, LLC 2019
 			}
 			return false;
 		}
-		async keys(prefix="",options) {
-			if(!options) {
-				options = this.keys.options || {};
-			}
+		async keys(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["keys"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
-	    		.then((array) => { 
-	    			const cursor = array.pop();
-	    			if(!cursor) {
-	    				delete this.keys.options;
-	    			} else {
-	    				if(!this.keys.options) {
-	    					this.keys.options = options;
-	    				}
-	    				this.keys.options.cursor = cursor;
-	    			}
-	    			return array;
-	    		})
+	    		.then((response) => response.json());
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
@@ -207,24 +188,9 @@ Copyright AnyWhichWay, LLC 2019
 			const object = new Schema(className,config);
 			return this.putItem(object);
 		}
-		async values(prefix="",options) {
-			if(!options) {
-				options = this.keys.options || {};
-			}
+		async values(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
-	    		.then((array) => { 
-	    			const cursor = array.pop();
-	    			if(!cursor) {
-	    				delete this.keys.options;
-	    			} else {
-	    				if(!this.keys.options) {
-	    					this.keys.options = options;
-	    				}
-	    				this.keys.options.cursor = cursor;
-	    			}
-	    			return array;
-	    		})
+	    		.then((response) => response.json());
 		}
 	}
 	
