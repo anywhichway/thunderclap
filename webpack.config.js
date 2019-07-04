@@ -106,8 +106,8 @@ module.exports = {
   watch: true,
   context: path.resolve(__dirname, "src"),
   entry: {
-	cloud: "./cloud.js" ,
-	thunderclap: "./thunderclap.js"
+	thunderclap: "./thunderclap.js",
+	cloud: "./cloud.js"
   },
   output: {
 	  path: __dirname, //path.resolve(__dirname,ROOT),
@@ -117,14 +117,10 @@ module.exports = {
   },
   plugins: [
 	  new WebpackShellPlugin({
-		  //onBuildStart:[`echo (function() { module.exports="${DBO_PASSWORD}"; }).call(this) > dbo.js`],
+		  onBuildStart:[],
 		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}`], //  && ${keysScript}
 		  dev: false
-	  }),
-	  // this ignore is not working
-	  new webpack.WatchIgnorePlugin([
-		  /.*\dbo.js/ 
-	  ])
+	  })
   ],
 }
 

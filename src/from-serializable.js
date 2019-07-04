@@ -1,5 +1,5 @@
 (function() {
-	const fromSerializable = (data) => {
+	function fromSerializable(data) {
 		const type = typeof(data);
 		if(data==="@undefined") {
 			return undefined;

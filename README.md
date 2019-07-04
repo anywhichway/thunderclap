@@ -19,7 +19,9 @@ Thunderclap also supports:
 
 4) inline analytics and hooks
 
-5) custom functions (with access control).
+5) full text indexing and search
+
+6) custom functions (with access control).
 
 Like MongoDB, Thunderclap is open-sourced under the Server Side Public License. This means licencees are free to use and 
 modify the code for internal applications or public applications that are not primarily a means of providing Thunderclap
@@ -41,12 +43,12 @@ Thunderclap.
 4) The source code could do with a lot more comments
 
 5) Project structure does not currently have a clean separation between what people might want to change
-for their own use vs submit as a pull request. In general changes to file in the `src` directory are
+for their own use vs submit as a pull request. In general, changes to file in the `src` directory are
 candidates for pull requests and with the exception of this README those outside are not.
 
 6) It has not been performance tuned.
 
-6) It could do with contributors!
+7) It could do with contributors!
 
 ## Installation and Deployment
 
@@ -502,6 +504,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-07-04 v0.0.17a Added full text indexing with `{$search: string terms}` or `{$search: [string terms, number pctMatch]}`
 
 2019-07-03 v0.0.16a Added `changePassword(userName,password,oldPassword)`.
 

@@ -4,6 +4,10 @@
 		joqular = require("./joqular.js"),
 		hashPassword = require("./hash-password.js"),
 		secure = require("./secure.js"),
+		//stemmer = require("./stemmer.js"),
+		trigrams = require("./trigrams.js"),
+		tokenize = require("./tokenize.js"),
+		stopwords = require("./stopwords.js"),
 		respond = require("./respond.js")("cloud"),
 		User = require("./user.js"),
 		Schema = require("./schema.js"),
@@ -100,8 +104,9 @@
 			}
 		}
 		async index(data,root,options={},recursing) {
+			const type = typeof(data);
 			let rootchanged;
-			if(data && typeof(data)==="object" && data["#"]) {
+			if(data && type==="object" && data["#"]) {
 				const id = data["#"];
 				for(const key in data) {
 					if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
@@ -110,7 +115,6 @@
 						if(value && type==="object") {
 							rootchanged += await this.index(value,root,options,true);
 						} else {
-							const valuekey = `${JSON.stringify(value)}`;
 							const keypath = `!${key}`;
 							if(!root[key]) {
 								rootchanged = root[key] = 1;
@@ -121,23 +125,56 @@
 							} else {
 								node = JSON.parse(node);
 							}
-							if(!node[valuekey]) {
-								node[valuekey] = 1;
-								await this.namespace.put(keypath,JSON.stringify(node));
-							}
-							
-							//await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
-							 
-							const valuepath = `${keypath}!${valuekey}`;
-							node = await this.namespace.get(valuepath);
-							if(!node) {
-								node = {};
-							} else {
-								node = JSON.parse(node);
-							}
-							if(!node[id]) {
-								node[id] = 1;
-								await this.namespace.put(valuepath,JSON.stringify(node))
+							let istring;
+							if(type==="string") {
+								let count = 0;
+								const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
+								let newgrams;
+								for(const gram of grams) {
+									if(!node[gram]) {
+										node[gram] = 1;
+										newgrams = true;
+									}
+									const valuepath = `${keypath}!${gram}`;
+									let leaf = await this.namespace.get(valuepath);
+									if(!leaf) {
+										leaf = {};
+									} else {
+										leaf = JSON.parse(leaf);
+									}
+									if(!leaf[id]) {
+										leaf[id] = 1;
+										await this.namespace.put(valuepath,JSON.stringify(leaf));
+										newgrams = true;
+									}
+								}
+								if(newgrams) {
+									await this.namespace.put(keypath,JSON.stringify(node));
+								}
+								if(value.length>64) {
+									istring = true;
+								}
+							} 
+							if(!istring) { // not an indexed string > 64 char
+								const valuekey = `${JSON.stringify(value)}`;
+								if(!node[valuekey]) {
+									node[valuekey] = 1;
+									await this.namespace.put(keypath,JSON.stringify(node));
+								}
+								
+								//await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
+								 
+								const valuepath = `${keypath}!${valuekey}`;
+								let leaf = await this.namespace.get(valuepath);
+								if(!leaf) {
+									leaf = {};
+								} else {
+									leaf = JSON.parse(leaf);
+								}
+								if(!leaf[id]) {
+									leaf[id] = 1;
+									await this.namespace.put(valuepath,JSON.stringify(leaf))
+								}
 							}
 						}
 					}
@@ -272,7 +309,43 @@
 								if(predicate==="$return") continue;
 								const test = joqular.toTest(predicate);
 								if(predicate==="$search") {
-
+									const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
+										tokens = tokenize(value).filter((token) => !stopwords.includes(token)),
+										keys = tokens.concat(trigrams(tokens)),
+										matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * keys.length : .8;
+									let testids;
+									for(const keyvalue in keynode) {
+										for(const key of keys) {
+											if(keyvalue.includes(key)) {
+												const valuepath = `${keypath}!${keyvalue}`;
+												let leaf = await this.namespace.get(valuepath);
+												if(leaf) {
+													leaf = JSON.parse(leaf);
+													if(!testids) {
+														testids = leaf;
+													} else {
+														for(const id in leaf) {
+															if(testids[id]) {
+																testids[id] = testids[id] + 1;
+															} else {
+																testids[id] = 1;
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+									if(testids) {
+										ids = {};
+										for(const id in testids) {
+ 											if(testids[id]>=matchlevel) {
+ 												ids[id] = true;
+ 											}
+										}
+									} else {
+										return [];
+									}
 								} else if(test) {
 									const ptype = typeof(pvalue);
 									if(ptype==="string") {
@@ -286,11 +359,16 @@
 									let haskeys;
 									for(const valuekey in keynode) {
 										haskeys = true;
-										let value = JSON.parse(valuekey);
+										let value;
+										try {
+											value = JSON.parse(valuekey);
+										} catch(e) {
+											value = valuekey;
+										}
 										if(typeof(value)==="string" && value.startsWith("Date@")) {
 											value = new Date(parseInt(value.split("@")[1]));
 										}
-										if(await test.call(keynode,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
+										if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 											// disallow index use by unauthorized users at document && property level
 											const valuepath = `${keypath}!${valuekey}`,
 												//valuenode = {},

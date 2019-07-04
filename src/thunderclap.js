@@ -153,8 +153,13 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
-	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
-		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+	    		.then((response) => {
+	    			if(response.status===200) {
+	    				return response.text();
+	    			}
+	    			throw new Error(`Request failed: ${response.status}`) 
+	    		})
+		    	.then((data) => JSON.parse(data.replace(/\%20/g," ")))
 	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}

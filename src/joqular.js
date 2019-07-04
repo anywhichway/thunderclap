@@ -112,7 +112,7 @@
 				return Array.isArray(a) && Array.isArray(b) && intersection(a,b).length>0;
 			},
 			$disjoint(a,b) {
-				return !this.$intersects(a,b);
+				return !joqular.$intersects(a,b);
 			},
 			$matches(a,b,flags) {
 				b = b && typeof(b)==="object" && b instanceof RegExp ? b : new RegExp(b,flags);
@@ -188,9 +188,6 @@
 				const tokens = arguments[2];
 				tokens.trigrams = [];
 				return joqular.$search.call(this,phrase,tokens);
-			},
-			$self(f) {
-				return f(this._value);
 			},
 			$valid(data,validations) {
 				return true;

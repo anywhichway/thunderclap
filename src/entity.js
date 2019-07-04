@@ -1,12 +1,12 @@
 (function() {
-	const uuid4 = require("./uuid4.js");
+	const uid = require("./uid.js");
 	
 	class Entity {
 		constructor(config) {
 			Object.assign(this,config);
 			let id = this["#"];
 			if(!id) {
-				id = `${this.constructor.name}@${uuid4()}`;
+				id = `${this.constructor.name}@${uid()}`;
 			}
 			const meta = {"#":id};
 			Object.defineProperty(this,"^",{value:meta});

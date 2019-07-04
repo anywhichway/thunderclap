@@ -81,22 +81,30 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 23);
+/******/ 	return __webpack_require__(__webpack_require__.s = 16);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
+}).call(this)
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(1);
+	const uid = __webpack_require__(0);
 	
 	class Entity {
 		constructor(config) {
 			Object.assign(this,config);
 			let id = this["#"];
 			if(!id) {
-				id = `${this.constructor.name}@${uuid4()}`;
+				id = `${this.constructor.name}@${uid()}`;
 			}
 			const meta = {"#":id};
 			Object.defineProperty(this,"^",{value:meta});
@@ -111,44 +119,30 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
-/***/ (function(module, exports) {
-
-(function() {
-	const uuid4 = () => {
-    //// return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    let uuid = '', ii;
-    for (ii = 0; ii < 32; ii += 1) {
-      switch (ii) {
-      case 8:
-      case 20:
-        uuid += '-';
-        uuid += (Math.random() * 16 | 0).toString(16);
-        break;
-      case 12:
-        uuid += '-';
-        uuid += '4';
-        break;
-      case 16:
-        uuid += '-';
-        uuid += (Math.random() * 4 | 8).toString(16);
-        break;
-      default:
-        uuid += (Math.random() * 16 | 0).toString(16);
-      }
-    }
-    return uuid;
-  }
-	uuid4.is = (value) => /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value)
-	module.exports = uuid4;
-}).call(this);
-
-/***/ }),
 /* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(0);
+	const uuid4 = __webpack_require__(7),
+		isSoul = (value,checkUUID=true) => {
+			if(typeof(value)==="string") {
+				const parts = value.split("@"),
+					isnum = !isNaN(parseInt(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
+			}
+			return false;
+		};
+	module.exports = isSoul;
+})();
+
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Entity = __webpack_require__(1);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -214,11 +208,11 @@
 })();
 
 /***/ }),
-/* 3 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(0);
+	const Entity = __webpack_require__(1);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -241,86 +235,14 @@
 })();
 
 /***/ }),
-/* 4 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const uuid4 = __webpack_require__(1),
-		isSoul = (value,checkUUID=true) => {
-			if(typeof(value)==="string") {
-				const parts = value.split("@"),
-					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
-			}
-			return false;
-		};
-	module.exports = isSoul;
-})();
-
-
-
-/***/ }),
 /* 5 */
-/***/ (function(module, exports) {
-
-(function() {
-	"use strict"
-	const toSerializable = (data,copy) => {
-		const type = typeof(data),
-			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
-		if(data===undefined || type==="Undefined") {
-			return "@undefined";
-		}
-		if(data===Infinity) {
-			return "@Infinity";
-		}
-		if(data===-Infinity) {
-			return "@-Infinity";
-		}
-		if(type==="number" && isNaN(data)) {
-			return "@NaN";
-		}
-		if(data && type==="object") {
-			if(data instanceof Date) {
-				return `Date@${data.getTime()}`;
-			}
-			Object.keys(data).forEach((key) => {
-				try {
-					clone[key] = toSerializable(data[key],copy);
-				} catch (e) {
-					;
-				}
-			});
-			if(data["^"]) {
-				try {
-					clone["^"] = toSerializable(data["^"],copy);
-				} catch(e) {
-					;
-				}
-			}
-		}
-		return clone;
-	};
-	module.exports = toSerializable;
-}).call(this);
-
-/***/ }),
-/* 6 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = () => Date.now().toString(36) +  Math.random().toString(36).substr(2,9);
-}).call(this)
-
-/***/ }),
-/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const soundex = __webpack_require__(8),
-		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(9),
-		isFloat = __webpack_require__(10),
+	const soundex = __webpack_require__(6),
+		isSoul = __webpack_require__(2),
+		isInt = __webpack_require__(8),
+		isFloat = __webpack_require__(9),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -430,7 +352,7 @@
 				return Array.isArray(a) && Array.isArray(b) && intersection(a,b).length>0;
 			},
 			$disjoint(a,b) {
-				return !this.$intersects(a,b);
+				return !joqular.$intersects(a,b);
 			},
 			$matches(a,b,flags) {
 				b = b && typeof(b)==="object" && b instanceof RegExp ? b : new RegExp(b,flags);
@@ -506,9 +428,6 @@
 				const tokens = arguments[2];
 				tokens.trigrams = [];
 				return joqular.$search.call(this,phrase,tokens);
-			},
-			$self(f) {
-				return f(this._value);
 			},
 			$valid(data,validations) {
 				return true;
@@ -666,7 +585,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 6 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -676,7 +595,40 @@
 }).call(this);
 
 /***/ }),
-/* 9 */
+/* 7 */
+/***/ (function(module, exports) {
+
+(function() {
+	const uuid4 = () => {
+    //// return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    let uuid = '', ii;
+    for (ii = 0; ii < 32; ii += 1) {
+      switch (ii) {
+      case 8:
+      case 20:
+        uuid += '-';
+        uuid += (Math.random() * 16 | 0).toString(16);
+        break;
+      case 12:
+        uuid += '-';
+        uuid += '4';
+        break;
+      case 16:
+        uuid += '-';
+        uuid += (Math.random() * 4 | 8).toString(16);
+        break;
+      default:
+        uuid += (Math.random() * 16 | 0).toString(16);
+      }
+    }
+    return uuid;
+  }
+	uuid4.is = (value) => /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value)
+	module.exports = uuid4;
+}).call(this);
+
+/***/ }),
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -684,7 +636,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -692,7 +644,74 @@
 }).call(this)
 
 /***/ }),
+/* 10 */
+/***/ (function(module, exports) {
+
+(function() {
+	function toSerializable(data,copy) {
+		const type = typeof(data),
+			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
+		if(data===undefined || type==="Undefined") {
+			return "@undefined";
+		}
+		if(data===Infinity) {
+			return "@Infinity";
+		}
+		if(data===-Infinity) {
+			return "@-Infinity";
+		}
+		if(type==="number" && isNaN(data)) {
+			return "@NaN";
+		}
+		if(data && type==="object") {
+			if(data instanceof Date) {
+				return `Date@${data.getTime()}`;
+			}
+			Object.keys(data).forEach((key) => {
+				try {
+					clone[key] = toSerializable(data[key],copy);
+				} catch (e) {
+					;
+				}
+			});
+			if(data["^"]) {
+				try {
+					clone["^"] = toSerializable(data["^"],copy);
+				} catch(e) {
+					;
+				}
+			}
+		}
+		return clone;
+	};
+	module.exports = toSerializable;
+}).call(this);
+
+/***/ }),
 /* 11 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		browser: {
+			
+		},
+		cloud: {
+			securedTestFunction() {
+				return "If you see this, there may be a security leak";
+			},
+			getDate() {
+				return new Date();
+			}
+		},
+		worker: {
+			
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -728,40 +747,10 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = {
-		browser: {
-			
-		},
-		cloud: {
-			securedTestFunction() {
-				return "If you see this, there may be a security leak";
-			},
-			getDate() {
-				return new Date();
-			}
-		},
-		worker: {
-			
-		}
-	}
-}).call(this);
-
-/***/ }),
 /* 13 */,
 /* 14 */,
 /* 15 */,
-/* 16 */,
-/* 17 */,
-/* 18 */,
-/* 19 */,
-/* 20 */,
-/* 21 */,
-/* 22 */,
-/* 23 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -772,18 +761,18 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(6),
-		joqular = __webpack_require__(7),
-		toSerializable = __webpack_require__(5),
-		create = __webpack_require__(24),
-		Schema = __webpack_require__(2),
-		User = __webpack_require__(3),
-		functions = __webpack_require__(12).browser,
-		when = __webpack_require__(11).browser;
+	const uid = __webpack_require__(0),
+		joqular = __webpack_require__(5),
+		toSerializable = __webpack_require__(10),
+		create = __webpack_require__(17),
+		Schema = __webpack_require__(3),
+		User = __webpack_require__(4),
+		functions = __webpack_require__(11).browser,
+		when = __webpack_require__(12).browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(26);
+		fetch = __webpack_require__(19);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -919,8 +908,13 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async query(object,{verify,partial}={}) {
 			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
-	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
-		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+	    		.then((response) => {
+	    			if(response.status===200) {
+	    				return response.text();
+	    			}
+	    			throw new Error(`Request failed: ${response.status}`) 
+	    		})
+		    	.then((data) => JSON.parse(data.replace(/\%20/g," ")))
 	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
@@ -966,51 +960,51 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 24 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(25),
-		create = (data,ctors={}) => {
-			const type = typeof(data);
-			if(type==="string") {
-				return fromSerializable(data);
-			}
-			if(!data || typeof(data)!=="object") return data;
-			Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
-			const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
-				cname = typeof(id)==="string" ? id.split("@")[0] : null,
-				ctor = cname ? ctors[cname] : null;
-			if(!ctor) {
-				return data;
-			}
-			let instance;
-			if(ctor.name!=="Object" && ctor.create) {
-				instance = ctor.create(data);
-			} else {
-				instance = Object.create(ctor.prototype);
-				Object.assign(instance,data);
-			}
-			if(!instance["^"]) {
-				const meta = {id};
-				Object.defineProperty(instance,"^",{value:meta});
-			}
-			try {
-				Object.defineProperty(instance,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
-			} catch(e) {
-				// ignore if already defined
-			}
-			return instance;
+	const fromSerializable = __webpack_require__(18);
+	function create(data,ctors={}) {
+		const type = typeof(data);
+		if(type==="string") {
+			return fromSerializable(data);
 		}
+		if(!data || typeof(data)!=="object") return data;
+		Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
+		const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
+			cname = typeof(id)==="string" ? id.split("@")[0] : null,
+			ctor = cname ? ctors[cname] : null;
+		if(!ctor) {
+			return data;
+		}
+		let instance;
+		if(ctor.name!=="Object" && ctor.create) {
+			instance = ctor.create(data);
+		} else {
+			instance = Object.create(ctor.prototype);
+			Object.assign(instance,data);
+		}
+		if(!instance["^"]) {
+			const meta = {id};
+			Object.defineProperty(instance,"^",{value:meta});
+		}
+		try {
+			Object.defineProperty(instance,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+		} catch(e) {
+			// ignore if already defined
+		}
+		return instance;
+	}
 	module.exports = create;
 }).call(this);
 
 /***/ }),
-/* 25 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() {
-	const fromSerializable = (data) => {
+	function fromSerializable(data) {
 		const type = typeof(data);
 		if(data==="@undefined") {
 			return undefined;
@@ -1043,7 +1037,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 26 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

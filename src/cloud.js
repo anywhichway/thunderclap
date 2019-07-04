@@ -4,13 +4,40 @@ VERSION 1, OCTOBER 16, 2018
 Copyright AnyWhichWay, LLC 2019
  */
 
-const Schema = require("./schema.js"),
+const //uid = require("./uid.js"),
+	//create = require("./create.js"),
+	//fromSerializable = require("./from-serializable.js"),
+	//toSerializable = require("./to-serializable.js"),
+	//Entity = require("./entity.js"),
+	Schema = require("./schema.js"),
 	User = require("./user.js"),
+	//functions = require("../functions.js").browser,
+	//when = require("../when.js").browser;
+	//Thunderclap = require("../thunderclap.js"),
 	hashPassword = require("./hash-password.js"),
 	toSerializable = require("./to-serializable"),
 	Thunderhead = require("./thunderhead.js"),
 	dboPassword = require("../keys.js").dboPassword,
 	secure = require("./secure.js");
+
+/*const thunderclapjs = `(function() 
+	{ 
+		${uid+""};
+		${create+""};
+		${fromSerializable+""};
+		${toSerializable+""};
+		${Entity+""};
+		${Schema+""}; 
+		${User+""};
+		const functions = ${JSON.stringify(functions,(key,val) => (typeof val === 'function') ? '' + val : val)};
+		const when = ${JSON.stringify(when,(key, val) => (typeof val === 'function') ? '' + val : val)};
+		${Thunderclap+""};
+		window.Schema = Schema; 
+		window.User = User; 
+		window.Thunderclap = Thunderclap; 
+	}).call(this)`;*/
+
+//const thunderclapjs = Thunderclap+"";
 
 let thunderhead;
 addEventListener('fetch', event => {
@@ -45,6 +72,9 @@ async function handleRequest({request,response}) {
 	
 	let body = "Not Found",
 		status = 404;
+	//if(request.URL.pathname==="/thunderclap.js") {
+	//	return new Response(thunderclapjs);
+	//}
 	if(request.URL.pathname!=="/db.json") {
 		return fetch(request);
 	}
@@ -83,7 +113,7 @@ async function handleRequest({request,response}) {
 			const userschema = await thunderhead.putItem(new Schema(User));
 			request.user = undefined;
 		}
-		body = decodeURIComponent(request.URL.search);
+		body = decodeURIComponent(request.URL.search.replace(/\+/g,"%20"));
 		const command = JSON.parse(body.substring(1)),
 			fname = command[0],
 			args = command.slice(1);
