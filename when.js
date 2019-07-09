@@ -25,7 +25,7 @@
 			}
 		],
 		worker: [
-			
+			// not yet implemented
 		]
 	}
 }).call(this);

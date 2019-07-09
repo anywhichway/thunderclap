@@ -118,7 +118,7 @@ module.exports = {
   plugins: [
 	  new WebpackShellPlugin({
 		  onBuildStart:[],
-		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}`], //  && ${keysScript}
+		  onBuildEnd:[`${metadataScript} && ${putScript} && ${putRoute}` ], //  && ${keysScript}
 		  dev: false
 	  })
   ],

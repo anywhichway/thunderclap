@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 20);
+/******/ 	return __webpack_require__(__webpack_require__.s = 21);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -243,6 +243,7 @@
 		isSoul = __webpack_require__(2),
 		isInt = __webpack_require__(8),
 		isFloat = __webpack_require__(9),
+		validateLuhn = __webpack_require__(10),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -312,9 +313,9 @@
 					if(range.endsWith("%")) {
 						f = (n,target,range) => n >= (target - Math.abs(range * target)) && n <= (target + Math.abs(range * target));
 					}
-					range = parseFloat(range);
+					range = parseFloat(range) / 100;
 				}
-				if(typeof(range)==="number") {
+				if(typeof(range)==="number" && !isNaN(range)) {
 					let ntype = typeof(n),
 						ttype = typeof(target);
 					if(n && ntype==="object" && target && ttype==="object" && n instanceof Date && target instanceof Date) {
@@ -647,6 +648,34 @@
 /* 10 */
 /***/ (function(module, exports) {
 
+// https://en.wikipedia.org/wiki/Luhn_algorithm
+(function() {
+	module.exports = function validateLuhn(value) {
+	    var nCheck = 0, nDigit = 0, bEven = false;
+	    value = value.replace(/\D/g, '');
+
+	    for (var n = value.length - 1; n >= 0; n--) {
+	        var cDigit = value.charAt(n);
+	        nDigit = parseInt(cDigit, 10);
+
+	        if (bEven) {
+	            if ((nDigit *= 2) > 9) {
+	                nDigit -= 9;
+	            }
+	        }
+
+	        nCheck += nDigit;
+	        bEven = !bEven;
+	    }
+	    return (nCheck % 10) === 0;
+	}
+}).call(this);
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports) {
+
 (function() {
 	function toSerializable(data,copy) {
 		const type = typeof(data),
@@ -688,7 +717,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -711,7 +740,7 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -741,19 +770,19 @@
 			}
 		],
 		worker: [
-			
+			// not yet implemented
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
 		module.exports = {
 		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "ce8a7b45989d456eabb1b39f6b79db81",
+		 namespaceId: "cc9032bcf0f2446b97cba556b8c63ab2",
 		 authEmail: "syblackwell@anywhichway.com",
 		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
 		 dboPassword: "dbo"
@@ -761,7 +790,7 @@
 	}).call(this)
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -805,12 +834,12 @@
 }).call(this)
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(22),
-		roles = __webpack_require__(23),
+	const acl = __webpack_require__(23),
+		roles = __webpack_require__(24),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -915,11 +944,11 @@
 }).call(this)
 
 /***/ }),
-/* 16 */,
 /* 17 */,
 /* 18 */,
 /* 19 */,
-/* 20 */
+/* 20 */,
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -938,11 +967,11 @@ const //uid = require("./uid.js"),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(14),
-	toSerializable = __webpack_require__(10),
-	Thunderhead = __webpack_require__(21),
-	dboPassword = __webpack_require__(13).dboPassword,
-	secure = __webpack_require__(15);
+	hashPassword = __webpack_require__(15),
+	toSerializable = __webpack_require__(11),
+	Thunderhead = __webpack_require__(22),
+	dboPassword = __webpack_require__(14).dboPassword,
+	secure = __webpack_require__(16);
 
 /*const thunderclapjs = `(function() 
 	{ 
@@ -965,9 +994,14 @@ const //uid = require("./uid.js"),
 
 let thunderhead;
 addEventListener('fetch', event => {
-	const request = event.request;
+	const request = event.request,
+		dbo = new User("dbo",{"#":"User@dbo",roles:{dbo:true}});
 	request.URL = new URL(request.url);
-	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo: new User("dbo",{"#":"User@dbo",roles:{dbo:true}})});
+	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo});
+	setInterval(() => {
+		thunderhead.resetCache();
+	},5000)
+	event.waitUntil(Promise.all(thunderhead.cache.promises));
 	event.respondWith(handleRequest({request}));
 });
 
@@ -1012,7 +1046,7 @@ async function handleRequest({request,response}) {
 		})
 	}
 	try {
-		let dbo = await thunderhead.namespace.get("User@dbo");
+		let dbo = await thunderhead.cache.get("User@dbo");
 		/*return new Response(JSON.stringify([dbo]),{
 			headers:
 			{
@@ -1143,47 +1177,52 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	const uid = __webpack_require__(0),
 		isSoul = __webpack_require__(2),
 		joqular = __webpack_require__(5),
-		hashPassword = __webpack_require__(14),
-		secure = __webpack_require__(15),
+		hashPassword = __webpack_require__(15),
+		secure = __webpack_require__(16),
 		//stemmer = require("./stemmer.js"),
-		trigrams = __webpack_require__(24),
-		tokenize = __webpack_require__(25),
-		stopwords = __webpack_require__(26),
-		respond = __webpack_require__(27)("cloud"),
+		trigrams = __webpack_require__(25),
+		tokenize = __webpack_require__(26),
+		stopwords = __webpack_require__(27),
+		respond = __webpack_require__(28)("cloud"),
 		User = __webpack_require__(4),
 		Schema = __webpack_require__(3),
-		when = __webpack_require__(12).cloud,
-		functions = __webpack_require__(11).cloud,
-		keys = __webpack_require__(13);
+		Cache = __webpack_require__(30),
+		when = __webpack_require__(13).cloud,
+		functions = __webpack_require__(12).cloud,
+		keys = __webpack_require__(14);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
 	class Thunderhead {
-		constructor({namespace,request,dbo}) {
+		constructor({namespace,request,dbo,refresh=5000}) {
 			this.ctors = {};
 			this.request = request;
-			this.namespace = namespace;
+			//this.namespace = namespace;
 			this.dbo = dbo;
+			this.cache = new Cache({namespace});
 			this.register(Array);
 			this.register(Date);
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
-			__webpack_require__(29)(this);
+			__webpack_require__(31)(this);
+			setInterval(() => {
+				this.cache = new Cache({namespace});
+			},refresh)
 			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
 		}
 		async authUser(userName,password) {
 			const request = this.request,
 				authed = request.user;
 			request.user = this.dbo;
-			//return this.dbo;
+			return this.dbo;
 			const user = (await this.query({userName},false))[0];
 			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
@@ -1227,9 +1266,8 @@ async function handleRequest({request,response}) {
 			return this.getItem(key);
 		}
 		async getItem(key) {
-			let data = await this.namespace.get(key);
-			if(data) {
-				data = JSON.parse(data);
+			let data = await this.cache.get(key);
+			if(data!==null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
 					const key = `${data["#"].split("@")[0]}@`,
@@ -1242,86 +1280,86 @@ async function handleRequest({request,response}) {
 			return data==null ? undefined : data;
 		}
 		async getSchema(ctor) {
-			let data = await this.namespace.get(`Schema@${ctor.name||ctor}`);
+			let data = await this.cache.get(`Schema@${ctor.name||ctor}`);
 			if(data) {
-				data = JSON.parse(data);
 				const secured = await secure.call(this,{key:"Schema",action:"read",data});
 				if(secured.data) {
 					return new Schema(ctor.name||ctor,data);
 				}
 			}
 		}
-		async index(data,root,options={},recursing) {
+		async index(data,root,options={},parentPath="",parentId) {
 			const type = typeof(data);
 			let rootchanged;
-			if(data && type==="object" && data["#"]) {
-				const id = data["#"];
-				for(const key in data) {
-					if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
-						const value = data[key],
-							type = typeof(value);
-						if(value && type==="object") {
-							rootchanged += await this.index(value,root,options,true);
-						} else {
-							const keypath = `!${key}`;
-							if(!root[key]) {
-								rootchanged = root[key] = 1;
+			if(data && type==="object") {
+				const id = parentId||data["#"]; // also need to index for # in case nested and id'd
+				if(id) {
+					for(const key in data) {
+						if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
+							const value = data[key],
+								type = typeof(value);
+							const keypath = `${parentPath}!${key}`;
+							if(!root.edges[key]) {
+								rootchanged = root.edges[key] = 1;
 							}
-							let node = await this.namespace.get(keypath);
+							let node = await this.cache.get(keypath);
 							if(!node) {
-								node = {};
-							} else {
-								node = JSON.parse(node);
+								node = {edges:{},trigrams:{},values:{},ids:{}};
 							}
-							let istring;
-							if(type==="string") {
-								let count = 0;
-								const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
-								let newgrams;
-								for(const gram of grams) {
-									if(!node[gram]) {
-										node[gram] = 1;
-										newgrams = true;
+							if(value && type==="object") {
+								if(await this.index(value,node,{},keypath,id)) {
+									this.cache.put(keypath,node)
+								}
+							} else {
+								let longstring,
+									newgrams;
+								if(type==="string") {
+									let count = 0;
+									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
+									for(const gram of grams) {
+										if(!node.trigrams[gram]) {
+											node.trigrams[gram] = 1;
+											newgrams = true;
+										}
+										const valuepath = `${keypath}!${gram}`;
+										let leaf = await this.cache.get(valuepath);
+										if(!leaf) {
+											leaf = {edges:{},trigrams:{},values:{},ids:{}};
+										}
+										if(!leaf.ids[id]) {
+											leaf.ids[id] = 1;
+											this.cache.put(valuepath,leaf);
+											newgrams = true;
+										}
 									}
-									const valuepath = `${keypath}!${gram}`;
-									let leaf = await this.namespace.get(valuepath);
+									if(newgrams) {
+										newgrams = this.cache.put(keypath,node);
+									}
+									if(value.length>64) {
+										longstring = true;
+									}
+								} 
+								if(!longstring) { // not an indexed string > 64 char
+									const valuekey = `${JSON.stringify(value)}`;
+									if(!node.values[valuekey]) {
+										node.values[valuekey] = 1;
+										if(newgrams) {
+											await newgrams;
+										}
+										this.cache.put(keypath,node);
+									}
+									
+									//await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
+									 
+									const valuepath = `${keypath}!${valuekey}`;
+									let leaf = await this.cache.get(valuepath);
 									if(!leaf) {
-										leaf = {};
-									} else {
-										leaf = JSON.parse(leaf);
+										leaf = {edges:{},trigrams:{},values:{},ids:{}};
 									}
-									if(!leaf[id]) {
-										leaf[id] = 1;
-										await this.namespace.put(valuepath,JSON.stringify(leaf));
-										newgrams = true;
+									if(!leaf.ids[id]) {
+										leaf.ids[id] = 1;
+										this.cache.put(valuepath,leaf)
 									}
-								}
-								if(newgrams) {
-									await this.namespace.put(keypath,JSON.stringify(node));
-								}
-								if(value.length>64) {
-									istring = true;
-								}
-							} 
-							if(!istring) { // not an indexed string > 64 char
-								const valuekey = `${JSON.stringify(value)}`;
-								if(!node[valuekey]) {
-									node[valuekey] = 1;
-									await this.namespace.put(keypath,JSON.stringify(node));
-								}
-								
-								//await this.namespace.put(`${keypath}!${valuekey}!${id}`,"1");
-								 
-								const valuepath = `${keypath}!${valuekey}`;
-								let leaf = await this.namespace.get(valuepath);
-								if(!leaf) {
-									leaf = {};
-								} else {
-									leaf = JSON.parse(leaf);
-								}
-								if(!leaf[id]) {
-									leaf[id] = 1;
-									await this.namespace.put(valuepath,JSON.stringify(leaf))
 								}
 							}
 						}
@@ -1373,11 +1411,9 @@ async function handleRequest({request,response}) {
 					data = await match.transform.call(this,data,match.when);
 				}
 			}
-			let root = await this.namespace.get("!");
+			let root = await this.cache.get("!");
 			if(!root) {
-				root = {};
-			} else {
-				root = JSON.parse(root);
+				root = {edges:{},trigrams:{},values:{},ids:{}};
 			}
 			const original = await this.getItem(id);
 			let changes;
@@ -1405,7 +1441,7 @@ async function handleRequest({request,response}) {
 			}
 			const changed = await this.index(data,root,options);
 			if(changed) {
-				await this.namespace.put("!",JSON.stringify(root));
+				this.cache.put("!",root);
 			}
 			data = await this.setItem(id,data,options,true);
 			if(data!==undefined) {
@@ -1422,62 +1458,65 @@ async function handleRequest({request,response}) {
 			}
 			return data;
 		}
-		async query(pattern,partial,options={}) {
+		async query(pattern,partial,options={},parentPath="") {
 			let ids,
 				count = 0,
 				results = [],
 				keys,
-				saveroot;
+				saveroot,
+				root = await this.cache.get(parentPath||"!");
+			if(!root) {
+				return [];
+			}
+			//root = JSON.parse(root);
 			//return [{"test":"test"},this.dbo];
-			let root = await this.namespace.get("!");
-			if(!root) return results;
-			root = JSON.parse(root);
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
 					value = pattern[key],
 					type = typeof(value);
 				if(keytest) { // if key can be converted to a test, assemble matching keys
-					keys = Object.keys(root).filter((key) => keytest(key));
+					keys = Object.keys(root.edges).filter((key) => keytest(key));
 				} else { // else key list is just the literal key
 					keys = [key];
 				}
 				for(const key of keys) {
-					if(root[key]) {
-						const keypath = `!${key}`;
-						let keynode = await this.namespace.get(keypath);
+					//return [pattern];
+					if(root.edges[key]) {
+						const keypath = `${parentPath}!${key}`,
+							securepath = keypath.replace(/\!/g,".").substring(1);
+						let keynode = await this.cache.get(keypath);
 						if(!keynode) {
-							delete root[key];
+							delete root.edges[key];
 							saveroot = true;
 							continue;
 						}
-						keynode = JSON.parse(keynode);
+						//keynode = JSON.parse(keynode);
+						//return [keynode]
 						if(value && type==="object") {
 							const valuecopy = Object.assign({},value);
+							let predicates;
 							for(let [predicate,pvalue] of Object.entries(value)) {
 								if(predicate==="$return") continue;
 								const test = joqular.toTest(predicate);
 								if(predicate==="$search") {
+									predicates = true;
 									const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
 										tokens = tokenize(value).filter((token) => !stopwords.includes(token)),
-										keys = tokens.concat(trigrams(tokens)),
+										grams = trigrams(tokens),
 										matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * keys.length : .8;
 									let testids;
-									for(const keyvalue in keynode) {
-										for(const key of keys) {
-											if(keyvalue.includes(key)) {
-												const valuepath = `${keypath}!${keyvalue}`;
-												let leaf = await this.namespace.get(valuepath);
-												if(leaf) {
-													leaf = JSON.parse(leaf);
-													if(!testids) {
-														testids = leaf;
-													} else {
-														for(const id in leaf) {
-															if(testids[id]) {
-																testids[id] = testids[id] + 1;
-															} else {
-																testids[id] = 1;
-															}
+									for(const gram of grams) {
+										if(keynode.trigrams[gram]) {
+											const valuepath = `${keypath}!${gram}`;
+											let leaf = await this.cache.get(valuepath);
+											if(leaf) {
+												//leaf = JSON.parse(leaf);
+												if(!testids) {
+													testids = leaf.ids;
+												} else {
+													for(const id in leaf) {
+														if(testids[id]) {
+															testids[id] = testids[id] + 1;
 														}
 													}
 												}
@@ -1495,6 +1534,7 @@ async function handleRequest({request,response}) {
 										return [];
 									}
 								} else if(test) {
+									predicates = true;
 									const ptype = typeof(pvalue);
 									if(ptype==="string") {
 										if(pvalue.startsWith("Date@")) {
@@ -1505,14 +1545,10 @@ async function handleRequest({request,response}) {
 									delete valuecopy[predicate];
 									const secured = {};
 									let haskeys;
-									for(const valuekey in keynode) {
+									//return [pattern,predicate,pvalue,keynode]
+									for(const valuekey in keynode.values) {
 										haskeys = true;
-										let value;
-										try {
-											value = JSON.parse(valuekey);
-										} catch(e) {
-											value = valuekey;
-										}
+										let value = JSON.parse(valuekey);
 										if(typeof(value)==="string" && value.startsWith("Date@")) {
 											value = new Date(parseInt(value.split("@")[1]));
 										}
@@ -1522,6 +1558,7 @@ async function handleRequest({request,response}) {
 												//valuenode = {},
 												len = valuepath.length;
 											let valuenode = {}, keys, cursor, haskeys;
+											// used for different indexing approach
 											/*do {
 												keys = await this.keys(valuepath+"!",{cursor});
 												cursor = keys.pop();
@@ -1535,31 +1572,31 @@ async function handleRequest({request,response}) {
 												    }
 												}
 											} while(keys.length>0 && cursor);*/
-											valuenode = await this.namespace.get(valuepath);
+											valuenode = await this.cache.get(valuepath);
 											if(!valuenode) {
-												delete keynode[valuekey];
-												await this.namespace.put(keypath,JSON.stringify(keynode));
+												delete keynode.values[valuekey];
+												this.cache.put(keypath,keynode);
 												continue;
 											}
-											valuenode = JSON.parse(valuenode);
-											for(const id in valuenode) {
+											//valuenode = JSON.parse(valuenode);
+											for(const id in valuenode.ids) {
 												haskeys = true;
 												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[securepath]:value}});
 												if(data==null || removed.length>0) {
-													delete valuenode[id];
+													delete valuenode.id[id];
 													secured[id] = true;
 												}
 											}
 											if(haskeys) {
-												Object.assign(testids,valuenode);
+												Object.assign(testids,valuenode.ids);
 											} else {
-												this.namespace.delete(valuepath);
+												this.cache.delete(valuepath);
 											}
 										}
 									}
 									if(!haskeys) {
-										delete root[key];
+										delete root.edges[key];
 										saveroot = true;
 										break;
 									}
@@ -1581,16 +1618,40 @@ async function handleRequest({request,response}) {
 										}
 									}
 								}
+							} 
+							if(!predicates){ // matching a nested object
+								const childids = await this.query(value,partial,options,keypath);
+								if(childids.length===0) {
+									return [];
+								}
+								if(!ids) {
+									ids = Object.assign({},childids);
+									count = Object.keys(ids).length;
+									if(count===0) {
+										return [];
+									}
+								} else {
+									for(const id in ids) {
+										if(!childids[id]) { //  
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
+								}
 							}
 						} else {
 							const valuekey = JSON.stringify(value);
-							if(keynode[valuekey]) {
+							if(keynode.values[valuekey]) {
 								// disallow index use by unauthorized users at document && property level
 								const secured = {},
 									valuepath = `${keypath}!${valuekey}`,
 								 	// valuenode = {},
 									len = valuepath.length;
 								let keys, cursor, haskeys;
+								// used for different indexing approach
 								/*do {
 									keys = await this.keys(valuepath+"!",{cursor});
 									cursor = keys.pop();
@@ -1605,19 +1666,19 @@ async function handleRequest({request,response}) {
 									}
 									break;
 								} while(keys.length>0 && cursor);*/
-								let valuenode = await this.namespace.get(valuepath);
+								let valuenode = await this.cache.get(valuepath);
 								if(!valuenode) {
-									delete keynode[valuekey];
-									await this.namespace.put(keypath,JSON.stringify(keynode));
+									delete keynode.values[valuekey];
+									this.cache.put(keypath,keynode);
 									return;
 								}
-								valuenode = JSON.parse(valuenode);
-								for(const id in valuenode) {
+								//valuenode = JSON.parse(valuenode);
+								for(const id in valuenode.ids) {
 									haskeys = true;
 									const cname = id.split("@")[0],
-										{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+										{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[securepath]:value}});
 									if(data==null || removed.length>0) {
-										delete valuenode[id];
+										delete valuenode.ids[id];
 										secured[id] = true;
 									}
 								}
@@ -1625,11 +1686,11 @@ async function handleRequest({request,response}) {
 									return [];
 								}
 								if(!ids) {
-									ids = Object.assign({},valuenode);
+									ids = Object.assign({},valuenode.ids);
 									count = Object.keys(ids).length;
 								} else {
 									for(const id in ids) {
-										if(!secured[id] && !valuenode[id]) { // 
+										if(!secured[id] && !valuenode.ids[id]) { // 
 											delete ids[id];
 											count--;
 											if(count<=0) {
@@ -1644,9 +1705,12 @@ async function handleRequest({request,response}) {
 				}
 			}
 			if(saveroot) {
-				this.namespace.set("!",JSON.stringify(root));
+				this.cache.set("!",JSON.stringify(root));
 			}
 			if(ids) {
+				if(parentPath) {
+					return ids;
+				}
 				for(const id in ids) {
 					const object = await this.getItem(id,options);
 					if(object) {
@@ -1690,7 +1754,7 @@ async function handleRequest({request,response}) {
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					await this.namespace.delete(keyOrObject);
+					await this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -1715,38 +1779,42 @@ async function handleRequest({request,response}) {
 				}
 			}
 			if(data!==undefined) {
-				await this.namespace.put(key,JSON.stringify(data),options);
+				this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
 		} 
-		async unindex(object) {
-			if(object && typeof(object)==="object" && object["#"]) {
-				const id = object["#"];
+		async unindex(object,parentPath="",parentId) {
+			// need to enhance to unindex full-text
+			const id = parentId||object["#"];
+			if(object && typeof(object)==="object" && id) {
 				for(const key in object) {
 					// just loop through deleting these `${keypath}!${valuekey}!${id}`;
 					if(key==="#") {
 						continue;
 					}
-					const value = object[key];
+					const value = object[key],
+						keypath = `${parentPath}!${key}`;
 					if(value && typeof(value)==="object") {
-						await this.unindex(value);
+						if(value["#"]) {
+							await this.unindex(value);
+						}
+						await this.unindex(value,keyPath,id);
 					} else {
-						const valuekey = `${JSON.stringify(value)}`,
-							keypath = `!${key}`;
-						let keynode = await this.namespace.get(keypath);
+						const valuekey = `${JSON.stringify(value)}`;
+						let keynode = await this.cache.get(keypath);
 						if(keynode) {
-							keynode = JSON.parse(keynode);
+							//keynode = JSON.parse(keynode);
 							if(keynode[valuekey]) {
 								const valuepath = `${keypath}!${valuekey}`;
-								let valuenode = await this.namespace.get(valuepath);
-								if(valuenode) {
+								let leaf = await this.cache.get(valuepath);
+								if(leaf) {
 									// if we revert to three level index, this needs to be enhanced
-									valuenode = JSON.parse(valuenode);
-									if(valuenode[id]) {
-										delete valuenode[id];
-										await this.namespace.put(`${keypath}!${valuekey}`,JSON.stringify(valuenode));
+									//leaf = JSON.parse(leaf);
+									if(leaf.ids[parentId]) {
+										delete leaf.ids[parentId];
+										this.cache.put(valuepath,leaf);
 									}
 								}
 							}
@@ -1767,7 +1835,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1837,7 +1905,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1849,7 +1917,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1864,7 +1932,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1874,7 +1942,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1895,7 +1963,7 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1926,7 +1994,7 @@ async function handleRequest({request,response}) {
 		return true
 	}
 	module.exports = (type) => {
-		triggers = __webpack_require__(28)[type],
+		triggers = __webpack_require__(29)[type],
 		triggersKeys = Object.keys(triggers),
 		compiled = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
 			const parts = key.split("/");
@@ -1946,7 +2014,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2007,18 +2075,53 @@ async function handleRequest({request,response}) {
 			}
 		},
 		worker: {
-			
+			// not yet implemented
 		}
 		
 	}
 }).call(this);
 
 /***/ }),
-/* 29 */
+/* 30 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = class Cache {
+		constructor({namespace}) {
+			this.namespace = namespace;
+			this.promises = [];
+		}
+		async delete(key) {
+			delete this[key];
+			await this.namespace.delete(key);
+		}
+		async get(key) {
+			const promise = this.namespace.get(key).then((value) => this[key] = JSON.parse(value));
+			this.promises.push(promise);
+			let value = this[key];
+			if(value!=null) {
+				return value;
+			}
+			return promise;
+		}
+		async put(key,value,options={}) {
+			this[key] = value;
+			const promise = this.namespace.put(key,JSON.stringify(value),options);
+			this.promises.push(promise);
+			if(options.await) {
+				return await promise;
+			}
+			return promise;
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(13),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(14),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})

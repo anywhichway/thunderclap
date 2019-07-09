@@ -41,9 +41,14 @@ const //uid = require("./uid.js"),
 
 let thunderhead;
 addEventListener('fetch', event => {
-	const request = event.request;
+	const request = event.request,
+		dbo = new User("dbo",{"#":"User@dbo",roles:{dbo:true}});
 	request.URL = new URL(request.url);
-	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo: new User("dbo",{"#":"User@dbo",roles:{dbo:true}})});
+	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo});
+	setInterval(() => {
+		thunderhead.resetCache();
+	},5000)
+	event.waitUntil(Promise.all(thunderhead.cache.promises));
 	event.respondWith(handleRequest({request}));
 });
 
@@ -88,7 +93,7 @@ async function handleRequest({request,response}) {
 		})
 	}
 	try {
-		let dbo = await thunderhead.namespace.get("User@dbo");
+		let dbo = await thunderhead.cache.get("User@dbo");
 		/*return new Response(JSON.stringify([dbo]),{
 			headers:
 			{

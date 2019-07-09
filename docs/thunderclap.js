@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 16);
+/******/ 	return __webpack_require__(__webpack_require__.s = 17);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -243,6 +243,7 @@
 		isSoul = __webpack_require__(2),
 		isInt = __webpack_require__(8),
 		isFloat = __webpack_require__(9),
+		validateLuhn = __webpack_require__(10),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -312,9 +313,9 @@
 					if(range.endsWith("%")) {
 						f = (n,target,range) => n >= (target - Math.abs(range * target)) && n <= (target + Math.abs(range * target));
 					}
-					range = parseFloat(range);
+					range = parseFloat(range) / 100;
 				}
-				if(typeof(range)==="number") {
+				if(typeof(range)==="number" && !isNaN(range)) {
 					let ntype = typeof(n),
 						ttype = typeof(target);
 					if(n && ntype==="object" && target && ttype==="object" && n instanceof Date && target instanceof Date) {
@@ -647,6 +648,34 @@
 /* 10 */
 /***/ (function(module, exports) {
 
+// https://en.wikipedia.org/wiki/Luhn_algorithm
+(function() {
+	module.exports = function validateLuhn(value) {
+	    var nCheck = 0, nDigit = 0, bEven = false;
+	    value = value.replace(/\D/g, '');
+
+	    for (var n = value.length - 1; n >= 0; n--) {
+	        var cDigit = value.charAt(n);
+	        nDigit = parseInt(cDigit, 10);
+
+	        if (bEven) {
+	            if ((nDigit *= 2) > 9) {
+	                nDigit -= 9;
+	            }
+	        }
+
+	        nCheck += nDigit;
+	        bEven = !bEven;
+	    }
+	    return (nCheck % 10) === 0;
+	}
+}).call(this);
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports) {
+
 (function() {
 	function toSerializable(data,copy) {
 		const type = typeof(data),
@@ -688,7 +717,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -711,7 +740,7 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -741,16 +770,16 @@
 			}
 		],
 		worker: [
-			
+			// not yet implemented
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 13 */,
 /* 14 */,
 /* 15 */,
-/* 16 */
+/* 16 */,
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -763,16 +792,16 @@ Copyright AnyWhichWay, LLC 2019
 	"use strict"
 	const uid = __webpack_require__(0),
 		joqular = __webpack_require__(5),
-		toSerializable = __webpack_require__(10),
-		create = __webpack_require__(17),
+		toSerializable = __webpack_require__(11),
+		create = __webpack_require__(18),
 		Schema = __webpack_require__(3),
 		User = __webpack_require__(4),
-		functions = __webpack_require__(11).browser,
-		when = __webpack_require__(12).browser;
+		functions = __webpack_require__(12).browser,
+		when = __webpack_require__(13).browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(19);
+		fetch = __webpack_require__(20);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -960,11 +989,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(18);
+	const fromSerializable = __webpack_require__(19);
 	function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
@@ -1000,7 +1029,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1037,7 +1066,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

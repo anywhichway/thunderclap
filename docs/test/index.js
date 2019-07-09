@@ -20,6 +20,7 @@ describe("query",function() {
 				flag:true,
 				ssn:"555-55-5555",
 				ip:"127.0.0.1",
+				notes:"a string with spaces and stop words",
 				email: "someone@somewhere.com"});
 		}
 		o1 = object; // save for deletion in final test
@@ -37,7 +38,7 @@ describe("query",function() {
 		expect(object.email).equal("someone@somewhere.com");
 	}).timeout(10000);
 	it("setItem primitive", async function() {
-		const value = await db.setItem("test","test");
+		const value = await db.setItem("test","test",{await:true});
 		expect(value).equal("test");
 	});
 	it("getItem primitive", async function() {
@@ -320,10 +321,9 @@ describe("query",function() {
 		expect(results[0].name).equal("test");
 		expect(Object.keys(results[0]).length).equal(2);
 	});
-	xit("$search", function(done) {
-		let some = 0;
-		db.query({notes:{$search:"lover lives"}}).forEach(object => { some++; expect(object.notes.indexOf("loves")>=0).equal(true); })
-		.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$search", async function() {
+		const results = await db.query({notes:{$search:"spaces words"}});
+		expect(typeof(results[0])).equal("object");
 	});
 	xit("$search RegExp", function(done) {
 		let some = 0;
@@ -378,7 +378,7 @@ describe("query",function() {
 	});
 	it("10 setItem", async function() {
 		for(let i=0;i<10;i++) {
-			await db.setItem(`key${i}`,i);
+			await db.setItem(`key${i}`,i,{await:true});
 		}
 	}).timeout(11000);
 	it("10 getItem", async function() {
@@ -387,7 +387,7 @@ describe("query",function() {
 			expect(value).equal(i);
 		}
 	}).timeout(10000);
-	it("10 removeItem", async function() {
+	it("10 removeItem by key", async function() {
 		for(let i=0;i<10;i++) {
 			await db.removeItem(`key${i}`);
 		}
@@ -400,7 +400,7 @@ describe("query",function() {
 	}).timeout(20000);
 	it("10 putItem", async function() {
 		for(let i=0;i<10;i++) {
-			await db.putItem({id:i});
+			db.putItem({id:i},{await:true});
 		}
 	}).timeout(30000);
 	let results;

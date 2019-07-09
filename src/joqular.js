@@ -3,6 +3,7 @@
 		isSoul = require("./is-soul.js"),
 		isInt = require("./is-int.js"),
 		isFloat = require("./is-float.js"),
+		validateLuhn = require("./validateLuhn.js"),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -72,9 +73,9 @@
 					if(range.endsWith("%")) {
 						f = (n,target,range) => n >= (target - Math.abs(range * target)) && n <= (target + Math.abs(range * target));
 					}
-					range = parseFloat(range);
+					range = parseFloat(range) / 100;
 				}
-				if(typeof(range)==="number") {
+				if(typeof(range)==="number" && !isNaN(range)) {
 					let ntype = typeof(n),
 						ttype = typeof(target);
 					if(n && ntype==="object" && target && ttype==="object" && n instanceof Date && target instanceof Date) {

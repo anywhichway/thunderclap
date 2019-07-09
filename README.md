@@ -1,6 +1,6 @@
 # thunderclap
 
-Thunderclap is an indexed JSON database and function server designed specifically for Cloudflare. It runs on top of the
+Thunderclap is an indexed key-value and JSON database plus function oriented server designed specifically for Cloudflare. It runs on top of the
 Cloudflare KV store. Its query language, [JOQULAR](https://medium.com/@anywhichway/joqular-high-powered-javascript-pattern-matching-273a0d77eab5) 
 (JavaScript Object Query Language), is similar to, but more extensive than, the query language associated with MongoDB. 
 In addition to having more predicates than MongoDB, JOQULAR extends pattern matching to object properties, e.g.
@@ -263,7 +263,7 @@ objects, properties and storage keys.
 
 If a user is not authorized read access to an object or key value, it will not be returned. If a user is not 
 authorized access to a particular property, the property will be stripped from the object before the
-object is returned. Additionaly, a query for an object using properties to which a user does not have access
+object is returned. Additionally, a query for an object using properties to which a user does not have access
 will automatically drop the properties from the selection process to prevent data leakage through inference.
 
 If a user is not authorized write access to specific properties on an object, update attempts will 
@@ -430,7 +430,7 @@ Triggers can be executed in the browser, a service worker, or the cloud.
 			}
 		},
 		worker: {
-		
+			//  not yet implemented
 		}
 	}
 }).call(this);
@@ -504,6 +504,12 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order)
+
+2019-07-09 v0.0.19a Server was throwing errors on date predicates. Fixed. Added support for un-indexing nested objects.
+Unindexing full-text not yet implemented. Added a short term cache to improve performance. Unit tests for removeItem are
+failing as a result. Not sure why.
+
+2019-07-06 v0.0.18a Added nested object indexing (unindex does not yet work).
 
 2019-07-04 v0.0.17a Added full text indexing with `{$search: string terms}` or `{$search: [string terms, number pctMatch]}`
 
