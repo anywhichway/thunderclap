@@ -12,6 +12,8 @@ Copyright AnyWhichWay, LLC 2019
 		create = require("./create.js"),
 		Schema = require("./schema.js"),
 		User = require("./user.js"),
+		Position = require("./position.js"),
+		Coordinates = require("./coordinates.js"),
 		functions = require("../functions.js").browser,
 		when = require("../when.js").browser;
 	
@@ -35,6 +37,8 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			this.register(Position);
+			this.register(Coordinates);
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
 					throw new Error(`Attempt to redefine Thunderclap function: ${key}`);
@@ -198,6 +202,8 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.json());
 		}
 	}
+	Thunderclap.Position = Position;
+	Thunderclap.Coordinates = Coordinates;
 	
 	if(typeof(module)!=="undefined") module.exports = Thunderclap;
 	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;

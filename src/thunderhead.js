@@ -1,4 +1,9 @@
 (function() {
+	/*
+	Server Side Public License
+	VERSION 1, OCTOBER 16, 2018
+	Copyright AnyWhichWay, LLC 2019
+	 */
 	const uid = require("./uid.js"),
 		isSoul = require("./is-soul.js"),
 		joqular = require("./joqular.js"),
@@ -11,6 +16,8 @@
 		respond = require("./respond.js")("cloud"),
 		User = require("./user.js"),
 		Schema = require("./schema.js"),
+		Position = require("./position.js"),
+		Coordinates = require("./coordinates.js"),
 		Cache = require("./cache.js"),
 		when = require("../when.js").cloud,
 		functions = require("../functions.js").cloud,
@@ -30,6 +37,8 @@
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			this.register(Position);
+			this.register(Coordinates);
 			require("./cloudflare-kv-extensions")(this);
 			setInterval(() => {
 				this.cache = new Cache({namespace});
@@ -77,14 +86,14 @@
 			request.user = authed;
 			return user;
 		}
-		async delete(key) {
-			return this.removeItem(key);
+		async delete(key,options) {
+			return this.removeItem(key,options);
 		}
-		async get(key) {
-			return this.getItem(key);
-		}
-		async getItem(key) {
-			let data = await this.cache.get(key);
+		//async get(key,options) {
+			//return this.get(key,options);
+		//}
+		async getItem(key,options) {
+			let data = await this.cache.get(key,options);
 			if(data!==null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
@@ -131,7 +140,7 @@
 							} else {
 								let longstring,
 									newgrams;
-								if(type==="string") {
+								if(type==="string" && value.includes(" ")) {
 									let count = 0;
 									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
 									for(const gram of grams) {
@@ -186,9 +195,9 @@
 			}
 			return !!rootchanged;
 		}
-		async put(key,value) {
-			return this.put(key,value);
-		}
+		//async put(key,value) {
+		//	return this.put(key,value);
+		//}
 		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
@@ -213,6 +222,9 @@
 				}
 			}
 			let {data,removed} = await secure.call(this,{key,action:"write",data:object});
+			if(data) {
+				data = await this.setItem(id,data,options,true);
+			}
 			if(!data) {
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
@@ -261,17 +273,14 @@
 			if(changed) {
 				this.cache.put("!",root);
 			}
-			data = await this.setItem(id,data,options,true);
-			if(data!==undefined) {
-				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				if(changes) {
-					await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
-				}
-				await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
-				for(const match of matches) {
-					if(match.call) {
-						await match.call(this,data,match.when);
-					}
+			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+			if(changes) {
+				await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
+			}
+			await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
+			for(const match of matches) {
+				if(match.call) {
+					await match.call(this,data,match.when);
 				}
 			}
 			return data;
@@ -286,7 +295,6 @@
 			if(!root) {
 				return [];
 			}
-			//root = JSON.parse(root);
 			//return [{"test":"test"},this.dbo];
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
@@ -308,7 +316,6 @@
 							saveroot = true;
 							continue;
 						}
-						//keynode = JSON.parse(keynode);
 						//return [keynode]
 						if(value && type==="object") {
 							const valuecopy = Object.assign({},value);
@@ -328,7 +335,6 @@
 											const valuepath = `${keypath}!${gram}`;
 											let leaf = await this.cache.get(valuepath);
 											if(leaf) {
-												//leaf = JSON.parse(leaf);
 												if(!testids) {
 													testids = leaf.ids;
 												} else {
@@ -396,7 +402,6 @@
 												this.cache.put(keypath,keynode);
 												continue;
 											}
-											//valuenode = JSON.parse(valuenode);
 											for(const id in valuenode.ids) {
 												haskeys = true;
 												const cname = id.split("@")[0],
@@ -490,7 +495,6 @@
 									this.cache.put(keypath,keynode);
 									return;
 								}
-								//valuenode = JSON.parse(valuenode);
 								for(const id in valuenode.ids) {
 									haskeys = true;
 									const cname = id.split("@")[0],
@@ -550,13 +554,13 @@
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject) {
+		async removeItem(keyOrObject,options) {
 			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject);
+				const value = await this.getItem(keyOrObject,options);
 				if(value===undefined) {
 					return true;
 				}
@@ -572,7 +576,7 @@
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					await this.cache.delete(keyOrObject);
+					await this.cache.delete(keyOrObject,options);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -623,13 +627,11 @@
 						const valuekey = `${JSON.stringify(value)}`;
 						let keynode = await this.cache.get(keypath);
 						if(keynode) {
-							//keynode = JSON.parse(keynode);
 							if(keynode[valuekey]) {
 								const valuepath = `${keypath}!${valuekey}`;
 								let leaf = await this.cache.get(valuepath);
 								if(leaf) {
 									// if we revert to three level index, this needs to be enhanced
-									//leaf = JSON.parse(leaf);
 									if(leaf.ids[parentId]) {
 										delete leaf.ids[parentId];
 										this.cache.put(valuepath,leaf);

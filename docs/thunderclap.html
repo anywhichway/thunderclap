@@ -51,5 +51,16 @@ Object.keys(Object.getOwnPropertyDescriptors(Thunderclap.prototype))
 	});
 
 </script>
+<script src="./src/position.js"></script>
+<script src="./src/coordinates.js"></script>
+<script>
+navigator.geolocation.getCurrentPosition(
+	function(position) {
+	  console.log(position);
+	},function(err) { console.log("err"); });
+Thunderclap.Position.create().then((position) => {
+	console.log(position)
+})
+</script>
 </body>
 </html>

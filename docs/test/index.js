@@ -417,6 +417,13 @@ describe("query",function() {
 		results = await db.query({id:{$gte:0,$lte:99}});
 		expect(results.length).equal(0);
 	}).timeout(100000);
+	it("create and delete Position",function(done) {
+		Thunderclap.Position.create().then((position) => {
+			const object = await db.putItem(position);
+			expect(object.coords.latitude).equal(position.coords.latitude);
+			done();
+		});
+	}).timeout(3000)
 });
 
 

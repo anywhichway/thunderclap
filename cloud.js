@@ -239,6 +239,10 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	/*
+	MIT License
+	Copyright AnyWhichWay, LLC 2019
+	 */
 	const soundex = __webpack_require__(6),
 		isSoul = __webpack_require__(2),
 		isInt = __webpack_require__(8),
@@ -695,6 +699,9 @@
 		if(data && type==="object") {
 			if(data instanceof Date) {
 				return `Date@${data.getTime()}`;
+			}
+			if(data.serialize) {
+				return data.serialize();
 			}
 			Object.keys(data).forEach((key) => {
 				try {
@@ -1181,6 +1188,11 @@ async function handleRequest({request,response}) {
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	/*
+	Server Side Public License
+	VERSION 1, OCTOBER 16, 2018
+	Copyright AnyWhichWay, LLC 2019
+	 */
 	const uid = __webpack_require__(0),
 		isSoul = __webpack_require__(2),
 		joqular = __webpack_require__(5),
@@ -1193,6 +1205,8 @@ async function handleRequest({request,response}) {
 		respond = __webpack_require__(28)("cloud"),
 		User = __webpack_require__(4),
 		Schema = __webpack_require__(3),
+		Position = __webpack_require__(32),
+		Coordinates = __webpack_require__(33),
 		Cache = __webpack_require__(30),
 		when = __webpack_require__(13).cloud,
 		functions = __webpack_require__(12).cloud,
@@ -1212,6 +1226,8 @@ async function handleRequest({request,response}) {
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			this.register(Position);
+			this.register(Coordinates);
 			__webpack_require__(31)(this);
 			setInterval(() => {
 				this.cache = new Cache({namespace});
@@ -1259,14 +1275,14 @@ async function handleRequest({request,response}) {
 			request.user = authed;
 			return user;
 		}
-		async delete(key) {
-			return this.removeItem(key);
+		async delete(key,options) {
+			return this.removeItem(key,options);
 		}
-		async get(key) {
-			return this.getItem(key);
-		}
-		async getItem(key) {
-			let data = await this.cache.get(key);
+		//async get(key,options) {
+			//return this.get(key,options);
+		//}
+		async getItem(key,options) {
+			let data = await this.cache.get(key,options);
 			if(data!==null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
@@ -1313,7 +1329,7 @@ async function handleRequest({request,response}) {
 							} else {
 								let longstring,
 									newgrams;
-								if(type==="string") {
+								if(type==="string" && value.includes(" ")) {
 									let count = 0;
 									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
 									for(const gram of grams) {
@@ -1368,9 +1384,9 @@ async function handleRequest({request,response}) {
 			}
 			return !!rootchanged;
 		}
-		async put(key,value) {
-			return this.put(key,value);
-		}
+		//async put(key,value) {
+		//	return this.put(key,value);
+		//}
 		async putItem(object,options={}) {
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
@@ -1395,6 +1411,9 @@ async function handleRequest({request,response}) {
 				}
 			}
 			let {data,removed} = await secure.call(this,{key,action:"write",data:object});
+			if(data) {
+				data = await this.setItem(id,data,options,true);
+			}
 			if(!data) {
 				const error = new Error();
 				error.errors = [new Error(`Denied 'write' for ${id}`)];
@@ -1443,17 +1462,14 @@ async function handleRequest({request,response}) {
 			if(changed) {
 				this.cache.put("!",root);
 			}
-			data = await this.setItem(id,data,options,true);
-			if(data!==undefined) {
-				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				if(changes) {
-					await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
-				}
-				await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
-				for(const match of matches) {
-					if(match.call) {
-						await match.call(this,data,match.when);
-					}
+			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
+			if(changes) {
+				await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
+			}
+			await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
+			for(const match of matches) {
+				if(match.call) {
+					await match.call(this,data,match.when);
 				}
 			}
 			return data;
@@ -1468,7 +1484,6 @@ async function handleRequest({request,response}) {
 			if(!root) {
 				return [];
 			}
-			//root = JSON.parse(root);
 			//return [{"test":"test"},this.dbo];
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
@@ -1490,7 +1505,6 @@ async function handleRequest({request,response}) {
 							saveroot = true;
 							continue;
 						}
-						//keynode = JSON.parse(keynode);
 						//return [keynode]
 						if(value && type==="object") {
 							const valuecopy = Object.assign({},value);
@@ -1510,7 +1524,6 @@ async function handleRequest({request,response}) {
 											const valuepath = `${keypath}!${gram}`;
 											let leaf = await this.cache.get(valuepath);
 											if(leaf) {
-												//leaf = JSON.parse(leaf);
 												if(!testids) {
 													testids = leaf.ids;
 												} else {
@@ -1578,7 +1591,6 @@ async function handleRequest({request,response}) {
 												this.cache.put(keypath,keynode);
 												continue;
 											}
-											//valuenode = JSON.parse(valuenode);
 											for(const id in valuenode.ids) {
 												haskeys = true;
 												const cname = id.split("@")[0],
@@ -1672,7 +1684,6 @@ async function handleRequest({request,response}) {
 									this.cache.put(keypath,keynode);
 									return;
 								}
-								//valuenode = JSON.parse(valuenode);
 								for(const id in valuenode.ids) {
 									haskeys = true;
 									const cname = id.split("@")[0],
@@ -1732,13 +1743,13 @@ async function handleRequest({request,response}) {
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject) {
+		async removeItem(keyOrObject,options) {
 			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject);
+				const value = await this.getItem(keyOrObject,options);
 				if(value===undefined) {
 					return true;
 				}
@@ -1754,7 +1765,7 @@ async function handleRequest({request,response}) {
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					await this.cache.delete(keyOrObject);
+					await this.cache.delete(keyOrObject,options);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -1805,13 +1816,11 @@ async function handleRequest({request,response}) {
 						const valuekey = `${JSON.stringify(value)}`;
 						let keynode = await this.cache.get(keypath);
 						if(keynode) {
-							//keynode = JSON.parse(keynode);
 							if(keynode[valuekey]) {
 								const valuepath = `${keypath}!${valuekey}`;
 								let leaf = await this.cache.get(valuepath);
 								if(leaf) {
 									// if we revert to three level index, this needs to be enhanced
-									//leaf = JSON.parse(leaf);
 									if(leaf.ids[parentId]) {
 										delete leaf.ids[parentId];
 										this.cache.put(valuepath,leaf);
@@ -2090,15 +2099,21 @@ async function handleRequest({request,response}) {
 		constructor({namespace}) {
 			this.namespace = namespace;
 			this.promises = [];
+			this.deleted = {};
 		}
 		async delete(key) {
-			delete this[key];
-			await this.namespace.delete(key);
+			this[key] = this.deleted;
+			const promise = this.namespace.delete(key).then(() => delete this[key]);
+			this.promises.push(promise);
+			return promise;
 		}
 		async get(key) {
 			const promise = this.namespace.get(key).then((value) => this[key] = JSON.parse(value));
 			this.promises.push(promise);
 			let value = this[key];
+			if(value===this.deleted) {
+				return;
+			}
 			if(value!=null) {
 				return value;
 			}
@@ -2184,6 +2199,61 @@ async function handleRequest({request,response}) {
 	module.exports = (namespace) => {
 		Object.assign(namespace,methods);
 	}
+}).call(this);
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Coordinates = __webpack_require__(33);
+	class Position {
+		constructor({coords,timestamp}) {
+			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
+			this.coords = {
+				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
+			};
+			if(timestamp) {
+				this.timestamp = timestamp;
+			}
+		}
+	}
+	Position.create = async ({coords,timestamp=Date.now()}={}) => {
+		if(coords) {
+			return new Position({coords:new Coordinates(coords),timestamp})
+		}
+		return new Promise((resolve,reject) => {
+			navigator.geolocation.getCurrentPosition(
+					(position) => {
+						resolve(new Position(position));
+					},
+					(err) => { 
+						reject(err); 
+					});
+		});
+	}
+	module.exports = Position;
+}).call(this);
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Position = __webpack_require__(32);
+	class Coordinates {
+		constructor(coords) {
+			Object.assign(this,coords);
+		}
+	}
+	Coordinates.create = async (coords) => {
+		if(coords) {
+			return new Coordinates(coords);
+		}
+		const position = await Position.create();
+		return new Coordinates(position.coords);
+	}
+	module.exports = Coordinates;
 }).call(this);
 
 /***/ })

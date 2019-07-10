@@ -1,12 +1,14 @@
 (function() {
 	const fromSerializable = require("./from-serializable.js");
-	function create(data,ctors={}) {
+	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
 			return fromSerializable(data);
 		}
 		if(!data || typeof(data)!=="object") return data;
-		Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
+		for(const key in data) {
+			data[key] = await create(data[key],ctors)
+		}
 		const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 			cname = typeof(id)==="string" ? id.split("@")[0] : null,
 			ctor = cname ? ctors[cname] : null;
@@ -15,7 +17,7 @@
 		}
 		let instance;
 		if(ctor.name!=="Object" && ctor.create) {
-			instance = ctor.create(data);
+			instance = await ctor.create(data);
 		} else {
 			instance = Object.create(ctor.prototype);
 			Object.assign(instance,data);

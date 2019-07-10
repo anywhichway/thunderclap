@@ -1,4 +1,8 @@
 (function() {
+	/*
+	MIT License
+	Copyright AnyWhichWay, LLC 2019
+	 */
 	const soundex = require("./soundex.js"),
 		isSoul = require("./is-soul.js"),
 		isInt = require("./is-int.js"),

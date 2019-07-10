@@ -1,5 +1,6 @@
 (function() {
-	function fromSerializable(data) {
+	const Position = require("./position.js");
+	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
 			return undefined;
@@ -16,6 +17,11 @@
 		if(type==="string") {
 			if(data.startsWith("Date@")) {
 				return new Date(parseInt(data.substring(5)));
+			}
+			for(const cname in classes) {
+				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
+					return classes[cname].deserialize(data);
+				}
 			}
 		}
 		if(data && type==="object") {

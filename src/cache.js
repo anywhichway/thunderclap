@@ -3,15 +3,21 @@
 		constructor({namespace}) {
 			this.namespace = namespace;
 			this.promises = [];
+			this.deleted = {};
 		}
 		async delete(key) {
-			delete this[key];
-			await this.namespace.delete(key);
+			this[key] = this.deleted;
+			const promise = this.namespace.delete(key).then(() => delete this[key]);
+			this.promises.push(promise);
+			return promise;
 		}
 		async get(key) {
 			const promise = this.namespace.get(key).then((value) => this[key] = JSON.parse(value));
 			this.promises.push(promise);
 			let value = this[key];
+			if(value===this.deleted) {
+				return;
+			}
 			if(value!=null) {
 				return value;
 			}

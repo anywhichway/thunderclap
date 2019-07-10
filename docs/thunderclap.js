@@ -239,6 +239,10 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	/*
+	MIT License
+	Copyright AnyWhichWay, LLC 2019
+	 */
 	const soundex = __webpack_require__(6),
 		isSoul = __webpack_require__(2),
 		isInt = __webpack_require__(8),
@@ -696,6 +700,9 @@
 			if(data instanceof Date) {
 				return `Date@${data.getTime()}`;
 			}
+			if(data.serialize) {
+				return data.serialize();
+			}
 			Object.keys(data).forEach((key) => {
 				try {
 					clone[key] = toSerializable(data[key],copy);
@@ -796,6 +803,8 @@ Copyright AnyWhichWay, LLC 2019
 		create = __webpack_require__(18),
 		Schema = __webpack_require__(3),
 		User = __webpack_require__(4),
+		Position = __webpack_require__(32),
+		Coordinates = __webpack_require__(33),
 		functions = __webpack_require__(12).browser,
 		when = __webpack_require__(13).browser;
 	
@@ -819,6 +828,8 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(URL);
 			this.register(User);
 			this.register(Schema);
+			this.register(Position);
+			this.register(Coordinates);
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
 					throw new Error(`Attempt to redefine Thunderclap function: ${key}`);
@@ -982,6 +993,8 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.json());
 		}
 	}
+	Thunderclap.Position = Position;
+	Thunderclap.Coordinates = Coordinates;
 	
 	if(true) module.exports = Thunderclap;
 	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
@@ -994,13 +1007,15 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	const fromSerializable = __webpack_require__(19);
-	function create(data,ctors={}) {
+	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
 			return fromSerializable(data);
 		}
 		if(!data || typeof(data)!=="object") return data;
-		Object.keys(data).forEach(key => data[key] = create(data[key],ctors));
+		for(const key in data) {
+			data[key] = await create(data[key],ctors)
+		}
 		const id = data["#"] || (data["^"] ? data["^"]["#"]||data["^"].id : ""),
 			cname = typeof(id)==="string" ? id.split("@")[0] : null,
 			ctor = cname ? ctors[cname] : null;
@@ -1009,7 +1024,7 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		let instance;
 		if(ctor.name!=="Object" && ctor.create) {
-			instance = ctor.create(data);
+			instance = await ctor.create(data);
 		} else {
 			instance = Object.create(ctor.prototype);
 			Object.assign(instance,data);
@@ -1030,10 +1045,11 @@ Copyright AnyWhichWay, LLC 2019
 
 /***/ }),
 /* 19 */
-/***/ (function(module, exports) {
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	function fromSerializable(data) {
+	const Position = __webpack_require__(32);
+	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
 			return undefined;
@@ -1050,6 +1066,11 @@ Copyright AnyWhichWay, LLC 2019
 		if(type==="string") {
 			if(data.startsWith("Date@")) {
 				return new Date(parseInt(data.substring(5)));
+			}
+			for(const cname in classes) {
+				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
+					return classes[cname].deserialize(data);
+				}
 			}
 		}
 		if(data && type==="object") {
@@ -1093,6 +1114,72 @@ exports.default = global.fetch.bind(global);
 exports.Headers = global.Headers;
 exports.Request = global.Request;
 exports.Response = global.Response;
+
+/***/ }),
+/* 21 */,
+/* 22 */,
+/* 23 */,
+/* 24 */,
+/* 25 */,
+/* 26 */,
+/* 27 */,
+/* 28 */,
+/* 29 */,
+/* 30 */,
+/* 31 */,
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Coordinates = __webpack_require__(33);
+	class Position {
+		constructor({coords,timestamp}) {
+			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
+			this.coords = {
+				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
+			};
+			if(timestamp) {
+				this.timestamp = timestamp;
+			}
+		}
+	}
+	Position.create = async ({coords,timestamp=Date.now()}={}) => {
+		if(coords) {
+			return new Position({coords:new Coordinates(coords),timestamp})
+		}
+		return new Promise((resolve,reject) => {
+			navigator.geolocation.getCurrentPosition(
+					(position) => {
+						resolve(new Position(position));
+					},
+					(err) => { 
+						reject(err); 
+					});
+		});
+	}
+	module.exports = Position;
+}).call(this);
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Position = __webpack_require__(32);
+	class Coordinates {
+		constructor(coords) {
+			Object.assign(this,coords);
+		}
+	}
+	Coordinates.create = async (coords) => {
+		if(coords) {
+			return new Coordinates(coords);
+		}
+		const position = await Position.create();
+		return new Coordinates(position.coords);
+	}
+	module.exports = Coordinates;
+}).call(this);
 
 /***/ })
 /******/ ]);

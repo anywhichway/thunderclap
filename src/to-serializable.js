@@ -18,6 +18,9 @@
 			if(data instanceof Date) {
 				return `Date@${data.getTime()}`;
 			}
+			if(data.serialize) {
+				return data.serialize();
+			}
 			Object.keys(data).forEach((key) => {
 				try {
 					clone[key] = toSerializable(data[key],copy);
