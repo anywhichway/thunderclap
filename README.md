@@ -719,7 +719,7 @@ Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB de
 but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. This
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
-# Change Log (reverse chronological order) [top](#top)
+# Change Log (reverse chronological order) <small>[top](#top)</small>
 
 2019-07-11 v0.0.21a Ehanced documentation.
 
