@@ -81,11 +81,45 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 17);
+/******/ 	return __webpack_require__(__webpack_require__.s = 19);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Coordinates = __webpack_require__(2);
+	class Position {
+		constructor({coords,timestamp}) {
+			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
+			this.coords = {
+				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
+			};
+			if(timestamp) {
+				this.timestamp = timestamp;
+			}
+		}
+	}
+	Position.create = async ({coords,timestamp=Date.now()}={}) => {
+		if(coords) {
+			return new Position({coords:new Coordinates(coords),timestamp})
+		}
+		return new Promise((resolve,reject) => {
+			navigator.geolocation.getCurrentPosition(
+					(position) => {
+						resolve(new Position(position));
+					},
+					(err) => { 
+						reject(err); 
+					});
+		});
+	}
+	module.exports = Position;
+}).call(this);
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -93,11 +127,32 @@
 }).call(this)
 
 /***/ }),
-/* 1 */
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uid = __webpack_require__(0);
+	const Position = __webpack_require__(0);
+	class Coordinates {
+		constructor(coords) {
+			Object.assign(this,coords);
+		}
+	}
+	Coordinates.create = async (coords) => {
+		if(coords) {
+			return new Coordinates(coords);
+		}
+		const position = await Position.create();
+		return new Coordinates(position.coords);
+	}
+	module.exports = Coordinates;
+}).call(this);
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uid = __webpack_require__(1);
 	
 	class Entity {
 		constructor(config) {
@@ -119,11 +174,11 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(7),
+	const uuid4 = __webpack_require__(9),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -138,11 +193,11 @@
 
 
 /***/ }),
-/* 3 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(3);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -208,11 +263,11 @@
 })();
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(3);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -235,7 +290,7 @@
 })();
 
 /***/ }),
-/* 5 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -243,11 +298,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(6),
-		isSoul = __webpack_require__(2),
-		isInt = __webpack_require__(8),
-		isFloat = __webpack_require__(9),
-		validateLuhn = __webpack_require__(10),
+	const soundex = __webpack_require__(8),
+		isSoul = __webpack_require__(4),
+		isInt = __webpack_require__(10),
+		isFloat = __webpack_require__(11),
+		validateLuhn = __webpack_require__(12),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -341,10 +396,10 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,array) {
+			$in(a,...array) {
 				return array.includes(a);
 			},
-			$nin(a,array) {
+			$nin(a,...array) {
 				return !array.includes(a);
 			},
 			$includes(array,b) {
@@ -395,38 +450,38 @@
 					return true;
 				}
 			},
-			$isCreditCard(a) {
+			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
-				return (/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a);
+				return bool===((/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a));
 			},
-			$isEmail(a) {
-				return !/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a);
+			$isEmail(a,bool) {
+				return bool==(!/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a));
 			},
-			$isEven(a) {
-				return a % 2 === 0;
+			$isEven(a,bool) {
+				return bool === (a % 2 === 0);
 			},
-			$isFloat(a) {
-				return isFloat(a);
+			$isFloat(a,bool) {
+				return bool===isFloat(a);
 			},
-			$isIPAddress(a) {
-				return (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a);
+			$isIPAddress(a,bool) {
+				return bool===((/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a));
 			},
-			$isInt(a) {
-				return isInt(a);
+			$isInt(a,bool) {
+				return bool===isInt(a);
 			},
-			$isNaN(a) { 
-				return isNaN(a); 
+			$isNaN(a,bool) { 
+				return bool===isNaN(a); 
 			},
-			$isOdd(a) {
-				return typeof(a)==="number" && !isNaN(a) && a % 2 !== 0;
+			$isOdd(a,bool) {
+				return bool===(typeof(a)==="number" && !isNaN(a) && a % 2 !== 0);
 			},
-			$isSSN(a) {
-				return /^\d{3}-?\d{2}-?\d{4}$/.test(a);
+			$isSSN(a,bool) {
+				return bool===(/^\d{3}-?\d{2}-?\d{4}$/.test(a));
 			},
 			$echoes(a,b) { 
 				return soundex(a)===soundex(b); 
 			},
-			$search(a,b) {
+			$search(a,b) { // implemented internal to Thunderclap in thunderhead.js
 				return true;
 			},
 			$stemSearch(_,phrase) {
@@ -590,7 +645,7 @@
 }).call(this);
 
 /***/ }),
-/* 6 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -600,7 +655,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -633,7 +688,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -641,7 +696,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -649,7 +704,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 12 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -677,7 +732,7 @@
 
 
 /***/ }),
-/* 11 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -724,7 +779,7 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -747,7 +802,7 @@
 }).call(this);
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -783,10 +838,10 @@
 }).call(this);
 
 /***/ }),
-/* 14 */,
-/* 15 */,
 /* 16 */,
-/* 17 */
+/* 17 */,
+/* 18 */,
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -797,20 +852,20 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(0),
-		joqular = __webpack_require__(5),
-		toSerializable = __webpack_require__(11),
-		create = __webpack_require__(18),
-		Schema = __webpack_require__(3),
-		User = __webpack_require__(4),
-		Position = __webpack_require__(32),
-		Coordinates = __webpack_require__(33),
-		functions = __webpack_require__(12).browser,
-		when = __webpack_require__(13).browser;
+	const uid = __webpack_require__(1),
+		joqular = __webpack_require__(7),
+		toSerializable = __webpack_require__(13),
+		create = __webpack_require__(20),
+		Schema = __webpack_require__(5),
+		User = __webpack_require__(6),
+		Position = __webpack_require__(0),
+		Coordinates = __webpack_require__(2),
+		functions = __webpack_require__(14).browser,
+		when = __webpack_require__(15).browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(20);
+		fetch = __webpack_require__(22);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -1002,11 +1057,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 18 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(19);
+	const fromSerializable = __webpack_require__(21);
 	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
@@ -1044,11 +1099,11 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 19 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Position = __webpack_require__(32);
+	const Position = __webpack_require__(0);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
@@ -1087,7 +1142,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 20 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1114,72 +1169,6 @@ exports.default = global.fetch.bind(global);
 exports.Headers = global.Headers;
 exports.Request = global.Request;
 exports.Response = global.Response;
-
-/***/ }),
-/* 21 */,
-/* 22 */,
-/* 23 */,
-/* 24 */,
-/* 25 */,
-/* 26 */,
-/* 27 */,
-/* 28 */,
-/* 29 */,
-/* 30 */,
-/* 31 */,
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Coordinates = __webpack_require__(33);
-	class Position {
-		constructor({coords,timestamp}) {
-			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
-			this.coords = {
-				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
-			};
-			if(timestamp) {
-				this.timestamp = timestamp;
-			}
-		}
-	}
-	Position.create = async ({coords,timestamp=Date.now()}={}) => {
-		if(coords) {
-			return new Position({coords:new Coordinates(coords),timestamp})
-		}
-		return new Promise((resolve,reject) => {
-			navigator.geolocation.getCurrentPosition(
-					(position) => {
-						resolve(new Position(position));
-					},
-					(err) => { 
-						reject(err); 
-					});
-		});
-	}
-	module.exports = Position;
-}).call(this);
-
-/***/ }),
-/* 33 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Position = __webpack_require__(32);
-	class Coordinates {
-		constructor(coords) {
-			Object.assign(this,coords);
-		}
-	}
-	Coordinates.create = async (coords) => {
-		if(coords) {
-			return new Coordinates(coords);
-		}
-		const position = await Position.create();
-		return new Coordinates(position.coords);
-	}
-	module.exports = Coordinates;
-}).call(this);
 
 /***/ })
 /******/ ]);

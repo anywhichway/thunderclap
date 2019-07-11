@@ -1,3 +1,4 @@
+<a name="top"></a>
 # thunderclap
 
 Thunderclap is an indexed key-value and JSON database plus function oriented server designed specifically for Cloudflare. It runs on top of the
@@ -22,7 +23,7 @@ Thunderclap uses a [JavaScript client](#javascript) client to support:
 
 5) [triggers](#triggers)
 
-6) [custom functions (with access control)](#custom-functions)
+6) [custom functions (with access control)](#functions)
 
 7) [full text indexing and search](#full-text) in addition to [pregular property indexing](#indexing)
 
@@ -105,14 +106,14 @@ and running `npm run thunderclap`. This will deploy the Thunderclap worker and a
 See the files in `docs` and `docs/test` for examples of using Thunderclap.
 
 <a name="javascript"></a>
-# Data Manipulation
+# Data Manipulation [top](#top)
 
 Data in Thunderclap can be manipulated using a JavaScript client or CURL.
 
 Unlike most JSON data stores, Thuderclap supports the storage of Infinity, -Infinity, and NaN. Dates are automatically 
 serialized and de-serialized.
 
-## JavaScript Client
+## JavaScript Client [top](#top)
 
 ```javascript
 <script src="thunderclap.js"></script>
@@ -186,12 +187,12 @@ If `await` is true the server will bypass internal caches await the underlying d
 start with `prefix`. By default it can only be called by a user with the `dbo` role. It can be used in a loop just like `keys` above.
 
 <a name="curl"></a>
-## CURL Requests 
+## CURL Requests [top](#top)
 
 To be written
 
 <a name="special-storage"></a>
-# Special Storage
+# Special Storage [top](#top)
 
 Most JavaScript document stores do not support special values like `undefined`, `Infinity` and `NaN`. Thunderclap 
 serializes these as special strings, e.g. `@Infinity`. However, this is transparent to API calls via the JavaScript
@@ -203,22 +204,22 @@ transport.
 The same is done for
 
 <a name="built-in-classes"></a>
-Built-in Classes
+# Built-in Classes [top](#top)
 
-## User
-
-To be written
-
-## Position
+## User [top](#top)
 
 To be written
 
-## Coordinates
+## Position [top](#top)
+
+To be written
+
+## Coordinates [top](#top)
 
 To be written
 
 <a name="joqular"></a>
-# JOQULAR
+# JOQULAR [top](#top)
 
 Thunderclap supports a subset of JOQULAR. It is simlar to the MongoDB query language but more extensive. You can see many
 examples in the unit test file `test/index.js`. 
@@ -236,98 +237,139 @@ Thuderclap also suppport pattern marching on property names:
 db.query({[/a.*/]:{$eq: 1}}) // match all objects with properties starting with the letter "a" containing the value 1
 ```
 
+The supported patterns are described below. All examples assume these two objects exist in the database:
 
-The supported patterns include:
+```javascript
+const o1 = {
+		#:"User@jxxtlym2fxbmg0pno",
+		userName:"joe",
+		age:21,
+		email: "joe@somewhere.com",
+		SSN: "555-55-5555",
+		registeredIP: "127.0.0.1",
+		address:{city:"Seattle",zipcode:"98101"},
+		registered:"Tue, 15 Jan 2019 05:00:00 GMT",
+		favoritePhrase:"to be or not to be, that is the question"
+	},
+	o2 = {
+		#:"User@jxxviym2fxbmg0pcr",
+		userName:"mary",
+		age:20,
+		address:{city:"Bainbridge Island",zipcode:"98110"},
+		registered:"Tue, 15 Jan 2019 10:00:00 GMT",
+		favoritePhrase:"premum non nocere"
+	};
 
-## Logical Operators
+```
 
-`$and`
+The supported patterns include the below. (If a pattern is not documented, it may not have been tested yet. See the
+unit test file `docs/test/index.js` to confirm.):
 
-`$not`
+## Math and String Comparisons [top](#top)
 
-`$or`
+`$lt` - A property is less than the one provided, e.g. `{age:{$lt:21}}` matches o2.
 
-`$xor`
+`$lte` - A value in a property is less or equal the one provided, e.g. `{age:{$lte:21}}` matches o1 and o2.
 
-## Date and Time
+`$eq` - A value in a property is relaxed equal the one provided, e.g. `{age:{$eq:21}}` and `{age:{$eq:"21"}}` match o1.
+
+`$eeq` - A value in a property is exactly equal the one provided, e.g. `{age:{$eeq:21}}` matches o1 but and `{age:{$eeq:"21"}}` does not.
+
+`$neq` - A value in a property is relaxed equal the one provided, e.g. `{age:{$neq:21}}` matches o2.
+
+`$gte` - A value in a property is greater than or equal the one provided, e.g. `{age:{$gte:20}}` matches o1 and o2.
+
+`$gt` - A value in a property is greater than the one provided, e.g. `{age:{$gt:20}}` matches o1 and o2.
+
+## Logical Operators [top](#top)
+
+`$and` -  Ands multiple conditions, e.g. `{age:{$and:[{$gt:20},{$lt: 30}]}` matches o1 and o2. Typically not required
+because this produces the same result, `{age:{$gt:20,$lt: 30}}`.
+
+`$not` - Negates the contained condition, e.g. `{age:{$not:{$gt:20}}}` matches o2.
+
+`$or` - Ors multiple conditions, e.g. `{age:{$or:[{$eq:20},{$eq: 21}]}` matches o1 and o2. The nested
+form is also supported, `{age:{$eq:20,$or:{$eq: 21}}}`
+
+`$xor` - Exclusive ors multiple conditions.
+
+## Date and Time [top](#top)
 
 To be written
 
-## Math and String Comparisons
+## Membership [top](#top)
 
-`$lt`
+`$in` - A value in a property is in the provided array, e.g. `{age:{$in:[20,21,22]}}` matches o1 and o2.
 
-`$lte`
+`$nin`  - A value in a property is not in the provided array, e.g. `{age:{$nin:[21,22,23]}}` matches o2.
 
-`$eq`
+`$includes` -
 
-`$eeq`
+`$excludes` -
 
-`$neq`
+`$intersects` -
 
-`$gte`
+`$disjoint` -
 
-`$gt`
+## Ranges [top](#top)
 
-## Membership
+`$between` - A value in a property in between the two provided limits. The limits can be in any order, 
+e.g. `{age:{$between:[19,21]}}` or `{age:{$between:[21,19]}}` matches o2. Optionally, the limits can be inclusive,
+e.g. `{age:{$between:[19,21,true]}}` matches o1 and o2.
 
-`$in`
+`$outside` - A value in a property in outside the two provided limits. The limits can be in any order, 
+e.g. `{age:{$outside:[19,20]}}` or `{age:{$between:[20,19]}}` matches o1.
 
-`$nin`
+`$near` - A value in a property is near the provided number either from an absolute or percentage perspective, 
+e.g. `{age:{$near:[21,1]}}` matches both o1 and o2 as does `{age:{$near:[21,"5%"]}}` since 1 is 4.7% of 21.
 
-`$includes`
+## Regular Expression [top](#top)
 
-`$excludes`
+`$matches` - A value in a property matches the provided regular expression. The regular expression can be
+a string that looks like a regular expression or an actual regular expression, e.g. `{userName:{$matches:/a.*/}}`
+or `{userName:{$matches:"/a.*/"}}`
 
-`$intersects`
+## Special Tests [top](#top)
 
-`$disjoint`
+Note that special tests typically take `true` as an argument. This is an artifact of JSON format that does not allow
+empty properties. Passing anything else will cause them to fail. You may occassionaly want to pass `false` to match
+things that do not satisfy the test.
 
-## Ranges
+`$isCreditCard` - A value in a property is a valid credit card based on a regular expression and Luhn algorithm.
 
-`$between`
+`$isEmail` - A value in a property is a valid e-mail address by format, e.g. `{email:{$isEmail: true}}`. Note:
+e-mail addresses are remarkably hard to validate without actually trying to send and e-mail. This will address
+all reasonable cases.
 
-`$near`
+`$isEven` - A value in a property is even, e.g. `{age:{$isEven: true}}` matches o2.
 
-`$outside`
+`$isFloat` - A value in a property is a float, e.g. `{age:{$isFloat: true}}` will not match either o1 or o2. Note,
+0 and 0.0 are both treated as 0 by JavaScript, so 0 will never satisfy $isFloat.
 
-## Regular Expression
+`$isIPAddress` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}}
 
-`$matches`
+`$isInt` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}} matches o1.
 
-`{"/<RegExp>/":<value>}`
+`$isNaN` - A value in a property is a not a number, e.g. `{address:{zipcode:{$isNaN: true}}} matches o1. Note, $isNaN
+will fail when there is no value since it is no known whether the target is a number or not.
 
-## Special Tests
+`$isOdd` - A value in a property is odd, e.g. `{age:{$isOdd: true}}` matches o1.
 
-`$isCreditCard`
+`$isSSN` - A value in a property looks like a Social Security Number, e.g. `{SSN:{$isSSN: true}}` matches o1. Note,
+unlike `$isCreditCard` no validation is done beyond textual format.
 
-`$isEmail`
+## Text Search [top](#top)
 
-`$isEven`
+`$echoes` - A value in a property sounds like the provided value, e.g. `{userName:{$echoes: "jo"}}` matches o1.
 
-`$isFloat`
-
-`$isIPAddress`
-
-`$isInt`
-
-`$isNaN`
-
-`$isOdd`
-
-`$isSSN`
-
-## Text Search
-
-`$echoes`
-
-`$search`
-
-
+`$search` - Does a full text trigram based search, e.g. `{favoritePhrase:{$search:"question"}}` matches o1. If
+no second argument is provided, the search is fuzzy at 80%, e.g. `{favoritePhrase:{$search:"questin"}}` also
+matches o1 whereas `{favoritePhrase:{$search:["questin",.99]}}`, which requires a 99% match does not. The search
+phrase can have multiple space separated words.
 
 
 <a name="access-control"></a>
-# Access Control
+# Access Control [top](#top)
 
 The Thunderclap security mechanisms support the application of role based read and write access rules for functions,
 objects, properties and storage keys. 
@@ -427,7 +469,7 @@ You can create additional accounts with the `createUser` and change passwords wi
 methods documented above.
 
 <a name="analytics"></a>
-# Inline Analytics & Hooks
+# Inline Analytics & Hooks [top](#top)
 
 Inline analytics and hooks are facilitated by the use of JOQULAR patterns and tranform or hook calls in the file `when.js`.
 The transforms and hooks can be invoked from the browser, a service worker, or in the cloud. Yhey are not currently access
@@ -473,7 +515,7 @@ data. Hooks are called after the data is written. Below is an example.
 ```
 
 <a name="triggers"></a>
-# Triggers
+# Triggers [top](#top)
 
 Triggers can get invoked before and after key value or indexed object properties change or get deleted. The triggers are configure in 
 the file `triggers.js`. Any asynchronous triggers will be awaited. `before` triggers must return truthy for execution to
@@ -549,7 +591,7 @@ Triggers can be executed in the browser, a service worker, or the cloud.
 }).call(this);
 ```
 <a name="functions"></a>
-# Functions
+# Functions [top](#top)
 
 Exposing server functions to the JavaScript client in the browser is simple. Just define the functions in 
 the file `functions.js`. Any asynchronous functions will be awaited.
@@ -571,7 +613,7 @@ The functions will automatically become available in the admin client `docs/thun
 be access controlled in `acl.js`.
 
 <a name="indexing"></a>
-# Indexing
+# Indexing [top](#top)
 
 All properties of objects inserted using `putItem` are indexed. Objects that are just a value to `setItem` are 
 not indexed. The index is not partitioned per class, it spans all classes.
@@ -627,19 +669,19 @@ underlying Cloudflare KV store; howvever, it also negatively impacts performance
 not been made. We may make it configurable.
 
 <a name="full-text"></a>
-## Full Text Indexing
+## Full Text Indexing [top](#top)
 
 To be written
 
 
 <a name="schema"></a>
-# Schema
+# Schema [top](#top)
 
 To be written.
 
 
 <a name="development"></a>
-# Development
+# Development [top](#top)
 
 If you wish to modify Thunderclap, you must subscribe to the Cloudflare Argo tunneling service on the domain where 
 you wish to use Thunderclap.
@@ -665,21 +707,23 @@ When in dev mode, files are watched by webpack and any changes cause a re-bundli
 to Cloudflare.
 
 <a name="development"></a>
-## Admin UI
+## Admin UI [top](#top)
 
 When in development mode, there is a primitive UI for making one-off requests at 
 `https://<dev-host-prefix>-thunderclap.<your-domain>/thunderclap.html`. This UI exposes all of the functions
 available via the [Javascript](#javascript) client.
 
-# History and Roadmap
+# History and Roadmap [top](#top)
 
 Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB development has been suspended for now, 
 but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. This
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
-# Change Log (reverse chronological order)
+# Change Log (reverse chronological order) [top](#top)
 
-2019-07-09 v0.0.20a Ehanced documentation. Added `Position` and `Coordinates`.
+2019-07-11 v0.0.21a Ehanced documentation.
+
+2019-07-10 v0.0.20a Ehanced documentation. Added `Position` and `Coordinates`.
 
 2019-07-09 v0.0.19a Server was throwing errors on date predicates. Fixed. Added support for un-indexing nested objects.
 Unindexing full-text not yet implemented. Added a short term cache to improve performance. Unit tests for removeItem are

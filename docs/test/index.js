@@ -168,6 +168,16 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].middle).equal(0);
 	});
+	it("$in",async function() {
+		const results = await db.query({middle:{$in:[-1,0,1]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
+	});
+	it("$nin",async function() {
+		const results = await db.query({middle:{$nin:[1,2,3]}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
+	});
 	it("$echoes",async function() {
 		const results = await db.query({name:{$echoes:"tesst"}});
 		expect(typeof(results[0])).equal("object");
@@ -184,40 +194,40 @@ describe("query",function() {
 		expect(results[0].plusInfinity).equal(Infinity);
 	});
 	it("NaN",async function() {
-		const results = await db.query({NaN:{$isNaN:null}});
+		const results = await db.query({NaN:{$isNaN:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(typeof(results[0].NaN)==="number" && isNaN(results[0].NaN)).equal(true);
 	});
 	xit("$isArray",function(done) {
 		let some = 0;
-		db.query({favoriteNumbers:{$isArray:null}}).forEach(object => { 
+		db.query({favoriteNumbers:{$isArray:true}}).forEach(object => { 
 			some++; 
 			expect(object.favoriteNumbers.length).equal(4);
 			})
 			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
 	});
 	it("$isEmail",async function() {
-		const results = await db.query({email:{$isEmail:null}});
+		const results = await db.query({email:{$isEmail:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].email).equal("someone@somewhere.com");
 	});
 	it("$isEven",async function() {
-		const results = await db.query({middle:{$isEven:null}});
+		const results = await db.query({middle:{$isEven:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].middle).equal(0);
 	});
 	it("$isIPAddress",async function() {
-		const results = await db.query({ip:{$isIPAddress:null}});
+		const results = await db.query({ip:{$isIPAddress:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].ip).equal("127.0.0.1");
 	});
 	it("$isOdd",async function() {
-		const results = await db.query({low:{$isOdd:null}});
+		const results = await db.query({low:{$isOdd:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].low).equal(-1);
 	});
 	it("$isSSN",async function() {
-		const results = await db.query({ssn:{$isSSN:null}});
+		const results = await db.query({ssn:{$isSSN:true}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].ssn).equal("555-55-5555");
 	});
@@ -419,11 +429,12 @@ describe("query",function() {
 	}).timeout(100000);
 	it("create and delete Position",function(done) {
 		Thunderclap.Position.create().then((position) => {
-			const object = await db.putItem(position);
-			expect(object.coords.latitude).equal(position.coords.latitude);
-			done();
+			db.putItem(position).then((position) => {
+				expect(object.coords.latitude).equal(position.coords.latitude);
+				done();
+			})
 		});
-	}).timeout(3000)
+	}).timeout(5000)
 });
 
 

@@ -81,11 +81,45 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 21);
+/******/ 	return __webpack_require__(__webpack_require__.s = 23);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Coordinates = __webpack_require__(2);
+	class Position {
+		constructor({coords,timestamp}) {
+			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
+			this.coords = {
+				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
+			};
+			if(timestamp) {
+				this.timestamp = timestamp;
+			}
+		}
+	}
+	Position.create = async ({coords,timestamp=Date.now()}={}) => {
+		if(coords) {
+			return new Position({coords:new Coordinates(coords),timestamp})
+		}
+		return new Promise((resolve,reject) => {
+			navigator.geolocation.getCurrentPosition(
+					(position) => {
+						resolve(new Position(position));
+					},
+					(err) => { 
+						reject(err); 
+					});
+		});
+	}
+	module.exports = Position;
+}).call(this);
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -93,11 +127,32 @@
 }).call(this)
 
 /***/ }),
-/* 1 */
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uid = __webpack_require__(0);
+	const Position = __webpack_require__(0);
+	class Coordinates {
+		constructor(coords) {
+			Object.assign(this,coords);
+		}
+	}
+	Coordinates.create = async (coords) => {
+		if(coords) {
+			return new Coordinates(coords);
+		}
+		const position = await Position.create();
+		return new Coordinates(position.coords);
+	}
+	module.exports = Coordinates;
+}).call(this);
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uid = __webpack_require__(1);
 	
 	class Entity {
 		constructor(config) {
@@ -119,11 +174,11 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uuid4 = __webpack_require__(7),
+	const uuid4 = __webpack_require__(9),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -138,11 +193,11 @@
 
 
 /***/ }),
-/* 3 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(3);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -208,11 +263,11 @@
 })();
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Entity = __webpack_require__(1);
+	const Entity = __webpack_require__(3);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -235,7 +290,7 @@
 })();
 
 /***/ }),
-/* 5 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -243,11 +298,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(6),
-		isSoul = __webpack_require__(2),
-		isInt = __webpack_require__(8),
-		isFloat = __webpack_require__(9),
-		validateLuhn = __webpack_require__(10),
+	const soundex = __webpack_require__(8),
+		isSoul = __webpack_require__(4),
+		isInt = __webpack_require__(10),
+		isFloat = __webpack_require__(11),
+		validateLuhn = __webpack_require__(12),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -341,10 +396,10 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,array) {
+			$in(a,...array) {
 				return array.includes(a);
 			},
-			$nin(a,array) {
+			$nin(a,...array) {
 				return !array.includes(a);
 			},
 			$includes(array,b) {
@@ -395,38 +450,38 @@
 					return true;
 				}
 			},
-			$isCreditCard(a) {
+			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
-				return (/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a);
+				return bool===((/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a));
 			},
-			$isEmail(a) {
-				return !/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a);
+			$isEmail(a,bool) {
+				return bool==(!/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a));
 			},
-			$isEven(a) {
-				return a % 2 === 0;
+			$isEven(a,bool) {
+				return bool === (a % 2 === 0);
 			},
-			$isFloat(a) {
-				return isFloat(a);
+			$isFloat(a,bool) {
+				return bool===isFloat(a);
 			},
-			$isIPAddress(a) {
-				return (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a);
+			$isIPAddress(a,bool) {
+				return bool===((/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a));
 			},
-			$isInt(a) {
-				return isInt(a);
+			$isInt(a,bool) {
+				return bool===isInt(a);
 			},
-			$isNaN(a) { 
-				return isNaN(a); 
+			$isNaN(a,bool) { 
+				return bool===isNaN(a); 
 			},
-			$isOdd(a) {
-				return typeof(a)==="number" && !isNaN(a) && a % 2 !== 0;
+			$isOdd(a,bool) {
+				return bool===(typeof(a)==="number" && !isNaN(a) && a % 2 !== 0);
 			},
-			$isSSN(a) {
-				return /^\d{3}-?\d{2}-?\d{4}$/.test(a);
+			$isSSN(a,bool) {
+				return bool===(/^\d{3}-?\d{2}-?\d{4}$/.test(a));
 			},
 			$echoes(a,b) { 
 				return soundex(a)===soundex(b); 
 			},
-			$search(a,b) {
+			$search(a,b) { // implemented internal to Thunderclap in thunderhead.js
 				return true;
 			},
 			$stemSearch(_,phrase) {
@@ -590,7 +645,7 @@
 }).call(this);
 
 /***/ }),
-/* 6 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -600,7 +655,7 @@
 }).call(this);
 
 /***/ }),
-/* 7 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -633,7 +688,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -641,7 +696,7 @@
 }).call(this)
 
 /***/ }),
-/* 9 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -649,7 +704,7 @@
 }).call(this)
 
 /***/ }),
-/* 10 */
+/* 12 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -677,7 +732,7 @@
 
 
 /***/ }),
-/* 11 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -724,7 +779,7 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -747,7 +802,7 @@
 }).call(this);
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -783,7 +838,7 @@
 }).call(this);
 
 /***/ }),
-/* 14 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -797,7 +852,7 @@
 	}).call(this)
 
 /***/ }),
-/* 15 */
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -841,12 +896,12 @@
 }).call(this)
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const acl = __webpack_require__(23),
-		roles = __webpack_require__(24),
+	const acl = __webpack_require__(25),
+		roles = __webpack_require__(26),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -951,11 +1006,11 @@
 }).call(this)
 
 /***/ }),
-/* 17 */,
-/* 18 */,
 /* 19 */,
 /* 20 */,
-/* 21 */
+/* 21 */,
+/* 22 */,
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -969,16 +1024,16 @@ const //uid = require("./uid.js"),
 	//fromSerializable = require("./from-serializable.js"),
 	//toSerializable = require("./to-serializable.js"),
 	//Entity = require("./entity.js"),
-	Schema = __webpack_require__(3),
-	User = __webpack_require__(4),
+	Schema = __webpack_require__(5),
+	User = __webpack_require__(6),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(15),
-	toSerializable = __webpack_require__(11),
-	Thunderhead = __webpack_require__(22),
-	dboPassword = __webpack_require__(14).dboPassword,
-	secure = __webpack_require__(16);
+	hashPassword = __webpack_require__(17),
+	toSerializable = __webpack_require__(13),
+	Thunderhead = __webpack_require__(24),
+	dboPassword = __webpack_require__(16).dboPassword,
+	secure = __webpack_require__(18);
 
 /*const thunderclapjs = `(function() 
 	{ 
@@ -1184,7 +1239,7 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 22 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1193,24 +1248,24 @@ async function handleRequest({request,response}) {
 	VERSION 1, OCTOBER 16, 2018
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const uid = __webpack_require__(0),
-		isSoul = __webpack_require__(2),
-		joqular = __webpack_require__(5),
-		hashPassword = __webpack_require__(15),
-		secure = __webpack_require__(16),
+	const uid = __webpack_require__(1),
+		isSoul = __webpack_require__(4),
+		joqular = __webpack_require__(7),
+		hashPassword = __webpack_require__(17),
+		secure = __webpack_require__(18),
 		//stemmer = require("./stemmer.js"),
-		trigrams = __webpack_require__(25),
-		tokenize = __webpack_require__(26),
-		stopwords = __webpack_require__(27),
-		respond = __webpack_require__(28)("cloud"),
-		User = __webpack_require__(4),
-		Schema = __webpack_require__(3),
-		Position = __webpack_require__(32),
-		Coordinates = __webpack_require__(33),
-		Cache = __webpack_require__(30),
-		when = __webpack_require__(13).cloud,
-		functions = __webpack_require__(12).cloud,
-		keys = __webpack_require__(14);
+		trigrams = __webpack_require__(27),
+		tokenize = __webpack_require__(28),
+		stopwords = __webpack_require__(29),
+		respond = __webpack_require__(30)("cloud"),
+		User = __webpack_require__(6),
+		Schema = __webpack_require__(5),
+		Position = __webpack_require__(0),
+		Coordinates = __webpack_require__(2),
+		Cache = __webpack_require__(32),
+		when = __webpack_require__(15).cloud,
+		functions = __webpack_require__(14).cloud,
+		keys = __webpack_require__(16);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1228,7 +1283,7 @@ async function handleRequest({request,response}) {
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
-			__webpack_require__(31)(this);
+			__webpack_require__(33)(this);
 			setInterval(() => {
 				this.cache = new Cache({namespace});
 			},refresh)
@@ -1844,7 +1899,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 23 */
+/* 25 */
 /***/ (function(module, exports) {
 
 (function () {
@@ -1914,7 +1969,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 24 */
+/* 26 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1926,7 +1981,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 25 */
+/* 27 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1941,7 +1996,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 26 */
+/* 28 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1951,7 +2006,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 27 */
+/* 29 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1972,7 +2027,7 @@ async function handleRequest({request,response}) {
 
 
 /***/ }),
-/* 28 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -2003,7 +2058,7 @@ async function handleRequest({request,response}) {
 		return true
 	}
 	module.exports = (type) => {
-		triggers = __webpack_require__(29)[type],
+		triggers = __webpack_require__(31)[type],
 		triggersKeys = Object.keys(triggers),
 		compiled = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
 			const parts = key.split("/");
@@ -2023,7 +2078,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 29 */
+/* 31 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2091,7 +2146,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 30 */
+/* 32 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2132,11 +2187,11 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 31 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(14),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(16),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})
@@ -2199,61 +2254,6 @@ async function handleRequest({request,response}) {
 	module.exports = (namespace) => {
 		Object.assign(namespace,methods);
 	}
-}).call(this);
-
-/***/ }),
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Coordinates = __webpack_require__(33);
-	class Position {
-		constructor({coords,timestamp}) {
-			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
-			this.coords = {
-				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
-			};
-			if(timestamp) {
-				this.timestamp = timestamp;
-			}
-		}
-	}
-	Position.create = async ({coords,timestamp=Date.now()}={}) => {
-		if(coords) {
-			return new Position({coords:new Coordinates(coords),timestamp})
-		}
-		return new Promise((resolve,reject) => {
-			navigator.geolocation.getCurrentPosition(
-					(position) => {
-						resolve(new Position(position));
-					},
-					(err) => { 
-						reject(err); 
-					});
-		});
-	}
-	module.exports = Position;
-}).call(this);
-
-/***/ }),
-/* 33 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Position = __webpack_require__(32);
-	class Coordinates {
-		constructor(coords) {
-			Object.assign(this,coords);
-		}
-	}
-	Coordinates.create = async (coords) => {
-		if(coords) {
-			return new Coordinates(coords);
-		}
-		const position = await Position.create();
-		return new Coordinates(position.coords);
-	}
-	module.exports = Coordinates;
 }).call(this);
 
 /***/ })

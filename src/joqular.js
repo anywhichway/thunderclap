@@ -101,10 +101,10 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,array) {
+			$in(a,...array) {
 				return array.includes(a);
 			},
-			$nin(a,array) {
+			$nin(a,...array) {
 				return !array.includes(a);
 			},
 			$includes(array,b) {
@@ -155,38 +155,38 @@
 					return true;
 				}
 			},
-			$isCreditCard(a) {
+			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
-				return (/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a);
+				return bool===((/^(?:4[0-9]{12}(?:[0-9]{3})?|(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}|3[47][0-9]{13}| 3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})$/m).test(a) && validateLuhn(a));
 			},
-			$isEmail(a) {
-				return !/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a);
+			$isEmail(a,bool) {
+				return bool==(!/(\.{2}|-{2}|_{2})/.test(a) && /^[a-z0-9][a-z0-9-_\.]+@[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,10}(?:\.[a-z]{2,10})?$/i.test(a));
 			},
-			$isEven(a) {
-				return a % 2 === 0;
+			$isEven(a,bool) {
+				return bool === (a % 2 === 0);
 			},
-			$isFloat(a) {
-				return isFloat(a);
+			$isFloat(a,bool) {
+				return bool===isFloat(a);
 			},
-			$isIPAddress(a) {
-				return (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a);
+			$isIPAddress(a,bool) {
+				return bool===((/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/m).test(a));
 			},
-			$isInt(a) {
-				return isInt(a);
+			$isInt(a,bool) {
+				return bool===isInt(a);
 			},
-			$isNaN(a) { 
-				return isNaN(a); 
+			$isNaN(a,bool) { 
+				return bool===isNaN(a); 
 			},
-			$isOdd(a) {
-				return typeof(a)==="number" && !isNaN(a) && a % 2 !== 0;
+			$isOdd(a,bool) {
+				return bool===(typeof(a)==="number" && !isNaN(a) && a % 2 !== 0);
 			},
-			$isSSN(a) {
-				return /^\d{3}-?\d{2}-?\d{4}$/.test(a);
+			$isSSN(a,bool) {
+				return bool===(/^\d{3}-?\d{2}-?\d{4}$/.test(a));
 			},
 			$echoes(a,b) { 
 				return soundex(a)===soundex(b); 
 			},
-			$search(a,b) {
+			$search(a,b) { // implemented internal to Thunderclap in thunderhead.js
 				return true;
 			},
 			$stemSearch(_,phrase) {
