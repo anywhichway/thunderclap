@@ -348,7 +348,7 @@ describe("query",function() {
 		expect(results[0].name).equal("test");
 		expect(Object.keys(results[0]).length).equal(2);
 	});
-	xit("$search", async function() {
+	it("$search", async function() {
 		const results = await db.query({notes:{$search:"spaces words"}});
 		expect(typeof(results[0])).equal("object");
 	});

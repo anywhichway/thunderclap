@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 19);
+/******/ 	return __webpack_require__(__webpack_require__.s = 20);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -780,6 +780,49 @@
 
 /***/ }),
 /* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Position = __webpack_require__(0);
+	function fromSerializable(data,classes={}) {
+		const type = typeof(data);
+		if(data==="@undefined") {
+			return undefined;
+		}
+		if(data==="@Infinity") {
+			return Infinity;
+		}
+		if(data==="@-Infinity") {
+			return -Infinity;
+		}
+		if(data==="@NaN") {
+			return NaN;
+		}
+		if(type==="string") {
+			if(data.startsWith("Date@")) {
+				return new Date(parseInt(data.substring(5)));
+			}
+			for(const cname in classes) {
+				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
+					return classes[cname].deserialize(data);
+				}
+			}
+		}
+		if(data && type==="object") {
+			Object.keys(data).forEach((key) => {
+				data[key] = fromSerializable(data[key]);
+			});
+			if(data["^"]) {
+				data["^"] = fromSerializable(data["^"]);
+			}
+		}
+		return data;
+	}
+	module.exports = fromSerializable;
+}).call(this);
+
+/***/ }),
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -802,7 +845,7 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -838,10 +881,10 @@
 }).call(this);
 
 /***/ }),
-/* 16 */,
 /* 17 */,
 /* 18 */,
-/* 19 */
+/* 19 */,
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -855,13 +898,13 @@ Copyright AnyWhichWay, LLC 2019
 	const uid = __webpack_require__(1),
 		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(13),
-		create = __webpack_require__(20),
+		create = __webpack_require__(21),
 		Schema = __webpack_require__(5),
 		User = __webpack_require__(6),
 		Position = __webpack_require__(0),
 		Coordinates = __webpack_require__(2),
-		functions = __webpack_require__(14).browser,
-		when = __webpack_require__(15).browser;
+		functions = __webpack_require__(15).browser,
+		when = __webpack_require__(16).browser;
 	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
@@ -903,30 +946,34 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async clear(key="") {
 			return fetch(`${this.endpoint}/db.json?["clear",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async changePassword(userName,password="",oldPassword="") {
 			return fetch(`${this.endpoint}/db.json?["changePassword",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))},${encodeURIComponent(JSON.stringify(oldPassword))}]`,{headers:this.headers})
-	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
-	    	.then((data) => create(data,this.ctors))
-	    	.then((password) => {
-	    		if(password && this.headers["X-Auth-Username"]===userName) {
-	    			this.headers["X-Auth-Password"] = password;
-	    		}
-	    		return password;
-	    	});
+	    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors))
+		    	.then((password) => {
+		    		if(password && this.headers["X-Auth-Username"]===userName) {
+		    			this.headers["X-Auth-Password"] = password;
+		    		}
+		    		return password;
+		    	});
 		}
 		async createUser(userName,password,reAuth) {
 			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
-	    	.then((response) => response.json()) // change to text(), try to parse, thow error if can't
-	    	.then((data) => create(data,this.ctors))
-	    	.then((user) => {
-	    		if(reAuth || !this.headers["X-Auth-Username"]) {
-	    			this.headers["X-Auth-Username"] = user.username;
-	    			this.headers["X-Auth-Password"] = user.password;
-	    		}
-	    		return user;
-	    	});
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
+		    	.then((user) => {
+		    		if(reAuth || !this.headers["X-Auth-Username"]) {
+		    			this.headers["X-Auth-Username"] = user.username;
+		    			this.headers["X-Auth-Password"] = user.password;
+		    		}
+		    		return user;
+		    	});
 		}
 		async entries(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["entries"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
@@ -947,13 +994,17 @@ Copyright AnyWhichWay, LLC 2019
 		async hasKey(key) {
 			if(key) {
 				return fetch(`${this.endpoint}/db.json?["hasKey",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
-	    		.then((response) => response.json())
+	    			.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+	    			.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+	    			.then((data) => create(data,this.ctors))
 			}
 			return false;
 		}
 		async keys(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["keys"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json());
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
@@ -1027,8 +1078,9 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async removeItem(keyOrObject) {
 			return fetch(`${this.endpoint}/db.json?["removeItem",${encodeURIComponent(JSON.stringify(toSerializable(keyOrObject)))}]`,{headers:this.headers})
-				.then((response) => response.json())
-				.then((data) => create(data,this.ctors))
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
@@ -1045,7 +1097,9 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async values(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json());
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 	}
 	
@@ -1055,11 +1109,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const fromSerializable = __webpack_require__(21);
+	const fromSerializable = __webpack_require__(14);
 	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
@@ -1094,49 +1148,6 @@ Copyright AnyWhichWay, LLC 2019
 		return instance;
 	}
 	module.exports = create;
-}).call(this);
-
-/***/ }),
-/* 21 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Position = __webpack_require__(0);
-	function fromSerializable(data,classes={}) {
-		const type = typeof(data);
-		if(data==="@undefined") {
-			return undefined;
-		}
-		if(data==="@Infinity") {
-			return Infinity;
-		}
-		if(data==="@-Infinity") {
-			return -Infinity;
-		}
-		if(data==="@NaN") {
-			return NaN;
-		}
-		if(type==="string") {
-			if(data.startsWith("Date@")) {
-				return new Date(parseInt(data.substring(5)));
-			}
-			for(const cname in classes) {
-				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
-					return classes[cname].deserialize(data);
-				}
-			}
-		}
-		if(data && type==="object") {
-			Object.keys(data).forEach((key) => {
-				data[key] = fromSerializable(data[key]);
-			});
-			if(data["^"]) {
-				data["^"] = fromSerializable(data["^"]);
-			}
-		}
-		return data;
-	}
-	module.exports = fromSerializable;
 }).call(this);
 
 /***/ }),

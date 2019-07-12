@@ -6,17 +6,17 @@
 				.then((result) => result.json())
 		},
 		methods = {
-			clear: async function(prefix) {
+			clear: async function(prefix="") {
 				let keys, cursor;
 				do {
 					keys = await this.keys(prefix,{cursor});
 					cursor = keys.pop();
 					for(const key of keys) {
-						await this.delete(key);
+						this.delete(key);
 					}
 				} while(keys.length>0 && cursor);
 			},
-			entries: async function(prefix,{batchSize=1000,cursor}) {
+			entries: async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),
 					entries = [];
 				for(const key of result) {
@@ -37,7 +37,7 @@
 				const {result} = await getKeys(key,100);
 				return result[0].name===key;
 			},
-			keys: async function(prefix,{extended,batchSize=1000,cursor}={}) {
+			keys: async function(prefix="",{extended,batchSize=1000,cursor}={}) {
 				let {result,result_info} = await getKeys(prefix,batchSize,cursor);
 				if(!extended) {
 					// should these be secured?
@@ -46,7 +46,7 @@
 				result.push(result_info.cursor);
 				return result;
 			},
-			values:async function(prefix,{batchSize=1000,cursor}) {
+			values:async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),
 					values = [];
 				for(const key of result) {

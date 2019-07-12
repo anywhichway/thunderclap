@@ -151,8 +151,7 @@ values and optionally expirations of data with keys that start with `prefix`., e
 
 It can be used in a loop just like `keys` below.
 
-`any async getItem(string key,{await}={})` - Gets the value at `key`. Returns `undefined` if no value exists. If 
-`await` is true the server will bypass internal caches await the underlying data store.
+`any async getItem(string key)` - Gets the value at `key`. Returns `undefined` if no value exists.
 
 `boolean async hasKey(string key)` - Returns `true` is `key` exists.
 
@@ -171,16 +170,16 @@ keys in database than match the `prefix` every time it is called. By default it 
 
 `any async putItem(object value,options={})` - Adds a unique id on property "#" if one does not exist, indexes the object and 
 stores it with `setItem` using the id as the key. In most cases the unique id will be of the form 
-`<className>@xxxxxxxxxxxxx`.
+`<className>@xxxxxxxxxxxxx`.Options can one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 
-`boolean async removeItem(string|object keyOrObject,,{await}={}) - Removes the keyOrObject. If the argument is an indexed object 
+`boolean async removeItem(string|object keyOrObject) - Removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the key and data are removed from the database so long as the user has 
 the appropriate privileges. If the key exists but can't be removed the function returns `false`. If the key does not exist
 or removal succeeds, the function returns `true`. If `await` is true the server will bypass internal caches await the 
 underlying data store.
 
 `any async setItem(string key,any value,options={})` - Sets the `key` to `value`. If the `value` is an object it is 
-NOT indexed. Options can have `await` and one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
+NOT indexed. Options can one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 If `await` is true the server will bypass internal caches await the underlying data store.
 
 `Array async query(object JOQULARPattern)` - query the database using `JOQULARPattern`. See [JOQULAR](#joqular) below.
@@ -704,9 +703,11 @@ available via the [Javascript](#javascript) client.
 
 Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB development has been suspended for now, 
 but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. This
-includes the addition of graph queries a la GunDB, full-text indexing, and joins.
+includes the addition of graph queries a la GunDB and joins.
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-12 v0.0.23a Full text search repaired. Optimized inserts and deletes. NAMESPACES must be recreated.
 
 2019-07-12 v0.0.22a Ehanced documentation. Completely re-worked indexing to allow for more object storage. Full text search
 currently broken. NAMESPACES must be re-created.

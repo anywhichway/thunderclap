@@ -12,6 +12,7 @@
 		trigrams = require("./trigrams.js"),
 		tokenize = require("./tokenize.js"),
 		stopwords = require("./stopwords.js"),
+		stemmer = require("./stemmer.js"),
 		respond = require("./respond.js")("cloud"),
 		fromSerializable = require("./from-serializable.js"),
 		User = require("./user.js"),
@@ -62,7 +63,7 @@
 			const authed = this.request.user;
 			let user = await this.authUser(userName,oldPassword);
 			if(authed.userName===userName && !user) {
-				return "fail";
+				return false;
 			}
 			if(user || authed.roles.dbo) {
 				if(!password) {
@@ -87,15 +88,15 @@
 			request.user = authed;
 			return user;
 		}
-		async delete(key,options) {
-			return this.removeItem(key,options);
+		async delete(key) {
+			return this.removeItem(key);
 		}
 		//async get(key,options) {
 			//return this.get(key,options);
 		//}
-		async getItem(key,options) {
-			let data = await this.cache.get(key,options);
-			if(data!==null) {
+		async getItem(key) {
+			let data = await this.cache.get(key);
+			if(data!=null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
 					const key = `${data["#"].split("@")[0]}@`,
@@ -126,23 +127,28 @@
 							const value = data[key],
 								type = typeof(value);
 							const keypath = `${parentPath}!${key}`;
-							await this.cache.put("!p"+keypath,1);
+							this.cache.put("!p"+keypath,1);
 							let node;
 							if(value && type==="object") {
-								await this.index(value,{},keypath,id);
+								await this.index(value,options,keypath,id);
 							} else {
-								if(type==="string" && value.includes(" ")) {
-									let count = 0;
-									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
-									for(const gram of grams) {
-										await this.cache.put(`!t${keypath}!${gram}`,1)	
-										await this.cache.put(`!o${keypath}!${gram}!${id}`,1)	
+								if(type==="string") {
+									if(value.includes(" ")) {
+										let count = 0;
+										const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
+										for(const gram of grams) {	
+											this.cache.put(`!o${keypath}!${gram}!${id}`,1,options)	
+										}
 									}
-								} 
-								if(value.length<64) { // not an indexed string > 64 char
+									if(value.length<64) {
+										const valuekey = `${JSON.stringify(value)}`;
+										this.cache.put(`!v${keypath}!${valuekey}`,1);
+										this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
+									}
+								} else {
 									const valuekey = `${JSON.stringify(value)}`;
-									await this.cache.put(`!v${keypath}!${valuekey}`,1);
-									await this.cache.put(`!o${keypath}!${valuekey}!${id}`,1);
+									this.cache.put(`!v${keypath}!${valuekey}`,1);
+									this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
 								}
 							}
 						}
@@ -203,7 +209,11 @@
 				if(removed) {
 					removed.forEach((key) => {
 						if(original[key]!==undefined) {
-							data[key] = original[key];
+							try {
+								data[key] = original[key];
+							} catch(e) {
+								;
+							}
 						}
 					});
 				}
@@ -221,6 +231,7 @@
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
+			
 			await this.index(data,options);
 			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 			if(changes) {
@@ -274,22 +285,50 @@
 							if(predicate==="$search") {
 								predicates = true;
 								const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
-									tokens = tokenize(value).filter((token) => !stopwords.includes(token)),
-									grams = trigrams(tokens),
-									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * keys.length : .8;
-								let testids;
+									grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token))),
+									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * grams.length : .8;
+								let testids = {}, count = 0;
 								for(const gram of grams) {
-									// this.keys(`!t${keypath}!${gram}!`);
-								}
-								if(testids) {
-									ids = {};
-									for(const id in testids) {
-										if(testids[id]>=matchlevel) {
-											ids[id] = true;
+									count++;
+									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
+									for(const gkey of gkeys) {
+										const id = gkey.split("!").pop();
+										if(testids[id]) {
+											testids[id].sum++;
+											testids[id].avg = testids[id].sum / count;
+										} else {
+											const cname = id.split("@")[0],
+												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+											if(data && removed.length===0) {
+												testids[id] = {sum:1};
+										    } else {
+										    	testids[id] = {sum:-Infinity};
+										    }
 										}
 									}
+								}
+								if(!ids) {
+									ids = {};
+									count = 0;
+									for(const id in testids) {
+										if(testids[id].avg>=matchlevel) {
+											ids[id] = true;
+											count++;
+										}
+									}
+									if(count===0) {
+										return [];
+									}
 								} else {
-									return [];
+									for(const id in ids) {
+										if(!testids[id] || testids[id].avg<=matchlevel) { //  !secured[id] && 
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
 								}
 							} else if(test) {
 								predicates = true;
@@ -303,6 +342,10 @@
 								const secured = {},
 									testids = {},
 									keys = await this.cache.keys(`!v${keypath}!`);
+								if(keys.length===0) {
+									await this.cache.delete(`!p${keypath}`);
+									return [];
+								}
 								for(const key of keys) {
 									const parts = key.split("!"), // offset should be based on parentPath length, not end
 										rawvalue = parts.pop(),
@@ -311,8 +354,12 @@
 										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
 										for(const key of keys) {
 											const parts = key.split("!"),
-												id = parts.pop();
-											testids[id] = true;
+												id = parts.pop(),
+												cname = id.split("@")[0],
+												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+											if(data && removed.length===0) {
+												testids[id] = true;
+										    }
 										}
 									}
 								}
@@ -363,11 +410,14 @@
 							secured = {},
 							valuepath = `${keypath}!${valuekey}`,
 							objectpath = `!o${valuepath}!`,
-							len = valuepath.length+3,
 							testids = {}, 
 							keys = await this.cache.keys(objectpath);
+						if(keys.length===0) {
+							await this.cache.delete(`!v${keypath}!${valuekey}`); // should we actually do this?
+							return [];
+						}
 						for(const key of keys) {
-							const id = key.substring(len),
+							const id = key.split("!").pop(),
 								cname = id.split("@")[0],
 								{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 							if(data && removed.length===0) {
@@ -419,13 +469,13 @@
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject,options) {
+		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject,options);
+				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
@@ -433,7 +483,7 @@
 					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
 				if(key) {
 					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
-						return "bad";
+						return false;
 					}
 				}
 				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
@@ -441,7 +491,7 @@
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					await this.cache.delete(keyOrObject,options);
+					this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -466,10 +516,7 @@
 				}
 			}
 			if(data!==undefined) {
-				const promise = this.cache.put(key,data,options);
-				if(options.await) {
-					await promise;
-				}
+				this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
@@ -491,8 +538,22 @@
 						}
 						await this.unindex(value,keyPath,id);
 					} else {
-						const valuekey = `${JSON.stringify(value)}`;
-						await this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+						if(type==="string") {
+							if(value.includes(" ")) {
+								let count = 0;
+								const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
+								for(const gram of grams) {
+									this.cache.delete(`!o${keypath}!${gram}!${id}`,1)	
+								}
+							}
+							if(value.length<64) {
+								const valuekey = `${JSON.stringify(value)}`;
+								this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+							}
+						} else {
+							const valuekey = `${JSON.stringify(value)}`;
+							this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+						}
 					}
 				}
 			}

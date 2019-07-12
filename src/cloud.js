@@ -48,11 +48,11 @@ addEventListener('fetch', event => {
 	setInterval(() => {
 		thunderhead.resetCache();
 	},5000)
-	event.waitUntil(Promise.all(thunderhead.cache.promises));
-	event.respondWith(handleRequest({request}));
+	event.respondWith(handleRequest(event));
 });
 
-async function handleRequest({request,response}) {
+async function handleRequest(event) {
+	const {request,response} = event;
 	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
 	  method: "POST",
 	  body:encodeURI(
@@ -182,6 +182,7 @@ async function handleRequest({request,response}) {
 				const data = toSerializable(result,true);
 				//const response = new Response(JSON.stringify(result));
 				//response.body.pipeTo(writable);
+				event.waitUntil(Promise.all(thunderhead.cache.promises));
 				return new Response(JSON.stringify(data),{
 					headers:
 					{

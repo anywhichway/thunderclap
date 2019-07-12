@@ -780,6 +780,49 @@
 
 /***/ }),
 /* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const Position = __webpack_require__(0);
+	function fromSerializable(data,classes={}) {
+		const type = typeof(data);
+		if(data==="@undefined") {
+			return undefined;
+		}
+		if(data==="@Infinity") {
+			return Infinity;
+		}
+		if(data==="@-Infinity") {
+			return -Infinity;
+		}
+		if(data==="@NaN") {
+			return NaN;
+		}
+		if(type==="string") {
+			if(data.startsWith("Date@")) {
+				return new Date(parseInt(data.substring(5)));
+			}
+			for(const cname in classes) {
+				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
+					return classes[cname].deserialize(data);
+				}
+			}
+		}
+		if(data && type==="object") {
+			Object.keys(data).forEach((key) => {
+				data[key] = fromSerializable(data[key]);
+			});
+			if(data["^"]) {
+				data["^"] = fromSerializable(data["^"]);
+			}
+		}
+		return data;
+	}
+	module.exports = fromSerializable;
+}).call(this);
+
+/***/ }),
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -802,7 +845,7 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -838,13 +881,13 @@
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
 		module.exports = {
 		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "ab0f1585231c4ef9818c3479244002c0",
+		 namespaceId: "34dca41478b943a0880fe24798d39eb0",
 		 authEmail: "syblackwell@anywhichway.com",
 		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
 		 dboPassword: "dbo"
@@ -852,7 +895,7 @@
 	}).call(this)
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -896,7 +939,7 @@
 }).call(this)
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1006,51 +1049,8 @@
 }).call(this)
 
 /***/ }),
-/* 19 */,
 /* 20 */,
-/* 21 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	const Position = __webpack_require__(0);
-	function fromSerializable(data,classes={}) {
-		const type = typeof(data);
-		if(data==="@undefined") {
-			return undefined;
-		}
-		if(data==="@Infinity") {
-			return Infinity;
-		}
-		if(data==="@-Infinity") {
-			return -Infinity;
-		}
-		if(data==="@NaN") {
-			return NaN;
-		}
-		if(type==="string") {
-			if(data.startsWith("Date@")) {
-				return new Date(parseInt(data.substring(5)));
-			}
-			for(const cname in classes) {
-				if(data.startsWith(`${cname}@`) && classes[cname].deserialize) {
-					return classes[cname].deserialize(data);
-				}
-			}
-		}
-		if(data && type==="object") {
-			Object.keys(data).forEach((key) => {
-				data[key] = fromSerializable(data[key]);
-			});
-			if(data["^"]) {
-				data["^"] = fromSerializable(data["^"]);
-			}
-		}
-		return data;
-	}
-	module.exports = fromSerializable;
-}).call(this);
-
-/***/ }),
+/* 21 */,
 /* 22 */,
 /* 23 */
 /***/ (function(module, exports, __webpack_require__) {
@@ -1071,11 +1071,11 @@ const //uid = require("./uid.js"),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(17),
+	hashPassword = __webpack_require__(18),
 	toSerializable = __webpack_require__(13),
 	Thunderhead = __webpack_require__(24),
-	dboPassword = __webpack_require__(16).dboPassword,
-	secure = __webpack_require__(18);
+	dboPassword = __webpack_require__(17).dboPassword,
+	secure = __webpack_require__(19);
 
 /*const thunderclapjs = `(function() 
 	{ 
@@ -1105,11 +1105,11 @@ addEventListener('fetch', event => {
 	setInterval(() => {
 		thunderhead.resetCache();
 	},5000)
-	event.waitUntil(Promise.all(thunderhead.cache.promises));
-	event.respondWith(handleRequest({request}));
+	event.respondWith(handleRequest(event));
 });
 
-async function handleRequest({request,response}) {
+async function handleRequest(event) {
+	const {request,response} = event;
 	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
 	  method: "POST",
 	  body:encodeURI(
@@ -1239,6 +1239,7 @@ async function handleRequest({request,response}) {
 				const data = toSerializable(result,true);
 				//const response = new Response(JSON.stringify(result));
 				//response.body.pipeTo(writable);
+				event.waitUntil(Promise.all(thunderhead.cache.promises));
 				return new Response(JSON.stringify(data),{
 					headers:
 					{
@@ -1293,21 +1294,22 @@ async function handleRequest({request,response}) {
 	const uid = __webpack_require__(1),
 		isSoul = __webpack_require__(4),
 		joqular = __webpack_require__(7),
-		hashPassword = __webpack_require__(17),
-		secure = __webpack_require__(18),
+		hashPassword = __webpack_require__(18),
+		secure = __webpack_require__(19),
 		trigrams = __webpack_require__(27),
 		tokenize = __webpack_require__(28),
 		stopwords = __webpack_require__(29),
-		respond = __webpack_require__(30)("cloud"),
-		fromSerializable = __webpack_require__(21),
+		stemmer = __webpack_require__(30),
+		respond = __webpack_require__(31)("cloud"),
+		fromSerializable = __webpack_require__(14),
 		User = __webpack_require__(6),
 		Schema = __webpack_require__(5),
 		Position = __webpack_require__(0),
 		Coordinates = __webpack_require__(2),
-		Cache = __webpack_require__(32),
-		when = __webpack_require__(15).cloud,
-		functions = __webpack_require__(14).cloud,
-		keys = __webpack_require__(16);
+		Cache = __webpack_require__(33),
+		when = __webpack_require__(16).cloud,
+		functions = __webpack_require__(15).cloud,
+		keys = __webpack_require__(17);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1325,7 +1327,7 @@ async function handleRequest({request,response}) {
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
-			__webpack_require__(33)(this);
+			__webpack_require__(34)(this);
 			namespace.keys = this.keys;
 			setInterval(() => {
 				this.cache = new Cache({namespace});
@@ -1348,7 +1350,7 @@ async function handleRequest({request,response}) {
 			const authed = this.request.user;
 			let user = await this.authUser(userName,oldPassword);
 			if(authed.userName===userName && !user) {
-				return "fail";
+				return false;
 			}
 			if(user || authed.roles.dbo) {
 				if(!password) {
@@ -1373,15 +1375,15 @@ async function handleRequest({request,response}) {
 			request.user = authed;
 			return user;
 		}
-		async delete(key,options) {
-			return this.removeItem(key,options);
+		async delete(key) {
+			return this.removeItem(key);
 		}
 		//async get(key,options) {
 			//return this.get(key,options);
 		//}
-		async getItem(key,options) {
-			let data = await this.cache.get(key,options);
-			if(data!==null) {
+		async getItem(key) {
+			let data = await this.cache.get(key);
+			if(data!=null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
 					const key = `${data["#"].split("@")[0]}@`,
@@ -1412,23 +1414,28 @@ async function handleRequest({request,response}) {
 							const value = data[key],
 								type = typeof(value);
 							const keypath = `${parentPath}!${key}`;
-							await this.cache.put("!p"+keypath,1);
+							this.cache.put("!p"+keypath,1);
 							let node;
 							if(value && type==="object") {
-								await this.index(value,{},keypath,id);
+								await this.index(value,options,keypath,id);
 							} else {
-								if(type==="string" && value.includes(" ")) {
-									let count = 0;
-									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)));
-									for(const gram of grams) {
-										await this.cache.put(`!t${keypath}!${gram}`,1)	
-										await this.cache.put(`!o${keypath}!${gram}!${id}`,1)	
+								if(type==="string") {
+									if(value.includes(" ")) {
+										let count = 0;
+										const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
+										for(const gram of grams) {	
+											this.cache.put(`!o${keypath}!${gram}!${id}`,1,options)	
+										}
 									}
-								} 
-								if(value.length<64) { // not an indexed string > 64 char
+									if(value.length<64) {
+										const valuekey = `${JSON.stringify(value)}`;
+										this.cache.put(`!v${keypath}!${valuekey}`,1);
+										this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
+									}
+								} else {
 									const valuekey = `${JSON.stringify(value)}`;
-									await this.cache.put(`!v${keypath}!${valuekey}`,1);
-									await this.cache.put(`!o${keypath}!${valuekey}!${id}`,1);
+									this.cache.put(`!v${keypath}!${valuekey}`,1);
+									this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
 								}
 							}
 						}
@@ -1489,7 +1496,11 @@ async function handleRequest({request,response}) {
 				if(removed) {
 					removed.forEach((key) => {
 						if(original[key]!==undefined) {
-							data[key] = original[key];
+							try {
+								data[key] = original[key];
+							} catch(e) {
+								;
+							}
 						}
 					});
 				}
@@ -1507,6 +1518,7 @@ async function handleRequest({request,response}) {
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
 				}
 			}
+			
 			await this.index(data,options);
 			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 			if(changes) {
@@ -1560,22 +1572,50 @@ async function handleRequest({request,response}) {
 							if(predicate==="$search") {
 								predicates = true;
 								const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
-									tokens = tokenize(value).filter((token) => !stopwords.includes(token)),
-									grams = trigrams(tokens),
-									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * keys.length : .8;
-								let testids;
+									grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token))),
+									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * grams.length : .8;
+								let testids = {}, count = 0;
 								for(const gram of grams) {
-									// this.keys(`!t${keypath}!${gram}!`);
-								}
-								if(testids) {
-									ids = {};
-									for(const id in testids) {
-										if(testids[id]>=matchlevel) {
-											ids[id] = true;
+									count++;
+									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
+									for(const gkey of gkeys) {
+										const id = gkey.split("!").pop();
+										if(testids[id]) {
+											testids[id].sum++;
+											testids[id].avg = testids[id].sum / count;
+										} else {
+											const cname = id.split("@")[0],
+												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+											if(data && removed.length===0) {
+												testids[id] = {sum:1};
+										    } else {
+										    	testids[id] = {sum:-Infinity};
+										    }
 										}
 									}
+								}
+								if(!ids) {
+									ids = {};
+									count = 0;
+									for(const id in testids) {
+										if(testids[id].avg>=matchlevel) {
+											ids[id] = true;
+											count++;
+										}
+									}
+									if(count===0) {
+										return [];
+									}
 								} else {
-									return [];
+									for(const id in ids) {
+										if(!testids[id] || testids[id].avg<=matchlevel) { //  !secured[id] && 
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
 								}
 							} else if(test) {
 								predicates = true;
@@ -1589,6 +1629,10 @@ async function handleRequest({request,response}) {
 								const secured = {},
 									testids = {},
 									keys = await this.cache.keys(`!v${keypath}!`);
+								if(keys.length===0) {
+									await this.cache.delete(`!p${keypath}`);
+									return [];
+								}
 								for(const key of keys) {
 									const parts = key.split("!"), // offset should be based on parentPath length, not end
 										rawvalue = parts.pop(),
@@ -1597,8 +1641,12 @@ async function handleRequest({request,response}) {
 										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
 										for(const key of keys) {
 											const parts = key.split("!"),
-												id = parts.pop();
-											testids[id] = true;
+												id = parts.pop(),
+												cname = id.split("@")[0],
+												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+											if(data && removed.length===0) {
+												testids[id] = true;
+										    }
 										}
 									}
 								}
@@ -1649,11 +1697,14 @@ async function handleRequest({request,response}) {
 							secured = {},
 							valuepath = `${keypath}!${valuekey}`,
 							objectpath = `!o${valuepath}!`,
-							len = valuepath.length+3,
 							testids = {}, 
 							keys = await this.cache.keys(objectpath);
+						if(keys.length===0) {
+							await this.cache.delete(`!v${keypath}!${valuekey}`); // should we actually do this?
+							return [];
+						}
 						for(const key of keys) {
-							const id = key.substring(len),
+							const id = key.split("!").pop(),
 								cname = id.split("@")[0],
 								{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
 							if(data && removed.length===0) {
@@ -1705,13 +1756,13 @@ async function handleRequest({request,response}) {
 				this.ctors[ctor.name] = ctor;
 			}
 		}
-		async removeItem(keyOrObject,options) {
+		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject);
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
 			if(keyOrObject) {
-				const value = await this.getItem(keyOrObject,options);
+				const value = await this.getItem(keyOrObject);
 				if(value===undefined) {
 					return true;
 				}
@@ -1719,7 +1770,7 @@ async function handleRequest({request,response}) {
 					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
 				if(key) {
 					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
-						return "bad";
+						return false;
 					}
 				}
 				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
@@ -1727,7 +1778,7 @@ async function handleRequest({request,response}) {
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					await this.cache.delete(keyOrObject,options);
+					this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -1752,10 +1803,7 @@ async function handleRequest({request,response}) {
 				}
 			}
 			if(data!==undefined) {
-				const promise = this.cache.put(key,data,options);
-				if(options.await) {
-					await promise;
-				}
+				this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
@@ -1777,8 +1825,22 @@ async function handleRequest({request,response}) {
 						}
 						await this.unindex(value,keyPath,id);
 					} else {
-						const valuekey = `${JSON.stringify(value)}`;
-						await this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+						if(type==="string") {
+							if(value.includes(" ")) {
+								let count = 0;
+								const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
+								for(const gram of grams) {
+									this.cache.delete(`!o${keypath}!${gram}!${id}`,1)	
+								}
+							}
+							if(value.length<64) {
+								const valuekey = `${JSON.stringify(value)}`;
+								this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+							}
+						} else {
+							const valuekey = `${JSON.stringify(value)}`;
+							this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+						}
 					}
 				}
 			}
@@ -1882,11 +1944,13 @@ async function handleRequest({request,response}) {
 
 (function() {
 	module.exports = function trigrams(tokens) {
-		const grams = [],
-			str = Array.isArray(tokens) ? tokens.join("") : tokens+"";
-		for(let i=0;i<str.length-2;i++) {
-			grams.push(str.substring(i,i+3));
-		}
+		const grams = [];
+		tokens = Array.isArray(tokens) ? tokens : [tokens];
+		tokens.forEach((str) => {
+			for(let i=0;i<str.length-2;i++) {
+				grams.push(str.substring(i,i+3));
+			}
+		})
 		return grams;
 	}
 }).call(this);
@@ -1924,6 +1988,196 @@ async function handleRequest({request,response}) {
 
 /***/ }),
 /* 30 */
+/***/ (function(module, exports) {
+
+(function() {
+	// stemmer from https://github.com/words/stemmer MIT License, Titus Wormer
+	/* Character code for `y`. */
+	var CC_Y = 'y'.charCodeAt(0);
+
+	/* Standard suffix manipulations. */
+	var step2list = {
+	  ational: 'ate',
+	  tional: 'tion',
+	  enci: 'ence',
+	  anci: 'ance',
+	  izer: 'ize',
+	  bli: 'ble',
+	  alli: 'al',
+	  entli: 'ent',
+	  eli: 'e',
+	  ousli: 'ous',
+	  ization: 'ize',
+	  ation: 'ate',
+	  ator: 'ate',
+	  alism: 'al',
+	  iveness: 'ive',
+	  fulness: 'ful',
+	  ousness: 'ous',
+	  aliti: 'al',
+	  iviti: 'ive',
+	  biliti: 'ble',
+	  logi: 'log'
+	};
+
+	var step3list = {
+	  icate: 'ic',
+	  ative: '',
+	  alize: 'al',
+	  iciti: 'ic',
+	  ical: 'ic',
+	  ful: '',
+	  ness: ''
+	};
+
+	/* Consonant-vowel sequences. */
+	var consonant = '[^aeiou]';
+	var vowel = '[aeiouy]';
+	var consonantSequence = '(' + consonant + '[^aeiouy]*)';
+	var vowelSequence = '(' + vowel + '[aeiou]*)';
+
+	var MEASURE_GT_0 = new RegExp(
+	  '^' + consonantSequence + '?' + vowelSequence + consonantSequence
+	);
+
+	var MEASURE_EQ_1 = new RegExp(
+	  '^' + consonantSequence + '?' + vowelSequence + consonantSequence +
+	  vowelSequence + '?$'
+	);
+
+	var MEASURE_GT_1 = new RegExp(
+	  '^' + consonantSequence + '?' +
+	  '(' + vowelSequence + consonantSequence + '){2,}'
+	);
+
+	var VOWEL_IN_STEM = new RegExp(
+	  '^' + consonantSequence + '?' + vowel
+	);
+
+	var CONSONANT_LIKE = new RegExp(
+	  '^' + consonantSequence + vowel + '[^aeiouwxy]$'
+	);
+
+	/* Exception expressions. */
+	var SUFFIX_LL = /ll$/;
+	var SUFFIX_E = /^(.+?)e$/;
+	var SUFFIX_Y = /^(.+?)y$/;
+	var SUFFIX_ION = /^(.+?(s|t))(ion)$/;
+	var SUFFIX_ED_OR_ING = /^(.+?)(ed|ing)$/;
+	var SUFFIX_AT_OR_BL_OR_IZ = /(at|bl|iz)$/;
+	var SUFFIX_EED = /^(.+?)eed$/;
+	var SUFFIX_S = /^.+?[^s]s$/;
+	var SUFFIX_SSES_OR_IES = /^.+?(ss|i)es$/;
+	var SUFFIX_MULTI_CONSONANT_LIKE = /([^aeiouylsz])\1$/;
+	var STEP_2 = new RegExp(
+	  '^(.+?)(ational|tional|enci|anci|izer|bli|alli|entli|eli|ousli|' +
+	  'ization|ation|ator|alism|iveness|fulness|ousness|aliti|iviti|' +
+	  'biliti|logi)$'
+	);
+	var STEP_3 = /^(.+?)(icate|ative|alize|iciti|ical|ful|ness)$/;
+	var STEP_4 = new RegExp(
+	  '^(.+?)(al|ance|ence|er|ic|able|ible|ant|ement|ment|ent|ou|ism|ate|' +
+	  'iti|ous|ive|ize)$'
+	);
+
+	/* Stem `value`. */
+	module.exports = function stemmer(value) {
+	  var firstCharacterWasLowerCaseY;
+	  var match;
+
+	  value = String(value).toLowerCase();
+
+	  /* Exit early. */
+	  if (value.length < 3) {
+	    return value;
+	  }
+
+	  /* Detect initial `y`, make sure it never matches. */
+	  if (value.charCodeAt(0) === CC_Y) {
+	    firstCharacterWasLowerCaseY = true;
+	    value = 'Y' + value.substr(1);
+	  }
+
+	  /* Step 1a. */
+	  if (SUFFIX_SSES_OR_IES.test(value)) {
+	    /* Remove last two characters. */
+	    value = value.substr(0, value.length - 2);
+	  } else if (SUFFIX_S.test(value)) {
+	    /* Remove last character. */
+	    value = value.substr(0, value.length - 1);
+	  }
+
+	  /* Step 1b. */
+	  if (match = SUFFIX_EED.exec(value)) {
+	    if (MEASURE_GT_0.test(match[1])) {
+	      /* Remove last character. */
+	      value = value.substr(0, value.length - 1);
+	    }
+	  } else if ((match = SUFFIX_ED_OR_ING.exec(value)) && VOWEL_IN_STEM.test(match[1])) {
+	    value = match[1];
+
+	    if (SUFFIX_AT_OR_BL_OR_IZ.test(value)) {
+	      /* Append `e`. */
+	      value += 'e';
+	    } else if (SUFFIX_MULTI_CONSONANT_LIKE.test(value)) {
+	      /* Remove last character. */
+	      value = value.substr(0, value.length - 1);
+	    } else if (CONSONANT_LIKE.test(value)) {
+	      /* Append `e`. */
+	      value += 'e';
+	    }
+	  }
+
+	  /* Step 1c. */
+	  if ((match = SUFFIX_Y.exec(value)) && VOWEL_IN_STEM.test(match[1])) {
+	    /* Remove suffixing `y` and append `i`. */
+	    value = match[1] + 'i';
+	  }
+
+	  /* Step 2. */
+	  if ((match = STEP_2.exec(value)) && MEASURE_GT_0.test(match[1])) {
+	    value = match[1] + step2list[match[2]];
+	  }
+
+	  /* Step 3. */
+	  if ((match = STEP_3.exec(value)) && MEASURE_GT_0.test(match[1])) {
+	    value = match[1] + step3list[match[2]];
+	  }
+
+	  /* Step 4. */
+	  if (match = STEP_4.exec(value)) {
+	    if (MEASURE_GT_1.test(match[1])) {
+	      value = match[1];
+	    }
+	  } else if ((match = SUFFIX_ION.exec(value)) && MEASURE_GT_1.test(match[1])) {
+	    value = match[1];
+	  }
+
+	  /* Step 5. */
+	  if (
+	    (match = SUFFIX_E.exec(value)) &&
+	    (MEASURE_GT_1.test(match[1]) || (MEASURE_EQ_1.test(match[1]) && !CONSONANT_LIKE.test(match[1])))
+	  ) {
+	    value = match[1];
+	  }
+
+	  if (SUFFIX_LL.test(value) && MEASURE_GT_1.test(value)) {
+	    value = value.substr(0, value.length - 1);
+	  }
+
+	  /* Turn initial `Y` back to `y`. */
+	  if (firstCharacterWasLowerCaseY) {
+	    value = 'y' + value.substr(1);
+	  }
+
+	  return value;
+	}
+			
+}).call(this);
+
+
+/***/ }),
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1954,7 +2208,7 @@ async function handleRequest({request,response}) {
 		return true
 	}
 	module.exports = (type) => {
-		triggers = __webpack_require__(31)[type],
+		triggers = __webpack_require__(32)[type],
 		triggersKeys = Object.keys(triggers),
 		compiled = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
 			const parts = key.split("/");
@@ -1974,7 +2228,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2042,7 +2296,7 @@ async function handleRequest({request,response}) {
 }).call(this);
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2053,14 +2307,18 @@ async function handleRequest({request,response}) {
 			this.deleted = {};
 		}
 		async delete(key) {
-			this[key] = this.deleted;
-			const promise = this.namespace.delete(key).then(() => delete this[key]);
+			let resolver;
+			const promise = new Promise((resolve) => resolver = resolve);
 			this.promises.push(promise);
+			this[key] = this.deleted;
+			this.namespace.delete(key).then(() => { delete this[key]; resolver(); });
 			return promise;
 		}
 		async get(key) {
-			const promise = this.namespace.get(key).then((value) => this[key] = JSON.parse(value));
+			let resolver;
+			const promise = new Promise((resolve) => resolver = resolve);
 			this.promises.push(promise);
+			this.namespace.get(key).then((value) => { try { resolver(this[key] = JSON.parse(value)); } catch(e) { resolver(e); } });
 			let value = this[key];
 			if(value===this.deleted) {
 				return;
@@ -2071,56 +2329,47 @@ async function handleRequest({request,response}) {
 			return promise;
 		}
 		async keys(prefix) {
-			let results = this[prefix];
-			if(results) {
-				return results;
-			}
-			results = [];
-			let keys, cursor;
+			let results = [],keys, cursor;
 			do {
 				keys = await this.namespace.keys(prefix,{cursor});
 				cursor = keys.pop();
 				results = results.concat(keys);
 			} while(keys.length>0 && cursor);
-			return this[prefix] = results;
+			return results;
 		}
-		async put(key,value,options={}) {
-			if(this[key]!==value) {
-				this[key] = value;
-				const promise = this.namespace.put(key,JSON.stringify(value),options);
-				this.promises.push(promise);
-				if(options.await) {
-					return await promise;
-				}
-				return promise;
-			}
+		async put(key,value,options) {
+			let resolver;
+			const promise = new Promise((resolve) => resolver = resolve);
+			this.promises.push(promise);
+			this[key] = value;
+			this.namespace.put(key,JSON.stringify(value),options).then(() => resolver());
 		}
 	}
 }).call(this);
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(16),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(17),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})
 				.then((result) => result.json())
 		},
 		methods = {
-			clear: async function(prefix) {
+			clear: async function(prefix="") {
 				let keys, cursor;
 				do {
 					keys = await this.keys(prefix,{cursor});
 					cursor = keys.pop();
 					for(const key of keys) {
-						await this.delete(key);
+						this.delete(key);
 					}
 				} while(keys.length>0 && cursor);
 			},
-			entries: async function(prefix,{batchSize=1000,cursor}) {
+			entries: async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),
 					entries = [];
 				for(const key of result) {
@@ -2141,7 +2390,7 @@ async function handleRequest({request,response}) {
 				const {result} = await getKeys(key,100);
 				return result[0].name===key;
 			},
-			keys: async function(prefix,{extended,batchSize=1000,cursor}={}) {
+			keys: async function(prefix="",{extended,batchSize=1000,cursor}={}) {
 				let {result,result_info} = await getKeys(prefix,batchSize,cursor);
 				if(!extended) {
 					// should these be secured?
@@ -2150,7 +2399,7 @@ async function handleRequest({request,response}) {
 				result.push(result_info.cursor);
 				return result;
 			},
-			values:async function(prefix,{batchSize=1000,cursor}) {
+			values:async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),
 					values = [];
 				for(const key of result) {
