@@ -58,7 +58,9 @@ candidates for pull requests and with the exception of this README those outside
 
 6) It has not been performance tuned.
 
-7) It could do with contributors!
+7) It is highly likely you will need to re-create your NAMESPACES with every new ALPHA release.
+
+8) It could do with contributors!
 
 # Installation and Deployment
 
@@ -208,15 +210,38 @@ The same is done for
 
 ## User [top](#top)
 
-To be written
-
-## Position [top](#top)
-
-To be written
+Thunderclap provides a basic `User` class accessable via `new Thunderclap.User({string userName,object roles={user:true}})`.
+Developers are free to add other properties and values to the constructor argument. Additional role keys may also
+be added to the roles sub-object. The only built-in roles are `user` and `dbo`. See Access Control(#access-control)
+for more detail.
 
 ## Coordinates [top](#top)
 
-To be written
+For convenience, Thunderclap exposes a Coordinates object with the same properties as the [JavaScript browser standard
+interface](https://developer.mozilla.org/en-US/docs/Web/API/Coordinates) `{latitude,longitude,altitude,accuracy,altitudeAccuracy,heading,speed}`. Coordinates can be created directly with:
+
+```javascript
+new Thunderclap.Coordinates({Coordinates coords,number timestamp});
+```
+
+There is also an asynchronous `Thunderclap.Coordinates.create([Coordinates coords])`. If the
+optional argument is not provided, then the browser `navigator.geolocation.getCurrentPosition` will be called
+to get the values to create the Coordinates.
+
+## Position [top](#top)
+
+For convenience, Thunderclap exposes a Position object with the same properties as the [JavaScript browser standard
+interface](https://developer.mozilla.org/en-US/docs/Web/API/Position) `coords` and `timestamp`. Positions can be created 
+directly with:
+
+```javascript
+new Thunderclap.Position({Coordinates coords,number timestamp});
+```
+
+There is also an asynchronous `Thunderclap.Position.create([{Coordinates coords,number timestamp}])`. If the
+optional argument is not provided, then the browser 
+[navigator.geolocation.getCurrentPosition](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition) 
+will be called to get the values to create the Position.
 
 <a name="joqular"></a>
 # JOQULAR [top](#top)
@@ -615,58 +640,17 @@ be access controlled in `acl.js`.
 <a name="indexing"></a>
 # Indexing [top](#top)
 
-All properties of objects inserted using `putItem` are indexed. Objects that are just a value to `setItem` are 
-not indexed. The index is not partitioned per class, it spans all classes.
+All properties of objects inserted using `putItem` are indexed with the exception of properties containing strings over
+128 characters in length. Objects that are just a value to `setItem` are not indexed. The index is not partitioned per 
+class, it spans all classes.
 
-At the moment, one index is created for each unique property name, regardless of the class on which the property
-exists.  Atlthough not directly accessible as such, this index entry is effectively a nested map of values and 
-then object ids, e.g.
+The root index node can be accessed via `keys("!")`. Direct access is restricted to users with the role `dbo`.
 
-```javascript
-{
-	<value1>:
-	{
-		<objectid1>:true,
-		<objectid2>:true,
-		...
-	}
-	<value2>:
-	{
-		<objectid2>:true,
-		...
-	}
-}
-```
-
-The root index node can be accessed via `getItem("!")`. Direct access is restricted to users with the role `dbo`
-To get at a property index, just add the property name, e.g. `getItem("!userName")`.
-To get at a value index, add a stringfied value, e.g. `getItem("!userName!\"joe64\"")`. Of course, you usually don't
-have to do this because the JOQULAR pattern processing engine in the worker script does it for you. Also, only users
-with the role `dbo` can directly query indexes.
-
-The physical size limit of a `thunderclap` database is the same as that of Cloudflare KV Store minus the size of 
-the index records.
-
-The portion of the 128MB of RAM used for indexes in each Cloudflare KV hosting a `thunderclap` is:
-
-```
-  (character size of all the property names + the number of property names)
-+ (size of all property values as strings for the property being tested at any given moment)
-```
-
-Property names are relatively few in practice unless the names themselves are used for unique values. Let's assume 1,000
-at 8 characters each. Except for unique keys, numbers, date/time values, and locations property values also tend to be 
-greater in number but still not huge. Let's assume 10,000,000 at 8 characters each.
-
-```
-  ((1,000 * 8) + 1,000)
-+ (5,000,000 * 8)
-= 48MB
-```
-
-We have tested an architecture that will reduce the RAM usage and allow for as much storage as physically possible by the
-underlying Cloudflare KV store; howvever, it also negatively impacts performance. A final decision on which to use has 
-not been made. We may make it configurable.
+Indexes in Thunderclap consume very little RAM, they are primarily composed of specially formed and partitioned keys 
+pointing to just the value `1`. The existence of keys is used to infer the existence of data. This means the performance 
+of Thunderclap is heavily dependent on the performance of the Cloudflare KV with respect to iterating keys. It also means 
+that Thunderclap can have an unlimited number of objects indexed. The largest object that can be stored is 2MB 
+(the same as Cloudflare KV).
 
 <a name="full-text"></a>
 ## Full Text Indexing [top](#top)
@@ -723,6 +707,9 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB, full-text indexing, and joins.
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-12 v0.0.22a Ehanced documentation. Completely re-worked indexing to allow for more object storage. Full text search
+currently broken. NAMESPACES must be re-created.
 
 2019-07-11 v0.0.21a Ehanced documentation.
 

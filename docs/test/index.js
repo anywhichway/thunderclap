@@ -63,6 +63,23 @@ describe("query",function() {
 		value = await db.getItem("securedTestReadKey");
 		expect(value).equal(undefined);
 	});
+	it("multi property match",async function() {
+		const results = await db.query({
+				date: TESTDATE,
+				name:"test",
+				low:-1,
+				middle:0,
+				high:1,
+				NaN: parseInt("a"),
+				minusInfinity: -Infinity,
+				plusInfinity: Infinity,
+				flag:true,
+				ssn:"555-55-5555",
+				ip:"127.0.0.1",
+				notes:"a string with spaces and stop words",
+				email: "someone@somewhere.com"});
+		expect(results.length).equal(1);
+	}).timeout(5000);
 	it("wild card key {$_:'test'}",async function() {
 		const results = await db.query({$_:"test"});
 		expect(typeof(results[0])).equal("object");
@@ -331,7 +348,7 @@ describe("query",function() {
 		expect(results[0].name).equal("test");
 		expect(Object.keys(results[0]).length).equal(2);
 	});
-	it("$search", async function() {
+	xit("$search", async function() {
 		const results = await db.query({notes:{$search:"spaces words"}});
 		expect(typeof(results[0])).equal("object");
 	});
@@ -429,7 +446,7 @@ describe("query",function() {
 	}).timeout(100000);
 	it("create and delete Position",function(done) {
 		Thunderclap.Position.create().then((position) => {
-			db.putItem(position).then((position) => {
+			db.putItem(position).then((object) => {
 				expect(object.coords.latitude).equal(position.coords.latitude);
 				done();
 			})

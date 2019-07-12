@@ -23,14 +23,30 @@
 			}
 			return promise;
 		}
-		async put(key,value,options={}) {
-			this[key] = value;
-			const promise = this.namespace.put(key,JSON.stringify(value),options);
-			this.promises.push(promise);
-			if(options.await) {
-				return await promise;
+		async keys(prefix) {
+			let results = this[prefix];
+			if(results) {
+				return results;
 			}
-			return promise;
+			results = [];
+			let keys, cursor;
+			do {
+				keys = await this.namespace.keys(prefix,{cursor});
+				cursor = keys.pop();
+				results = results.concat(keys);
+			} while(keys.length>0 && cursor);
+			return this[prefix] = results;
+		}
+		async put(key,value,options={}) {
+			if(this[key]!==value) {
+				this[key] = value;
+				const promise = this.namespace.put(key,JSON.stringify(value),options);
+				this.promises.push(promise);
+				if(options.await) {
+					return await promise;
+				}
+				return promise;
+			}
 		}
 	}
 }).call(this);

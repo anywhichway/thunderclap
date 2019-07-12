@@ -1013,8 +1013,7 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((objects) => create(objects,this.ctors))
 	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
-		register(ctor) {
-			let name;
+		register(ctor,name=ctor.name) {
 			if(typeof(ctor)==="string") {
 				name = ctor;
 				ctor = Function(`return ${ctor}`);
@@ -1022,6 +1021,7 @@ Copyright AnyWhichWay, LLC 2019
 				name = ctor.name;
 			}
 			if(name && name!=="anonymous") {
+				Thunderclap[name] = ctor;
 				return this.ctors[name] = ctor;
 			}
 		}
@@ -1048,8 +1048,6 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.json());
 		}
 	}
-	Thunderclap.Position = Position;
-	Thunderclap.Coordinates = Coordinates;
 	
 	if(true) module.exports = Thunderclap;
 	if(typeof(window)!=="undefined") window.Thunderclap = Thunderclap;
