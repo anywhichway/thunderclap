@@ -708,12 +708,11 @@ after stop words such as `and`, `but`, `or` have been removed. These can be sear
 <a name="schema"></a>
 # Schema [top](#top)
 
-The use of schema is optional with Thuderclap. They can be used to validate data in all tiers of an application: browser,
+The use of schema is optional with Thunderclap. They can be used to validate data in all tiers of an application: browser,
 worker, or cloud. The built in classes `User`, `Position`, and `Coordinates` all have schema. If schema are present, they
 are automatically used to validate data prior to insert in the cloud. They can be optionally applied in the browser. 
 
-Below is an example for `User`.
-Note, by convention Schema are attached to classes as a static property.
+Below is an example for `User`. Note, by convention Schema are attached to classes as a static property.
 
 ```
 User.schema = {
