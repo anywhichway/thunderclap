@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const uuid4 = () => {
     //// return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     let uuid = '', ii;

@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	let triggers,
 		triggersKeys,
 		compiled;

@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	// stemmer from https://github.com/words/stemmer MIT License, Titus Wormer
 	/* Character code for `y`. */
 	var CC_Y = 'y'.charCodeAt(0);

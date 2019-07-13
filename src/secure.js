@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const acl = require("../acl.js"),
 		roles = require("../roles.js"),
 		aclKeys = Object.keys(acl),

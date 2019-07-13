@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const Position = require("./position.js");
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);

@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	module.exports = function trigrams(tokens) {
 		const grams = [];
 		tokens = Array.isArray(tokens) ? tokens : [tokens];

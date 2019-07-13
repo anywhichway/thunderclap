@@ -267,7 +267,12 @@ describe("query",function() {
 		const results = await db.query({date:{$instanceof:"Date"}});
 		expect(typeof(results[0])).equal("object");
 		expect(new Date(results[0].date)).instanceof(Date);
-	});
+	}).timeout(3000);
+	it("$isa",async function() {
+		const results = await db.query({date:{$isa:"Date"}});
+		expect(typeof(results[0])).equal("object");
+		expect(new Date(results[0].date)).instanceof(Date);
+	}).timeout(3000);
 	it("$matches",async function() {
 		const results = await db.query({name:{$matches:["test"]}});
 		expect(typeof(results[0])).equal("object");
@@ -394,7 +399,7 @@ describe("query",function() {
 	});
 	it("fail Schema validation", async function() {
 		const schema = await db.getSchema("User"),
-			data = {"#":"User@1234"};
+			data = {"#":"User@1234"},
 			errors = await schema.validate(data,db);
 		expect(errors.length>=1).equal(true);
 	});

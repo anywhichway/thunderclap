@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const uid = require("./uid.js");
 	
 	class Entity {

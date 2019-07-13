@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const fromSerializable = require("./from-serializable.js");
 	async function create(data,ctors={}) {
 		const type = typeof(data);

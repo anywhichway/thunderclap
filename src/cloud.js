@@ -3,7 +3,7 @@ Server Side Public License
 VERSION 1, OCTOBER 16, 2018
 Copyright AnyWhichWay, LLC 2019
  */
-
+"use strict"
 const //uid = require("./uid.js"),
 	//create = require("./create.js"),
 	//fromSerializable = require("./from-serializable.js"),

@@ -255,7 +255,7 @@ const db = new Thunderclap({endpoint,user:{username:"<username>",password:"<pass
 	results = await db.query({age:{$gte: 21},address:{zipcode:98101}}),
 ```
 
-Thuderclap also suppport pattern marching on property names:
+Thuderclap also suppport pattern matching on property names:
 
 ```javascript
 db.query({[/a.*/]:{$eq: 1}}) // match all objects with properties starting with the letter "a" containing the value 1
@@ -291,41 +291,78 @@ unit test file `docs/test/index.js` to confirm.):
 
 ## Math and String Comparisons [top](#top)
 
-`$lt` - A property is less than the one provided, e.g. `{age:{$lt:21}}` matches o2.
+`{$lt: number|string value}` - A value in a property is less than the one provided, e.g. `{age:{$lt:21}}` matches o2.
 
-`$lte` - A value in a property is less or equal the one provided, e.g. `{age:{$lte:21}}` matches o1 and o2.
+`{$lte: number|string value}` - A value in a property is less or equal the one provided, e.g. `{age:{$lte:21}}` matches o1 and o2.
 
-`$eq` - A value in a property is relaxed equal the one provided, e.g. `{age:{$eq:21}}` and `{age:{$eq:"21"}}` match o1.
+`{$eq: number|string value}` - A value in a property is relaxed equal the one provided, e.g. `{age:{$eq:21}}` and `{age:{$eq:"21"}}` match o1.
 
-`$eeq` - A value in a property is exactly equal the one provided, e.g. `{age:{$eeq:21}}` matches o1 but and `{age:{$eeq:"21"}}` does not.
+`{$eeq: number|string value}` - A value in a property is exactly equal the one provided, e.g. `{age:{$eeq:21}}` matches o1 but and `{age:{$eeq:"21"}}` does not.
 
-`$neq` - A value in a property is relaxed equal the one provided, e.g. `{age:{$neq:21}}` matches o2.
+`{$neq: number|string value}` - A value in a property is relaxed equal the one provided, e.g. `{age:{$neq:21}}` matches o2.
 
-`$gte` - A value in a property is greater than or equal the one provided, e.g. `{age:{$gte:20}}` matches o1 and o2.
+`{$gte: number|string value}` - A value in a property is greater than or equal the one provided, e.g. `{age:{$gte:20}}` matches o1 and o2.
 
-`$gt` - A value in a property is greater than the one provided, e.g. `{age:{$gt:20}}` matches o1 and o2.
+`{$gt: number|string value}` - A value in a property is greater than the one provided, e.g. `{age:{$gt:20}}` matches o1 and o2.
 
 ## Logical Operators [top](#top)
 
-`$and` -  Ands multiple conditions, e.g. `{age:{$and:[{$gt:20},{$lt: 30}]}` matches o1 and o2. Typically not required
+`{$and: Array}` -  Ands multiple conditions, e.g. `{age:{$and:[{$gt:20},{$lt: 30}]}` matches o1 and o2. Typically not required
 because this produces the same result, `{age:{$gt:20,$lt: 30}}`.
 
-`$not` - Negates the contained condition, e.g. `{age:{$not:{$gt:20}}}` matches o2.
+`{$not: JOQULARExpression}` - Negates the contained condition, e.g. `{age:{$not:{$gt:20}}}` matches o2.
 
-`$or` - Ors multiple conditions, e.g. `{age:{$or:[{$eq:20},{$eq: 21}]}` matches o1 and o2. The nested
-form is also supported, `{age:{$eq:20,$or:{$eq: 21}}}`
+`{$or: Array}` - Ors multiple conditions, e.g. `{age:{$or:[{$eq:20},{$eq: 21}]}` matches o1 and o2. Allow repeating
+the same predicate for a single property. The nested form is also supported, `{age:{$eq:20,$or:{$eq: 21}}}`
 
-`$xor` - Exclusive ors multiple conditions.
+`{$xor: Array}` - Exclusive ors multiple conditions.
 
 ## Date and Time [top](#top)
 
-To be written
+The full range of methods available for extracting parts from Date are also available as predicates:
+
+`{$date: number dayOfMonth}` - `{$date: 14}` matches o1 in EST.
+
+`{$day: number dayOfWeek}` - `{$day: 2}` matches o1 in EST.
+
+`{$fullYear: number fourDigitYear}` - `{$fullYear: 2019}` matches o1 in EST.
+
+`{$hours: number hours}` - `{$hours: 5}` matches o1 in EST.
+
+`{$milliseconds: number ms}` - `{$milliseconds: 0}` matches o1.
+
+`{$minutes: number minutes}` - `{$minutes: 0}` matches o1.
+
+`{$month: number month}` - `{$month: 0}` matches o1.
+
+`{$seconds: number seconds}` - `{$seconds: 0}` matches o1.
+
+`{$time: number time}` - `{$time: 1547528400000}` matches o1.
+
+`{$UTCDate: number dayofMonth}` - `{$date: 14}` matches o1.
+
+`{$UTCDay: number dayOfWeek}` -  `{$day: 2}` matches o1.
+
+`{$UTCFullYear: number fourDigitYear}` - `{$fullYear: 2019}` matches o1.
+
+`{$UTCHours: number hours}` - `{$hours: 5}` matches o1.
+
+`{$UTCMilliseconds: number ms}` - `{$milliseconds: 0}` matches o1.
+
+`{$UTCMinutes: number minutes}` - `{$minutes: 0}` matches o1.
+
+`{$UTCMonth: number month}` - `{$month: 0}` matches o1.
+
+`{$UTCSeconds: number seconds}` - `{$seconds: 0}` matches o1.
+
+`{$year: number 2digitYear}` - `${year: 19}` matches o1.
+
 
 ## Membership [top](#top)
 
-`$in` - A value in a property is in the provided array, e.g. `{age:{$in:[20,21,22]}}` matches o1 and o2.
+`{$in: Array values}` - A value in a property is in the provided array, e.g. `{age:{$in:[20,21,22]}}` matches o1 and o2.
 
-`$nin`  - A value in a property is not in the provided array, e.g. `{age:{$nin:[21,22,23]}}` matches o2.
+`{$nin: Array values}`  - A value in a property is not in the provided array, e.g. `{age:{$nin:[21,22,23]}}` matches o2.
 
 `$includes` -
 
@@ -337,60 +374,68 @@ To be written
 
 ## Ranges [top](#top)
 
-`$between` - A value in a property in between the two provided limits. The limits can be in any order, 
-e.g. `{age:{$between:[19,21]}}` or `{age:{$between:[21,19]}}` matches o2. Optionally, the limits can be inclusive,
-e.g. `{age:{$between:[19,21,true]}}` matches o1 and o2.
+`{$between: Array [number|string bound1,number|string bound2,inclusive]}` - A value in a property in between the two provided 
+limits. The limits can be in any order, e.g. `{age:{$between:[19,21]}}` or `{age:{$between:[21,19]}}` matches o2. Optionally, 
+the limits can be inclusive, e.g. `{age:{$between:[19,21,true]}}` matches o1 and o2.
 
-`$outside` - A value in a property in outside the two provided limits. The limits can be in any order, 
-e.g. `{age:{$outside:[19,20]}}` or `{age:{$between:[20,19]}}` matches o1.
+`{$outside: Array [number|string bound1, number|string bound2]}` - A value in a property in outside the two provided limits. 
+The limits can be in any order, e.g. `{age:{$outside:[19,20]}}` or `{age:{$between:[20,19]}}` matches o1.
 
-`$near` - A value in a property is near the provided number either from an absolute or percentage perspective, 
-e.g. `{age:{$near:[21,1]}}` matches both o1 and o2 as does `{age:{$near:[21,"5%"]}}` since 1 is 4.7% of 21.
+`{$near: Array [number target,number|string absoluteOrPercent]}` - A value in a property is near the provided number either 
+from an absolute or percentage perspective, e.g. `{age:{$near:[21,1]}}` matches both o1 and o2 as does 
+`{age:{$near:[21,"5%"]}}` since 1 is 4.7% of 21.
 
 ## Regular Expression [top](#top)
 
-`$matches` - A value in a property matches the provided regular expression. The regular expression can be
-a string that looks like a regular expression or an actual regular expression, e.g. `{userName:{$matches:/a.*/}}`
+`{$matches: RegExp|string pattern}` - A value in a property matches the provided regular expression. The regular expression 
+can be a string that looks like a regular expression or an actual regular expression, e.g. `{userName:{$matches:/a.*/}}`
 or `{userName:{$matches:"/a.*/"}}`
 
 ## Special Tests [top](#top)
 
-Note that special tests typically take `true` as an argument. This is an artifact of JSON format that does not allow
+`{$instanceof: string className}` - A value in a property is an instanceof the class denoted by the string argument. The 
+class must  be registered on the server. Currently this includes Object, Array, Data, User, Schema, Position, and Coordinates.
+You can add more classes by modifying the file `classes.js`.
+
+`{$isa: string className}` - A value in a property is of the class provided by the string argument. Note, this is not 
+an `instanceof` test, it does not walk the inheritance tree.
+
+Note that other special tests typically take `true` as an argument. This is an artifact of JSON format that does not allow
 empty properties. Passing anything else will cause them to fail. You may occassionaly want to pass `false` to match
 things that do not satisfy the test.
 
-`$isCreditCard` - A value in a property is a valid credit card based on a regular expression and Luhn algorithm.
+`{$isCreditCard: boolean value}` - A value in a property is a valid credit card based on a regular expression and Luhn algorithm.
 
-`$isEmail` - A value in a property is a valid e-mail address by format, e.g. `{email:{$isEmail: true}}`. Note:
+`{$isEmail: boolean value}` - A value in a property is a valid e-mail address by format, e.g. `{email:{$isEmail: true}}`. Note:
 e-mail addresses are remarkably hard to validate without actually trying to send and e-mail. This will address
 all reasonable cases.
 
-`$isEven` - A value in a property is even, e.g. `{age:{$isEven: true}}` matches o2.
+`{$isEven: boolean value}` - A value in a property is even, e.g. `{age:{$isEven: true}}` matches o2.
 
-`$isFloat` - A value in a property is a float, e.g. `{age:{$isFloat: true}}` will not match either o1 or o2. Note,
+`{$isFloat: boolean value}` - A value in a property is a float, e.g. `{age:{$isFloat: true}}` will not match either o1 or o2. Note,
 0 and 0.0 are both treated as 0 by JavaScript, so 0 will never satisfy $isFloat.
 
-`$isIPAddress` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}}
+`{$isIPAddress: boolean value}` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}}
 
-`$isInt` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}} matches o1.
+`{$isInt: boolean value}` - A value in a property is a dot delimited IP address, e.g. `{registeredIP:{$isIPAddress: true}} matches o1.
 
-`$isNaN` - A value in a property is a not a number, e.g. `{address:{zipcode:{$isNaN: true}}} matches o1. Note, $isNaN
+`{$isNaN: boolean value}` - A value in a property is a not a number, e.g. `{address:{zipcode:{$isNaN: true}}} matches o1. Note, $isNaN
 will fail when there is no value since it is no known whether the target is a number or not.
 
-`$isOdd` - A value in a property is odd, e.g. `{age:{$isOdd: true}}` matches o1.
+`{$isOdd: boolean value}` - A value in a property is odd, e.g. `{age:{$isOdd: true}}` matches o1.
 
-`$isSSN` - A value in a property looks like a Social Security Number, e.g. `{SSN:{$isSSN: true}}` matches o1. Note,
+`{$isSSN: boolean value}` - A value in a property looks like a Social Security Number, e.g. `{SSN:{$isSSN: true}}` matches o1. Note,
 unlike `$isCreditCard` no validation is done beyond textual format.
 
 ## Text Search [top](#top)
 
-`$echoes` - A value in a property sounds like the provided value, e.g. `{userName:{$echoes: "jo"}}` matches o1.
+`{$echoes: string soundALike}` - A value in a property sounds like the provided value, e.g. `{userName:{$echoes: "jo"}}` matches o1.
 
-`$search` - Does a full text trigram based search, e.g. `{favoritePhrase:{$search:"question"}}` matches o1. If
-no second argument is provided, the search is fuzzy at 80%, e.g. `{favoritePhrase:{$search:"questin"}}` also
+<a name="search"></a>
+`{$search: string searchPhrase}` - Does a full text trigram based search, e.g. `{favoritePhrase:{$search:"question"}}` matches o1. 
+If no second argument is provided, the search is fuzzy at 80%, e.g. `{favoritePhrase:{$search:"questin"}}` also
 matches o1 whereas `{favoritePhrase:{$search:["questin",.99]}}`, which requires a 99% match does not. The search
-phrase can have multiple space separated words.
-
+phrase can contain multiple space separated words.
 
 <a name="access-control"></a>
 # Access Control [top](#top)
@@ -443,12 +488,12 @@ The default `acl.js` file is show below.
 		values: { // only dbo can list values
 			execute: ["dbo"]
 		},
-		"User@": { // key to control, user <cname>@ for classes
+		"User@": { // key to control User, use <cname>@ for classes
 			
 			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
 			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
 			// a filter function can also be used
-			// action with be "read" or "write", not returning anything will result in denial
+			// action will be "read" or "write", not returning anything will result in denial
 			// not specifying a filter function will allow all read and write, unless controlled above
 			// a function with the same call signature can also be used as a property value above
 			filter: async function({action,user,data,request}) {
@@ -489,17 +534,19 @@ Roles can also be established in a tree that is automatically applied at runtime
 When Thunderclap is first initialized, a special user `User@dbo` with the user name `dbo` the role `dbo` and the
 dbo password defined in `thunderclap.json` is created. It also has the unique id `User@dbo`.
 
-You can create additional accounts with the `createUser` and change passwords with the `changePassword` 
-methods documented above.
+You can create additional accounts with the `createUser` method and change passwords with the `changePassword` 
+method.
 
 <a name="analytics"></a>
 # Inline Analytics & Hooks [top](#top)
 
 Inline analytics and hooks are facilitated by the use of JOQULAR patterns and tranform or hook calls in the file `when.js`.
-The transforms and hooks can be invoked from the browser, a service worker, or in the cloud. Yhey are not currently access
-controlled in the browser or a service worker. In the cloud transforms are invoked after it is determined primary key access
+The transforms and hooks can be invoked from the browser, a service worker, or in the cloud. They are not currently access
+controlled in the browser or a service worker. In the cloud, transforms are invoked after it is determined primary key access
 is allowed but before data property access is assesed and the data is written. This security is applied to the transformed
-data. Hooks are called after the data is written. Below is an example.
+data. Hooks are called after the data is written. If you need to transform something and call a hook, but not write
+to the database either call the hook as the last action in the transform and return nothing, or use a before trigger.
+Below is an example.
 
 ```javascript
 (function() {
@@ -541,9 +588,9 @@ data. Hooks are called after the data is written. Below is an example.
 <a name="triggers"></a>
 # Triggers [top](#top)
 
-Triggers can get invoked before and after key value or indexed object properties change or get deleted. The triggers are configure in 
-the file `triggers.js`. Any asynchronous triggers will be awaited. `before` triggers must return truthy for execution to
-continue, i.e. a before on set that returns false with result in the set aborting. `before` triggers are fired immediately
+Triggers can get invoked before and after key value or indexed object properties change or get deleted. The triggers are configured
+in the file `triggers.js`. Any asynchronous triggers will be awaited. `before` triggers must return truthy for execution to
+continue, i.e. a before on set that returns false will result in the set aborting. `before` triggers are fired immediately
 before security checks. Triggers are not access controlled.
 
 Triggers can be executed in the browser, a service worker, or the cloud.
@@ -639,9 +686,9 @@ be access controlled in `acl.js`.
 <a name="indexing"></a>
 # Indexing [top](#top)
 
-All properties of objects inserted using `putItem` are indexed with the exception of properties containing strings over
-128 characters in length. Objects that are just a value to `setItem` are not indexed. The index is not partitioned per 
-class, it spans all classes.
+All properties of objects inserted using `putItem` are indexed for direct match, with the exception of properties 
+containing strings over 64 characters in length. Strings longer than 64 characters can be matched use `$search`.
+Objects that are just a value to `setItem` are not indexed. The index is not partitioned per class, it spans all classes.
 
 The root index node can be accessed via `keys("!")`. Direct access is restricted to users with the role `dbo`.
 
@@ -654,13 +701,41 @@ that Thunderclap can have an unlimited number of objects indexed. The largest ob
 <a name="full-text"></a>
 ## Full Text Indexing [top](#top)
 
-To be written
+Any strings containg spaces are automatically added to a full-text index based on [trigrams](https://en.wikipedia.org/wiki/Trigram_search)
+after stop words such as `and`, `but`, `or` have been removed. These can be searched using the [`{$search: <phrase>}`](#search) pattern.
 
 
 <a name="schema"></a>
 # Schema [top](#top)
 
-To be written.
+The use of schema is optional with Thuderclap. They can be used to validate data in all tiers of an application: browser,
+worker, or cloud. The built in classes `User`, `Position`, and `Coordinates` all have schema. If schema are present, they
+are automatically used to validate data prior to insert in the cloud. They can be optionally applied in the browser. 
+
+Below is an example for `User`.
+Note, by convention Schema are attached to classes as a static property.
+
+```
+User.schema = {
+	userName: {required:true, type: "string", unique:true},
+	roles: {type: "object"}
+}
+```
+
+The following constraints are supported:
+
+`matches:RegExp` - Checks to see if a property value matches the provided regular expression.
+
+`noindex:boolean` - If present and `truthy`, prevents indexing of a property.
+
+`oneof:Array` - Checks to see if a property value is in the provided array.
+
+`required:boolean` - Ensures the property has a value.
+
+`unique:boolean` - Does a database look-up to ensure no other entity of the same class has the same property value. (Not yet implemented).
+
+`validate:function` - Calls a custom validation function with the signature `(object object,string key,any value,Array errors,Thunderclap db)`. 
+The function is responsible for pushing any errors into the provided errors array.
 
 
 <a name="development"></a>
@@ -706,6 +781,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB and joins.
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-13 v0.0.24a Fixed `$instanceof` and added `$isa`. Eliminated gloabal leak in unit test for Schema validation.
 
 2019-07-12 v0.0.23a Full text search repaired. Optimized inserts and deletes. NAMESPACES must be recreated.
 

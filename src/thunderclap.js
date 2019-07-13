@@ -14,9 +14,10 @@ Copyright AnyWhichWay, LLC 2019
 		User = require("./user.js"),
 		Position = require("./position.js"),
 		Coordinates = require("./coordinates.js"),
+		when = require("../when.js").browser,
 		functions = require("../functions.js").browser,
-		when = require("../when.js").browser;
-	
+		classes = require("../classes.js");
+		
 	var fetch;
 	if(typeof(fetch)==="undefined") {
 		fetch = require("node-fetch");
@@ -39,6 +40,7 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
+			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
 					throw new Error(`Attempt to redefine Thunderclap function: ${key}`);

@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const uuid4 = require("./uuid4.js"),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {

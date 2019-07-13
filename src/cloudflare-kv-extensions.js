@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const {accountId,namespaceId,authEmail,authKey} = require("../keys.js"),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,

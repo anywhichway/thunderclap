@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	const Entity = require("./entity.js");
 	
 	class User extends Entity {

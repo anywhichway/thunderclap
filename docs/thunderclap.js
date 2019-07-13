@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 20);
+/******/ 	return __webpack_require__(__webpack_require__.s = 21);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -89,9 +89,12 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Coordinates = __webpack_require__(2);
-	class Position {
+	"use strict"
+	const Entity = __webpack_require__(3),
+		Coordinates = __webpack_require__(2);
+	class Position extends Entity {
 		constructor({coords,timestamp}) {
+			super();
 			const {latitude,longitude,altitude,accuracy,altitudeAccuracy,heading} = coords;
 			this.coords = {
 				latitude,longitude,altitude,accuracy,altitudeAccuracy,heading	
@@ -115,6 +118,10 @@
 					});
 		});
 	}
+	Position.schema = {
+		coords: {required:true, type: "object"},
+		timestamp: {required:true, type:"number"}
+	}
 	module.exports = Position;
 }).call(this);
 
@@ -123,6 +130,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
 }).call(this)
 
@@ -131,9 +139,12 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const Position = __webpack_require__(0);
-	class Coordinates {
+	"use strict"
+	const Entity = __webpack_require__(3),
+		Position = __webpack_require__(0);
+	class Coordinates extends Entity {
 		constructor(coords) {
+			super();
 			Object.assign(this,coords);
 		}
 	}
@@ -144,6 +155,10 @@
 		const position = await Position.create();
 		return new Coordinates(position.coords);
 	}
+	Coordinates.schema = {
+		latitude: {required:true, type: "number"},
+		longitude: {required:true, type: "number"}
+	}
 	module.exports = Coordinates;
 }).call(this);
 
@@ -152,6 +167,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const uid = __webpack_require__(1);
 	
 	class Entity {
@@ -178,6 +194,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const uuid4 = __webpack_require__(9),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
@@ -197,6 +214,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const Entity = __webpack_require__(3);
 	
 	class Schema extends Entity {
@@ -234,19 +252,38 @@
 			return new Schema(cname,config);
 		}
 	}
+	/* 	validations parrallel property names in schema definitions
+		they can have the signature (constraint,object,key,value,errors,db)
+		`constraint` is the value of the constraint property, e.g. `required` would be `true` or `false`
+		`object` is the object being validated
+		`key` is the property being validated
+		`value` is the value of the property being validated
+		`error` is an array of errors into which cvalidation errors should be pushed
+		`db` is the database, in case it is needed to support validation
+	*/
 	Schema.validations = {
+			matches(constraint,object,key,value,errors) {
+				if(!constraint.test(value)) {
+					errors.push(new TypeError(`"${value}" does not match "${constraint}"`));
+				}
+			},
 			noindex() {
 				// just a dummy function so it looks like a validation, used by other code to flag non-indexed properties
 			},
+			oneof(constraint,object,key,value,errors) {
+				if(value!=null && !constraint.includes(value)) {
+					errors.push(new TypeError(`"${key}" expected type ${JSON.stringify(constraint)} not "${type}"`));
+				}
+			},
 			required(constraint,object,key,value,errors) {
 				if(constraint && value==null) {
-					errors.push(new TypeError(`'${key}' is required`));
+					errors.push(new TypeError(`"${key}" is required`));
 				}
 			},
 			type(constraint,object,key,value,errors) {
 				const type = typeof(value);
-				if(value!=null && type!==constraint) {
-					errors.push(new TypeError(`'${key}' expected type '${constraint}' not '${type}'`));
+				if(value!=null && Array.isArray(constraint) ? !constraint.includes(type) : type!==constraint) {
+					errors.push(new TypeError(`"${key}" expected type ${JSON.stringify(constraint)} not "${type}"`));
 				}
 			},
 			async unique(constraint,object,key,value,errors,db) {
@@ -254,9 +291,12 @@
 					const node = await db.getItem(`!${key}`),
 						valuekey = JSON.stringify(value);
 					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
-						errors.push(new TypeError(`'${key}' value '${value}' must be unique`));
+						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}
+			},
+			async validate(constraint,object,key,value,errors,db) {
+				await constraint(object,key,value,errors,db);
 			}
 	}
 	module.exports = Schema;
@@ -267,6 +307,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const Entity = __webpack_require__(3);
 	
 	class User extends Entity {
@@ -294,6 +335,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	/*
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
@@ -431,12 +473,21 @@
 					}
 					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
 				}
-				if(cname===b) {
-					return true;
-				}
 				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors[b] : b;
 				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
+			},
+			$isa(a,b) {
+				let ctor,
+					cname;
+				if(isSoul(a,false)) {
+					cname = a.split("@")[0];
+					if(cname===b) {
+						return true;
+					}
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
+				}
+				return b.name===cname;
 			},
 			async $isArray() { 
 				const	edges = [];
@@ -649,6 +700,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	//soundex from https://gist.github.com/shawndumas/1262659
 	const soundex = (a) => {a=(a+"").toLowerCase().split("");var c=a.shift(),b="",d={a:"",e:"",i:"",o:"",u:"",b:1,f:1,p:1,v:1,c:2,g:2,j:2,k:2,q:2,s:2,x:2,z:2,d:3,t:3,l:4,m:5,n:5,r:6},b=c+a.map(function(a){return d[a]}).filter(function(a,b,e){return 0===b?a!==d[c]:a!==e[b-1]}).join("");return(b+"000").slice(0,4).toUpperCase()};
 	module.exports = soundex;
@@ -659,6 +711,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	const uuid4 = () => {
     //// return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     let uuid = '', ii;
@@ -692,6 +745,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	module.exports = (x) => typeof x === "number" && isFinite(x) && x % 1 === 0;
 }).call(this)
 
@@ -700,6 +754,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	module.exports = (x) => typeof x === "number" && isFinite(x) && x % 1 !== 0;
 }).call(this)
 
@@ -709,6 +764,7 @@
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
 (function() {
+	"use strict"
 	module.exports = function validateLuhn(value) {
 	    var nCheck = 0, nDigit = 0, bEven = false;
 	    value = value.replace(/\D/g, '');
@@ -736,6 +792,7 @@
 /***/ (function(module, exports) {
 
 (function() {
+	"use strict"
 	function toSerializable(data,copy) {
 		const type = typeof(data),
 			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
@@ -783,6 +840,7 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const Position = __webpack_require__(0);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
@@ -827,29 +885,6 @@
 
 (function() {
 	module.exports = {
-		browser: {
-			
-		},
-		cloud: {
-			securedTestFunction() {
-				return "If you see this, there may be a security leak";
-			},
-			getDate() {
-				return new Date();
-			}
-		},
-		worker: {
-			
-		}
-	}
-}).call(this);
-
-/***/ }),
-/* 16 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = {
 		browser: [
 			{
 				when: {testWhenBrowser:{$eq:true}},
@@ -881,10 +916,44 @@
 }).call(this);
 
 /***/ }),
-/* 17 */,
+/* 16 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		browser: {
+			
+		},
+		cloud: {
+			securedTestFunction() {
+				return "If you see this, there may be a security leak";
+			},
+			getDate() {
+				return new Date();
+			}
+		},
+		worker: {
+			
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 17 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		// Add class declaration using require
+		// <cname>: require(".<path>/<myClass>.js")
+	}
+}).call(this);
+
+/***/ }),
 /* 18 */,
 /* 19 */,
-/* 20 */
+/* 20 */,
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -898,17 +967,18 @@ Copyright AnyWhichWay, LLC 2019
 	const uid = __webpack_require__(1),
 		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(13),
-		create = __webpack_require__(21),
+		create = __webpack_require__(22),
 		Schema = __webpack_require__(5),
 		User = __webpack_require__(6),
 		Position = __webpack_require__(0),
 		Coordinates = __webpack_require__(2),
-		functions = __webpack_require__(15).browser,
-		when = __webpack_require__(16).browser;
-	
+		when = __webpack_require__(15).browser,
+		functions = __webpack_require__(16).browser,
+		classes = __webpack_require__(17);
+		
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(22);
+		fetch = __webpack_require__(23);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -928,6 +998,7 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
+			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
 					throw new Error(`Attempt to redefine Thunderclap function: ${key}`);
@@ -1109,10 +1180,11 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict"
 	const fromSerializable = __webpack_require__(14);
 	async function create(data,ctors={}) {
 		const type = typeof(data);
@@ -1151,7 +1223,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

@@ -4,6 +4,7 @@
 	VERSION 1, OCTOBER 16, 2018
 	Copyright AnyWhichWay, LLC 2019
 	 */
+	"use strict"
 	const uid = require("./uid.js"),
 		isSoul = require("./is-soul.js"),
 		joqular = require("./joqular.js"),
@@ -22,7 +23,9 @@
 		Cache = require("./cache.js"),
 		when = require("../when.js").cloud,
 		functions = require("../functions.js").cloud,
+		classes = require("../classes.js"),
 		keys = require("../keys.js");
+	
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -40,7 +43,9 @@
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
+			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			require("./cloudflare-kv-extensions")(this);
+			joqular.db = this;
 			namespace.keys = this.keys;
 			setInterval(() => {
 				this.cache = new Cache({namespace});
@@ -140,7 +145,7 @@
 											this.cache.put(`!o${keypath}!${gram}!${id}`,1,options)	
 										}
 									}
-									if(value.length<64) {
+									if(value.length<=64) {
 										const valuekey = `${JSON.stringify(value)}`;
 										this.cache.put(`!v${keypath}!${valuekey}`,1);
 										this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
@@ -491,7 +496,7 @@
 				}
 				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
 				if(data && removed.length===0) {
-					this.cache.delete(keyOrObject);
+					await this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
@@ -516,14 +521,13 @@
 				}
 			}
 			if(data!==undefined) {
-				this.cache.put(key,data,options);
+				await this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
 			}
 			return data;
 		} 
 		async unindex(object,parentPath="",parentId) {
-			// need to enhance to unindex full-text
 			const id = parentId||object["#"];
 			if(object && typeof(object)==="object" && id) {
 				for(const key in object) {

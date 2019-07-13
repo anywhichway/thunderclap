@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	module.exports = [
 		  'a', 'about', 'after', 'ala', 'all', 'also', 'am', 'an', 'and', 'another', 'any', 'are', 
 		  'around','as', 'at', 'be',

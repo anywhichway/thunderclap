@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	/*
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
@@ -136,12 +137,21 @@
 					}
 					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
 				}
-				if(cname===b) {
-					return true;
-				}
 				b = typeof(b)==="string" && joqular.db && joqular.db.ctors ? joqular.db.ctors[b] : b;
 				a = ctor ? Object.create(ctor.prototype) : a;
 				return a && typeof(a)==="object" && b && typeof(b)==="function" && a instanceof b;
+			},
+			$isa(a,b) {
+				let ctor,
+					cname;
+				if(isSoul(a,false)) {
+					cname = a.split("@")[0];
+					if(cname===b) {
+						return true;
+					}
+					ctor = joqular.db && joqular.db.ctors ? joqular.db.ctors[cname] : null;
+				}
+				return b.name===cname;
 			},
 			async $isArray() { 
 				const	edges = [];

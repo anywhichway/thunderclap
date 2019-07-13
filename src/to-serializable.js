@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	function toSerializable(data,copy) {
 		const type = typeof(data),
 			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;

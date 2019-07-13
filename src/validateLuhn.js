@@ -1,5 +1,6 @@
 // https://en.wikipedia.org/wiki/Luhn_algorithm
 (function() {
+	"use strict"
 	module.exports = function validateLuhn(value) {
 	    var nCheck = 0, nDigit = 0, bEven = false;
 	    value = value.replace(/\D/g, '');

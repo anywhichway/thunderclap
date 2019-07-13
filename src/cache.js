@@ -1,4 +1,5 @@
 (function() {
+	"use strict"
 	module.exports = class Cache {
 		constructor({namespace}) {
 			this.namespace = namespace;
@@ -42,6 +43,7 @@
 			this.promises.push(promise);
 			this[key] = value;
 			this.namespace.put(key,JSON.stringify(value),options).then(() => resolver());
+			return promise;
 		}
 	}
 }).call(this);
