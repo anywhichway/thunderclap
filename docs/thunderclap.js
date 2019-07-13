@@ -90,8 +90,35 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3),
-		Coordinates = __webpack_require__(2);
+	const uid = __webpack_require__(2);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uid()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 1 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
+	const Entity = __webpack_require__(0),
+		Coordinates = __webpack_require__(3);
 	class Position extends Entity {
 		constructor({coords,timestamp}) {
 			super();
@@ -126,7 +153,7 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
+/* 2 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -135,13 +162,13 @@
 }).call(this)
 
 /***/ }),
-/* 2 */
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3),
-		Position = __webpack_require__(0);
+	const Entity = __webpack_require__(0),
+		Position = __webpack_require__(1);
 	class Coordinates extends Entity {
 		constructor(coords) {
 			super();
@@ -160,33 +187,6 @@
 		longitude: {required:true, type: "number"}
 	}
 	module.exports = Coordinates;
-}).call(this);
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	"use strict"
-	const uid = __webpack_require__(1);
-	
-	class Entity {
-		constructor(config) {
-			Object.assign(this,config);
-			let id = this["#"];
-			if(!id) {
-				id = `${this.constructor.name}@${uid()}`;
-			}
-			const meta = {"#":id};
-			Object.defineProperty(this,"^",{value:meta});
-			try {
-				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
-			} catch(e) {
-				;
-			}
-		}
-	}
-	module.exports = Entity;
 }).call(this);
 
 /***/ }),
@@ -215,7 +215,7 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3);
+	const Entity = __webpack_require__(0);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -288,9 +288,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					const node = await db.getItem(`!${key}`),
-						valuekey = JSON.stringify(value);
-					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
+					if(!(await db.unique(object,key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}
@@ -308,7 +306,7 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3);
+	const Entity = __webpack_require__(0);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -841,7 +839,7 @@
 
 (function() {
 	"use strict"
-	const Position = __webpack_require__(0);
+	const Position = __webpack_require__(1);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
@@ -964,14 +962,14 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(1),
+	const uid = __webpack_require__(2),
 		joqular = __webpack_require__(7),
 		toSerializable = __webpack_require__(13),
 		create = __webpack_require__(22),
 		Schema = __webpack_require__(5),
 		User = __webpack_require__(6),
-		Position = __webpack_require__(0),
-		Coordinates = __webpack_require__(2),
+		Position = __webpack_require__(1),
+		Coordinates = __webpack_require__(3),
 		when = __webpack_require__(15).browser,
 		functions = __webpack_require__(16).browser,
 		classes = __webpack_require__(17);
@@ -1123,8 +1121,9 @@ Copyright AnyWhichWay, LLC 2019
 			}
 			return result;
 		}
-		async query(object,{verify,partial}={}) {
-			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${partial||false}]`,{headers:this.headers})
+		async query(object,{validate,partial,limit}={}) {
+			const options = partial||limit ? {partial,limit} : {};
+			return fetch(`${this.endpoint}/db.json?["query",${encodeURIComponent(JSON.stringify(toSerializable(object)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 	    		.then((response) => {
 	    			if(response.status===200) {
 	    				return response.text();
@@ -1133,7 +1132,7 @@ Copyright AnyWhichWay, LLC 2019
 	    		})
 		    	.then((data) => JSON.parse(data.replace(/\%20/g," ")))
 	    		.then((objects) => create(objects,this.ctors))
-	    		.then((objects) => verify ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
+	    		.then((objects) => validate ? objects.filter((result) => joqular.matches(object,result)!==undefined) : objects);
 		}
 		register(ctor,name=ctor.name) {
 			if(typeof(ctor)==="string") {
@@ -1165,6 +1164,16 @@ Copyright AnyWhichWay, LLC 2019
 		async setSchema(className,config) {
 			const object = new Schema(className,config);
 			return this.putItem(object);
+		}
+		async unique(objectOrId,property,value) {
+			const cname = typeof(objectOrId)==="string" ? objectOrId : objectOrId["#"];
+			if(!cname) {
+				return false;
+			}
+			return fetch(`${this.endpoint}/db.json?["unique",${encodeURIComponent(JSON.stringify(cname))},${encodeURIComponent(JSON.stringify(property))},${encodeURIComponent(JSON.stringify(value))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 		async values(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})

@@ -90,8 +90,35 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3),
-		Coordinates = __webpack_require__(2);
+	const uid = __webpack_require__(2);
+	
+	class Entity {
+		constructor(config) {
+			Object.assign(this,config);
+			let id = this["#"];
+			if(!id) {
+				id = `${this.constructor.name}@${uid()}`;
+			}
+			const meta = {"#":id};
+			Object.defineProperty(this,"^",{value:meta});
+			try {
+				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
+			} catch(e) {
+				;
+			}
+		}
+	}
+	module.exports = Entity;
+}).call(this);
+
+/***/ }),
+/* 1 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
+	const Entity = __webpack_require__(0),
+		Coordinates = __webpack_require__(3);
 	class Position extends Entity {
 		constructor({coords,timestamp}) {
 			super();
@@ -126,7 +153,7 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
+/* 2 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -135,13 +162,13 @@
 }).call(this)
 
 /***/ }),
-/* 2 */
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3),
-		Position = __webpack_require__(0);
+	const Entity = __webpack_require__(0),
+		Position = __webpack_require__(1);
 	class Coordinates extends Entity {
 		constructor(coords) {
 			super();
@@ -160,33 +187,6 @@
 		longitude: {required:true, type: "number"}
 	}
 	module.exports = Coordinates;
-}).call(this);
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	"use strict"
-	const uid = __webpack_require__(1);
-	
-	class Entity {
-		constructor(config) {
-			Object.assign(this,config);
-			let id = this["#"];
-			if(!id) {
-				id = `${this.constructor.name}@${uid()}`;
-			}
-			const meta = {"#":id};
-			Object.defineProperty(this,"^",{value:meta});
-			try {
-				Object.defineProperty(this,"#",{enumerable:true,get() { return this["^"]["#"]||this["^"].id; }});
-			} catch(e) {
-				;
-			}
-		}
-	}
-	module.exports = Entity;
 }).call(this);
 
 /***/ }),
@@ -215,7 +215,7 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3);
+	const Entity = __webpack_require__(0);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -288,9 +288,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					const node = await db.getItem(`!${key}`),
-						valuekey = JSON.stringify(value);
-					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
+					if(!(await db.unique(object,key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}
@@ -308,7 +306,7 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(3);
+	const Entity = __webpack_require__(0);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -841,7 +839,7 @@
 
 (function() {
 	"use strict"
-	const Position = __webpack_require__(0);
+	const Position = __webpack_require__(1);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
@@ -1364,7 +1362,7 @@ async function handleRequest(event) {
 	Copyright AnyWhichWay, LLC 2019
 	 */
 	"use strict"
-	const uid = __webpack_require__(1),
+	const uid = __webpack_require__(2),
 		isSoul = __webpack_require__(4),
 		joqular = __webpack_require__(7),
 		hashPassword = __webpack_require__(19),
@@ -1377,8 +1375,8 @@ async function handleRequest(event) {
 		fromSerializable = __webpack_require__(14),
 		User = __webpack_require__(6),
 		Schema = __webpack_require__(5),
-		Position = __webpack_require__(0),
-		Coordinates = __webpack_require__(2),
+		Position = __webpack_require__(1),
+		Coordinates = __webpack_require__(3),
 		Cache = __webpack_require__(34),
 		when = __webpack_require__(15).cloud,
 		functions = __webpack_require__(16).cloud,
@@ -1416,7 +1414,7 @@ async function handleRequest(event) {
 				authed = request.user;
 			request.user = this.dbo;
 			return this.dbo;
-			const user = (await this.query({userName},false))[0];
+			const user = (await this.query({userName},{limit:1}))[0];
 			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
@@ -1434,7 +1432,7 @@ async function handleRequest(event) {
 					password = Math.random().toString(36).substr(2,10);
 				}
 				if(!user) {
-					user = (await this.query({userName},false))[0];
+					user = (await this.query({userName},{limit:1}))[0];
 					if(!user) return;
 				}
 				Object.assign(user,await hashPassword(password,1000));
@@ -1609,7 +1607,7 @@ async function handleRequest(event) {
 			}
 			return data;
 		}
-		async query(pattern,partial,options={},parentPath="") {
+		async query(pattern,{partial,filter,limit}={},parentPath="") {
 			let ids,
 				count = 0,
 				results = [],
@@ -1657,17 +1655,19 @@ async function handleRequest(event) {
 									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
 									for(const gkey of gkeys) {
 										const id = gkey.split("!").pop();
-										if(testids[id]) {
-											testids[id].sum++;
-											testids[id].avg = testids[id].sum / count;
-										} else {
-											const cname = id.split("@")[0],
-												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-											if(data && removed.length===0) {
-												testids[id] = {sum:1};
-										    } else {
-										    	testids[id] = {sum:-Infinity};
-										    }
+										if(!filter || filter(id)) {
+											if(testids[id]) {
+												testids[id].sum++;
+												testids[id].avg = testids[id].sum / count;
+											} else {
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = {sum:1};
+											    } else {
+											    	testids[id] = {sum:-Infinity};
+											    }
+											}
 										}
 									}
 								}
@@ -1718,12 +1718,14 @@ async function handleRequest(event) {
 										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
 										for(const key of keys) {
 											const parts = key.split("!"),
-												id = parts.pop(),
-												cname = id.split("@")[0],
-												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-											if(data && removed.length===0) {
-												testids[id] = true;
-										    }
+												id = parts.pop();
+											if(!filter || filter(id)) {
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = true;
+											    }
+											}
 										}
 									}
 								}
@@ -1747,7 +1749,7 @@ async function handleRequest(event) {
 							}
 						} 
 						if(!predicates){ // matching a nested object
-							const childids = await this.query(value,partial,options,keypath);
+							const childids = await this.query(value,{partial},keypath);
 							if(childids.length===0) {
 								return [];
 							}
@@ -1782,11 +1784,13 @@ async function handleRequest(event) {
 						}
 						for(const key of keys) {
 							const id = key.split("!").pop(),
-								cname = id.split("@")[0],
-								{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-							if(data && removed.length===0) {
-								testids[id] = true;
-						    }
+								cname = id.split("@")[0];
+							if(!filter ||filter(id)) {
+								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+								if(data && removed.length===0) {
+									testids[id] = true;
+							    }
+							}
 						}
 						if(!ids) {
 							ids = Object.assign({},testids);
@@ -1813,8 +1817,8 @@ async function handleRequest(event) {
 					return ids;
 				}
 				for(const id in ids) {
-					const object = await this.getItem(id,options);
-					if(object) {
+					const object = await this.getItem(id);
+					if(object && (!filter || filter(object))) {
 						if(partial) {
 							for(const key in object) {
 								if(pattern[key]===undefined && key!=="#" && key!=="^") {
@@ -1823,6 +1827,9 @@ async function handleRequest(event) {
 							}
 						}
 						results.push(object);
+						if(limit && results.length>=limit) {
+							break;
+						}
 					}
 				}
 			}
@@ -1920,6 +1927,14 @@ async function handleRequest(event) {
 					}
 				}
 			}
+		}
+		async unique(id,property,value) {
+			const parts = id.split("@"),
+				cname = parts[0],
+				ckey = `${cname}@`,
+				filter = id => typeof(id) === "string" ? id.startsWith(ckey) : true,
+				instances = await this.query({[property]:value},{filter,limit:1});
+			return instances.length===0 || (id && instances.length===1 && instances[0]["#"]===id);
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
@@ -2410,12 +2425,15 @@ async function handleRequest(event) {
 			}
 			return promise;
 		}
-		async keys(prefix) {
+		async keys(prefix,batchSize) {
 			let results = [],keys, cursor;
 			do {
-				keys = await this.namespace.keys(prefix,{cursor});
+				keys = await this.namespace.keys(prefix,{cursor,batchSize});
 				cursor = keys.pop();
 				results = results.concat(keys);
+				if(results.length>=batchSize) {
+					break;
+				}
 			} while(keys.length>0 && cursor);
 			return results;
 		}
@@ -2438,6 +2456,7 @@ async function handleRequest(event) {
 	"use strict"
 	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(18),
 		getKeys = (prefix,limit=1000,cursor) => { 
+			limit = Math.max(limit,1000);
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})
 				.then((result) => result.json())

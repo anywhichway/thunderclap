@@ -2,6 +2,7 @@
 	"use strict"
 	const {accountId,namespaceId,authEmail,authKey} = require("../keys.js"),
 		getKeys = (prefix,limit=1000,cursor) => { 
+			limit = Math.max(limit,1000);
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
 				{headers:{"X-Auth-Email":`${authEmail}`,"X-Auth-Key":`${authKey}`}})
 				.then((result) => result.json())

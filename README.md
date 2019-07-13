@@ -184,6 +184,9 @@ If `await` is true the server will bypass internal caches await the underlying d
 
 `Array async query(object JOQULARPattern)` - query the database using `JOQULARPattern`. See [JOQULAR](#joqular) below.
 
+`boolean async unique(cnameOrIdOrObject,property,value)` - returns true if the `value` on `property` is or will be unique for
+the provide `cnameOrIdOrObject`.
+
 `Array async values(string prefix="",{number batchSize,string cursor})` - Returns all the data associated with keys that
 start with `prefix`. By default it can only be called by a user with the `dbo` role. It can be used in a loop just like `keys` above.
 
@@ -714,7 +717,7 @@ are automatically used to validate data prior to insert in the cloud. They can b
 
 Below is an example for `User`. Note, by convention Schema are attached to classes as a static property.
 
-```
+```javascript
 User.schema = {
 	userName: {required:true, type: "string", unique:true},
 	roles: {type: "object"}
@@ -780,6 +783,8 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB and joins.
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-13 v0.0.25a Added `unique(cnameOrIdOrObject,property,value`).
 
 2019-07-13 v0.0.24a Fixed `$instanceof` and added `$isa`. Eliminated gloabal leak in unit test for Schema validation.
 

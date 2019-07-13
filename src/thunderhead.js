@@ -57,7 +57,7 @@
 				authed = request.user;
 			request.user = this.dbo;
 			return this.dbo;
-			const user = (await this.query({userName},false))[0];
+			const user = (await this.query({userName},{limit:1}))[0];
 			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
@@ -75,7 +75,7 @@
 					password = Math.random().toString(36).substr(2,10);
 				}
 				if(!user) {
-					user = (await this.query({userName},false))[0];
+					user = (await this.query({userName},{limit:1}))[0];
 					if(!user) return;
 				}
 				Object.assign(user,await hashPassword(password,1000));
@@ -250,7 +250,7 @@
 			}
 			return data;
 		}
-		async query(pattern,partial,options={},parentPath="") {
+		async query(pattern,{partial,filter,limit}={},parentPath="") {
 			let ids,
 				count = 0,
 				results = [],
@@ -298,17 +298,19 @@
 									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
 									for(const gkey of gkeys) {
 										const id = gkey.split("!").pop();
-										if(testids[id]) {
-											testids[id].sum++;
-											testids[id].avg = testids[id].sum / count;
-										} else {
-											const cname = id.split("@")[0],
-												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-											if(data && removed.length===0) {
-												testids[id] = {sum:1};
-										    } else {
-										    	testids[id] = {sum:-Infinity};
-										    }
+										if(!filter || filter(id)) {
+											if(testids[id]) {
+												testids[id].sum++;
+												testids[id].avg = testids[id].sum / count;
+											} else {
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = {sum:1};
+											    } else {
+											    	testids[id] = {sum:-Infinity};
+											    }
+											}
 										}
 									}
 								}
@@ -359,12 +361,14 @@
 										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
 										for(const key of keys) {
 											const parts = key.split("!"),
-												id = parts.pop(),
-												cname = id.split("@")[0],
-												{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-											if(data && removed.length===0) {
-												testids[id] = true;
-										    }
+												id = parts.pop();
+											if(!filter || filter(id)) {
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = true;
+											    }
+											}
 										}
 									}
 								}
@@ -388,7 +392,7 @@
 							}
 						} 
 						if(!predicates){ // matching a nested object
-							const childids = await this.query(value,partial,options,keypath);
+							const childids = await this.query(value,{partial},keypath);
 							if(childids.length===0) {
 								return [];
 							}
@@ -423,11 +427,13 @@
 						}
 						for(const key of keys) {
 							const id = key.split("!").pop(),
-								cname = id.split("@")[0],
-								{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-							if(data && removed.length===0) {
-								testids[id] = true;
-						    }
+								cname = id.split("@")[0];
+							if(!filter ||filter(id)) {
+								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+								if(data && removed.length===0) {
+									testids[id] = true;
+							    }
+							}
 						}
 						if(!ids) {
 							ids = Object.assign({},testids);
@@ -454,8 +460,8 @@
 					return ids;
 				}
 				for(const id in ids) {
-					const object = await this.getItem(id,options);
-					if(object) {
+					const object = await this.getItem(id);
+					if(object && (!filter || filter(object))) {
 						if(partial) {
 							for(const key in object) {
 								if(pattern[key]===undefined && key!=="#" && key!=="^") {
@@ -464,6 +470,9 @@
 							}
 						}
 						results.push(object);
+						if(limit && results.length>=limit) {
+							break;
+						}
 					}
 				}
 			}
@@ -561,6 +570,14 @@
 					}
 				}
 			}
+		}
+		async unique(id,property,value) {
+			const parts = id.split("@"),
+				cname = parts[0],
+				ckey = `${cname}@`,
+				filter = id => typeof(id) === "string" ? id.startsWith(ckey) : true,
+				instances = await this.query({[property]:value},{filter,limit:1});
+			return instances.length===0 || (id && instances.length===1 && instances[0]["#"]===id);
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));

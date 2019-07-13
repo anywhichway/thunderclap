@@ -73,9 +73,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					const node = await db.getItem(`!${key}`),
-						valuekey = JSON.stringify(value);
-					if(value!==undefined && node && node[valuekey] && node[valuekey].__keyCount__ && !node[valuekey][object["#"]]) {
+					if(!(await db.unique(object,key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}

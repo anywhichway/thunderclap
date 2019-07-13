@@ -28,12 +28,15 @@
 			}
 			return promise;
 		}
-		async keys(prefix) {
+		async keys(prefix,batchSize) {
 			let results = [],keys, cursor;
 			do {
-				keys = await this.namespace.keys(prefix,{cursor});
+				keys = await this.namespace.keys(prefix,{cursor,batchSize});
 				cursor = keys.pop();
 				results = results.concat(keys);
+				if(results.length>=batchSize) {
+					break;
+				}
 			} while(keys.length>0 && cursor);
 			return results;
 		}
