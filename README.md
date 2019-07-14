@@ -8,7 +8,7 @@ In addition to having more predicates than MongoDB, JOQULAR extends pattern matc
 
 ```javascript
 // match all objects with properties starting with the letter "a" containing the value 1
-db.query({[/a.*/]:{$eq: 1}}) 
+db.query({Object:{[/a.*/]:{$eq: 1}}}) 
 ```
 
 Thunderclap uses a [JavaScript client](#javascript) client to support:
@@ -155,7 +155,7 @@ It can be used in a loop just like `keys` below.
 
 `boolean async hasKey(string key)` - Returns `true` is `key` exists.
 
-`Array async keys(prefix="",{number batchSize,string cursor,boolean expanded})` - Returns an Array of the next `batchSize`
+`Array async keys(prefix="",{number batchSize=1000,string cursor,boolean expanded})` - Returns an Array of the next `batchSize`
 keys in database than match the `prefix` every time it is called. By default it can only be called by a user with the 
 `dbo` role. You can use a loop to process all keys:
 
@@ -173,16 +173,15 @@ stores it with `setItem` using the id as the key. In most cases the unique id wi
 `<className>@xxxxxxxxxxxxx`.Options can one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 
 `boolean async removeItem(string|object keyOrObject) - Removes the keyOrObject. If the argument is an indexed object 
-or a key that resolves to an indexed object, the key and data are removed from the database so long as the user has 
+or a key that resolves to an indexed object, the index entries are also removed from the database so long as the user has 
 the appropriate privileges. If the key exists but can't be removed the function returns `false`. If the key does not exist
-or removal succeeds, the function returns `true`. If `await` is true the server will bypass internal caches await the 
-underlying data store.
+or removal succeeds, the function returns `true`.
 
 `any async setItem(string key,any value,options={})` - Sets the `key` to `value`. If the `value` is an object it is 
 NOT indexed. Options can one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 If `await` is true the server will bypass internal caches await the underlying data store.
 
-`Array async query(object JOQULARPattern)` - query the database using `JOQULARPattern`. See [JOQULAR](#joqular) below.
+`Array async query(object {<className>:JOQULARPattern)` - query the database using `JOQULARPattern`. See [JOQULAR](#joqular) below.
 
 `boolean async unique(cnameOrIdOrObject,property,value)` - returns true if the `value` on `property` is or will be unique for
 the provide `cnameOrIdOrObject`.
@@ -204,8 +203,6 @@ client and should only be of concern to those who are customizing or extending T
 
 The Thunderclap client also serializes dates as `Date@<timestamp>` and restores them to full-fledged dates after
 transport.
-
-The same is done for
 
 <a name="built-in-classes"></a>
 # Built-in Classes [top](#top)
@@ -251,18 +248,22 @@ will be called to get the values to create the Position.
 Thunderclap supports a subset of JOQULAR. It is simlar to the MongoDB query language but more extensive. You can see many
 examples in the unit test file `test/index.js`. 
 
-Here is a basic query that returns everyone of age 21 or greater in zipcode 98101:
+Here is a basic query that returns all Users of age 21 or greater in zipcode 98101:
 
 ```javascript
 const db = new Thunderclap({endpoint,user:{username:"<username>",password:"<password>"}}),
-	results = await db.query({age:{$gte: 21},address:{zipcode:98101}}),
+	results = await db.query({User:{age:{$gte: 21},address:{zipcode:98101}}});
 ```
 
 Thuderclap also suppport pattern matching on property names:
 
 ```javascript
-db.query({[/a.*/]:{$eq: 1}}) // match all objects with properties starting with the letter "a" containing the value 1
+db.query({Object:{[/a.*/]:{$eq: 1}}}) // match all Objects with properties starting with the letter "a" containing the value 1
 ```
+
+You may have noted above, the top level property names in a query should be class names. In MongoDB, these would probably 
+be collections. Currently, only one top level class name is supported. In the future it will be possible to query multiple
+class types at once.
 
 The supported patterns are described below. All examples assume these two objects exist in the database:
 
@@ -307,6 +308,12 @@ unit test file `docs/test/index.js` to confirm.):
 `{$gte: number|string value}` - A value in a property is greater than or equal the one provided, e.g. `{age:{$gte:20}}` matches o1 and o2.
 
 `{$gt: number|string value}` - A value in a property is greater than the one provided, e.g. `{age:{$gt:20}}` matches o1 and o2.
+
+## String Tests
+
+`{$startsWith: string value}` -
+
+`{$endsWith: string value}` -
 
 ## Logical Operators [top](#top)
 
@@ -439,6 +446,14 @@ unlike `$isCreditCard` no validation is done beyond textual format.
 If no second argument is provided, the search is fuzzy at 80%, e.g. `{favoritePhrase:{$search:"questin"}}` also
 matches o1 whereas `{favoritePhrase:{$search:["questin",.99]}}`, which requires a 99% match does not. The search
 phrase can contain multiple space separated words.
+
+## Special Predicates
+
+`{$_:any value}` -
+
+`{"$.":[string functionName,...args]}` -
+
+`{"$.<functionName>":[...args]}` -
 
 <a name="access-control"></a>
 # Access Control [top](#top)
@@ -783,6 +798,11 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 includes the addition of graph queries a la GunDB and joins.
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-14 v0.0.26a Modified indexing and query approach to use classes at top level, i.e. `{<cname>:<pattern>}`
+instead of `<pattern>`. NAMESPACES must be recreated. The ability to query across classes will be re-introduce in 
+a subsequent release using {_:<pattern>}. This change will improve performance is real-world cases by further
+partitioning keys and also making unique key look-up/verification much faster.
 
 2019-07-13 v0.0.25a Added `unique(cnameOrIdOrObject,property,value`).
 

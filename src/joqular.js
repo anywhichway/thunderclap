@@ -18,6 +18,11 @@
 				if(JSON.stringify(a)!==original) throw new Error("function call by $test has illegal side effect");
 				return result;
 			},
+			"$.":function(a,fname,...args) {
+				if(typeof(a[fname])==="function") {
+					return a[fname](...args); // this may create a security vulnerability, add access control
+				}
+			},
 			$_() {
 				return true;
 			},
@@ -71,6 +76,12 @@
 			},
 			$gt(a,b) { 
 				return a > b; 
+			},
+			$startsWith(a,b) { 
+				return a.startsWith(b); 
+			},
+			$endsWith(a,b) { 
+				return a.$endsWith(b); 
 			},
 			$near(n,target,range) {
 				let f = (n,target,range) => n >= target - range && n <= target + range;

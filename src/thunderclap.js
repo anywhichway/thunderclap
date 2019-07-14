@@ -209,12 +209,12 @@ Copyright AnyWhichWay, LLC 2019
 			const object = new Schema(className,config);
 			return this.putItem(object);
 		}
-		async unique(objectOrId,property,value) {
-			const cname = typeof(objectOrId)==="string" ? objectOrId : objectOrId["#"];
-			if(!cname) {
+		async unique(objectOrIdOrCname,property,value="") {
+			objectOrIdOrCname = typeof(objectOrIdOrCname)==="string" ? objectOrIdOrCname : objectOrIdOrCname["#"];
+			if(!objectOrIdOrCname) {
 				return false;
 			}
-			return fetch(`${this.endpoint}/db.json?["unique",${encodeURIComponent(JSON.stringify(cname))},${encodeURIComponent(JSON.stringify(property))},${encodeURIComponent(JSON.stringify(value))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["unique",${encodeURIComponent(JSON.stringify(objectOrIdOrCname))},${encodeURIComponent(JSON.stringify(property))},${encodeURIComponent(JSON.stringify(value))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))

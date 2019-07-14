@@ -352,6 +352,11 @@
 				if(JSON.stringify(a)!==original) throw new Error("function call by $test has illegal side effect");
 				return result;
 			},
+			"$.":function(a,fname,...args) {
+				if(typeof(a[fname])==="function") {
+					return a[fname](...args); // this may create a security vulnerability, add access control
+				}
+			},
 			$_() {
 				return true;
 			},
@@ -405,6 +410,12 @@
 			},
 			$gt(a,b) { 
 				return a > b; 
+			},
+			$startsWith(a,b) { 
+				return a.startsWith(b); 
+			},
+			$endsWith(a,b) { 
+				return a.$endsWith(b); 
 			},
 			$near(n,target,range) {
 				let f = (n,target,range) => n >= target - range && n <= target + range;
@@ -954,7 +965,7 @@
 (function() {
 		module.exports = {
 		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "34dca41478b943a0880fe24798d39eb0",
+		 namespaceId: "21271ea30170474c89d552e831ce7374",
 		 authEmail: "syblackwell@anywhichway.com",
 		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
 		 dboPassword: "dbo"
@@ -1482,7 +1493,42 @@ async function handleRequest(event) {
 		async index(data,options={},parentPath="",parentId) {
 			const type = typeof(data);
 			if(data && type==="object") {
-				const id = parentId||data["#"]; // also need to index for # in case nested and id'd
+				const id = parentId||data["#"];
+				if(!parentId) {
+					const cname = id.split("@")[0];
+					parentPath = `!${cname}`;
+				}
+				if(id) {
+					for(const key in data) {
+						if(!options.schema || !options.schema[key] || !options.schema[key].noindex) {
+							const value = data[key],
+							type = typeof(value),
+							keypath = `${parentPath}!${key}`;
+							this.cache.put("!p"+keypath,1);
+							if(value && type==="object") {
+								await this.index(value,options,keypath,id);
+							} else if(type==="string") {
+								if(value.includes(" ")) {
+									let count = 0;
+									const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
+									for(const gram of grams) {	
+										this.cache.put(`!o${keypath}!${gram}!${id}`,1,options)	
+									}
+								}
+								if(value.length<=64) {
+									const valuekey = `${JSON.stringify(value)}`;
+									this.cache.put(`!v${keypath}!${valuekey}`,1);
+									this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
+								}
+							} else {
+								const valuekey = `${JSON.stringify(value)}`;
+								this.cache.put(`!v${keypath}!${valuekey}`,1);
+								this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
+							}
+						}
+					}
+				}
+				/*const id = parentId||data["#"]; // also need to index for # in case nested and id'd
 				if(id) {
 					for(const key in data) {
 						if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
@@ -1515,7 +1561,7 @@ async function handleRequest(event) {
 							}
 						}
 					}
-				}
+				}*/
 			}
 		}
 		//async put(key,value) {
@@ -1607,16 +1653,245 @@ async function handleRequest(event) {
 			}
 			return data;
 		}
-		async query(pattern,{partial,filter,limit}={},parentPath="") {
+		async query(pattern,{partial,filter,limit}={},parentPath="",cname) {
 			let ids,
 				count = 0,
 				results = [],
-				keys;
+				keys,
+				top;
 			//"!p!edge"
 			//'!p!edge!edge
 			//'!t!edge!trigram|id
 			//"!o!edge!"\value\"!id
+			if(!cname) {
+				const topkeys = Object.keys(pattern);
+				cname = topkeys[0];
+				pattern = pattern[cname];
+				parentPath = `!${cname}`;
+				top = true;
+			}
 			for(const key in pattern) {
+				const keytest = joqular.toTest(key,true),
+					value = pattern[key],
+					type = typeof(value);
+				if(keytest) { // if key can be converted to a test, assemble matching keys
+					keys = [];
+					const edges = await this.cache.keys(`!p${parentPath}!`);
+					for(const edge of edges) {
+						const [_0,_1,_2,key] = edge.split("!"); // should be based on parentPath
+						if(keytest(key)) {
+							keys.push(key)
+						}
+					}
+					if(keys.length===0) {
+						return [];
+					}
+				} else { // else key list is just the literal key
+					keys = [key];
+				}
+				for(const key of keys) {
+					const keypath = `${parentPath}!${key}`,
+						securepath = keypath.replace(/\!/g,".").substring(1);
+					if(value && type==="object") {
+						const valuecopy = Object.assign({},value);
+						let predicates;
+						for(let [predicate,pvalue] of Object.entries(value)) {
+							if(predicate==="$return") continue;
+							const test = joqular.toTest(predicate);
+							if(predicate==="$search") {
+								predicates = true;
+								const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
+									grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token))),
+									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * grams.length : .8;
+								let testids = {}, count = 0;
+								for(const gram of grams) {
+									count++;
+									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
+									for(const gkey of gkeys) {
+										const id = gkey.split("!").pop();
+										if(!filter || filter(id)) {
+											if(testids[id]) {
+												testids[id].sum++;
+												testids[id].avg = testids[id].sum / count;
+											} else {
+												const cname = id.split("@")[0],
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = {sum:1};
+											    } else {
+											    	testids[id] = {sum:-Infinity};
+											    }
+											}
+										}
+									}
+								}
+								if(!ids) {
+									ids = {};
+									count = 0;
+									for(const id in testids) {
+										if(testids[id].avg>=matchlevel) {
+											ids[id] = true;
+											count++;
+										}
+									}
+									if(count===0) {
+										return [];
+									}
+								} else {
+									for(const id in ids) {
+										if(!testids[id] || testids[id].avg<=matchlevel) { //  !secured[id] && 
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
+								}
+							} else if(test) {
+								predicates = true;
+								const ptype = typeof(pvalue);
+								if(ptype==="string") {
+									if(pvalue.startsWith("Date@")) {
+										pvalue = new Date(parseInt(pvalue.split("@")[1]));
+									}
+								}
+								delete valuecopy[predicate];
+								const secured = {},
+									testids = {},
+									keys = await this.cache.keys(`!v${keypath}!`);
+								if(keys.length===0) {
+									await this.cache.delete(`!p${keypath}`);
+									return [];
+								}
+								for(const key of keys) {
+									const parts = key.split("!"), // offset should be based on parentPath length, not end
+										rawvalue = parts.pop(),
+										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
+									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
+										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
+										for(const key of keys) {
+											const parts = key.split("!"),
+												id = parts.pop();
+											if(!filter || filter(id)) {
+												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												if(data && removed.length===0) {
+													testids[id] = true;
+											    }
+											}
+										}
+									}
+								}
+								if(!ids) {
+									ids = Object.assign({},testids);
+									count = Object.keys(ids).length;
+									if(count===0) {
+										return [];
+									}
+								} else {
+									for(const id in ids) {
+										if(!secured[id] && !testids[id]) { //  
+											delete ids[id];
+											count--;
+											if(count<=0) {
+												return [];
+											}
+										}
+									}
+								}
+							}
+						} 
+						if(!predicates){ // matching a nested object
+							const childids = await this.query(value,{partial},keypath,cname);
+							if(childids.length===0) {
+								return [];
+							}
+							if(!ids) {
+								ids = Object.assign({},childids);
+								count = Object.keys(ids).length;
+								if(count===0) {
+									return [];
+								}
+							} else {
+								for(const id in ids) {
+									if(!childids[id]) { //  
+										delete ids[id];
+										count--;
+										if(count<=0) {
+											return [];
+										}
+									}
+								}
+							}
+						}
+					} else {
+						const valuekey = JSON.stringify(value),
+							secured = {},
+							valuepath = `${keypath}!${valuekey}`,
+							objectpath = `!o${valuepath}!`,
+							testids = {}, 
+							keys = await this.cache.keys(objectpath);
+						if(keys.length===0) {
+							await this.cache.delete(`!v${keypath}!${valuekey}`);
+							return [];
+						}
+						for(const key of keys) {
+							const id = key.split("!").pop();
+							if(!filter ||filter(id)) {
+								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+								if(data && removed.length===0) {
+									testids[id] = true;
+							    }
+							}
+						}
+						if(!ids) {
+							ids = Object.assign({},testids);
+							count = Object.keys(ids).length;
+							if(count===0) {
+								return [];
+							}
+						} else {
+							for(const id in ids) {
+								if(!secured[id] && !testids[id]) { // 
+									delete ids[id];
+									count--;
+									if(count<=0) {
+										return [];
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			if(ids) {
+				if(top) {
+					for(const id in ids) {
+						const object = await this.getItem(id);
+						if(object && (!filter || filter(object))) {
+							if(partial) {
+								for(const key in object) {
+									if(pattern[key]===undefined && key!=="#" && key!=="^") {
+										delete object[key];
+									}
+								}
+							}
+							results.push(object);
+							if(limit && results.length>=limit) {
+								break;
+							}
+						}
+					}
+					return results;
+				}
+				return ids;
+			}
+			return [];
+			//"!p!edge"
+			//'!p!edge!edge
+			//'!t!edge!trigram|id
+			//"!o!edge!"\value\"!id
+			/*for(const key in pattern) {
 				const keytest = joqular.toTest(key,true),
 					value = pattern[key],
 					type = typeof(value);
@@ -1833,7 +2108,7 @@ async function handleRequest(event) {
 					}
 				}
 			}
-			return results;
+			return results;*/
 		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
@@ -1895,6 +2170,10 @@ async function handleRequest(event) {
 		} 
 		async unindex(object,parentPath="",parentId) {
 			const id = parentId||object["#"];
+			if(!parentId) {
+				const cname = id.split("@")[0];
+				parentPath = `!${cname}`;
+			}
 			if(object && typeof(object)==="object" && id) {
 				for(const key in object) {
 					if(key==="#") {
@@ -1931,10 +2210,8 @@ async function handleRequest(event) {
 		async unique(id,property,value) {
 			const parts = id.split("@"),
 				cname = parts[0],
-				ckey = `${cname}@`,
-				filter = id => typeof(id) === "string" ? id.startsWith(ckey) : true,
-				instances = await this.query({[property]:value},{filter,limit:1});
-			return instances.length===0 || (id && instances.length===1 && instances[0]["#"]===id);
+				keys = await this.keys(`!o!${cname}!${property}!`,{batchSize:1});
+			return keys.length===0 || !keys[0] || keys[0].endsWith(`!${JSON.stringify(value)}!${id}`);
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));

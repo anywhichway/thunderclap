@@ -11,10 +11,16 @@ function submit(event) {
 		config[key] = document.getElementById(key).value;
 	});
 	const {username,password} = config,
-		thunderclap = new Thunderclap({endpoint,user:{username,password}}),
-		fname = document.getElementById("fname").value,
-		args = JSON.parse(`[${document.getElementById("args").value}]`),
-		stdout = document.getElementById("console");
+	thunderclap = new Thunderclap({endpoint,user:{username,password}}),
+	fname = document.getElementById("fname").value,
+	stdout = document.getElementById("console");
+	let args;
+	try {
+		args = JSON.parse(`[${document.getElementById("args").value}]`);
+	} catch(e) {
+		stdout.innerText = e+"";
+		return false;
+	}
 	thunderclap[fname](...args)
 		.then((result => {
 			stdout.innerText = JSON.stringify(result);
