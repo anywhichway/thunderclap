@@ -3,7 +3,38 @@ const TESTDATE = new Date("2019-06-20T23:04:35.815Z");
 let o1,
 	o2;
 
-describe("query",function() {
+describe("tests",function() {
+	it("createUser",async function() {
+		const user = await db.createUser("testuser","test",{roles:{dummy:true},email:"someone@somewhere.com"});
+		expect(user["#"].startsWith("User@"));
+		expect(user.userName).equal("testuser");
+		expect(user.roles.dummy).equal(undefined);
+		expect(user.email).equal("someone@somewhere.com");
+	});
+	it("addRoles",async function() {
+		const user = await db.addRoles("testuser",["dummy"]);
+		expect(user.userName).equal("testuser");
+		expect(user.roles.dummy).equal(true);
+		expect(user.email).equal("someone@somewhere.com");
+	})
+	it("getUser",async function() {
+		const user = await db.getUser("testuser");
+		expect(user.userName).equal("testuser");
+		expect(user.roles.dummy).equal(true);
+		expect(user.email).equal("someone@somewhere.com");
+	});
+	it("removeRoles",async function() {
+		const user = await db.removeRoles("testuser",["dummy"]);
+		expect(user.userName).equal("testuser");
+		expect(user.roles.dummy).equal(undefined);
+		expect(user.email).equal("someone@somewhere.com");
+	});
+	it("deleteUser",async function() {
+		const result = await db.deleteUser("testuser");
+		expect(result).equal(true);
+		const user = await db.getUser("testuser");
+		expect(user).equal(undefined);
+	});
 	it("put nested item",async function() {
 		let object = await db.getItem("Object@test");
 		if(!object) {
@@ -143,6 +174,16 @@ describe("query",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].name).equal("test");
 	});
+	it("$startsWith string",async function() {
+		const results = await db.query({Object:{name:{$startsWith:"te"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
+	it("$endsWith string",async function() {
+		const results = await db.query({Object:{name:{$endsWith:"st"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
 	it("$near low absolute", async function() {
 		const results = await db.query({Object:{low:{$near:[0,1]}}});
 		expect(typeof(results[0])).equal("object");
@@ -195,6 +236,16 @@ describe("query",function() {
 	});
 	it("$nin",async function() {
 		const results = await db.query({Object:{middle:{$nin:[1,2,3]}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
+	});
+	it("$in string",async function() {
+		const results = await db.query({Object:{name:{$in:"a test"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].middle).equal(0);
+	});
+	it("$nin string",async function() {
+		const results = await db.query({Object:{name:{$nin:"not"}}});
 		expect(typeof(results[0])).equal("object");
 		expect(results[0].middle).equal(0);
 	});
@@ -389,8 +440,23 @@ describe("query",function() {
 		const results = await db.query({Object:{name:"test"}});
 		expect(results.length).equal(0);
 	});
+	it("$. [fname,...args] (startsWith) string",async function() {
+		const results = await db.query({Object:{name:{"$.":["startsWith","te"]}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
+	it("$.startsWith string",async function() {
+		const results = await db.query({Object:{name:{"$.startsWith":"te"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
+	it("$.endsWith string",async function() {
+		const results = await db.query({Object:{name:{"$.endsWith":"st"}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].name).equal("test");
+	});
 	it("get User",async function() {
-		const results = await db.query({Object:{userName:username}});
+		const results = await db.query({User:{userName:username}});
 		expect(results.length).equal(1);
 		expect(results[0]).instanceof(db.ctors["User"]);
 		expect(results[0].userName).equal(username);
@@ -448,7 +514,7 @@ describe("query",function() {
 			await db.removeItem(item);
 		}
 	}).timeout(100000);
-	it("10 query", async function() {
+	it("10 query after removeItem", async function() {
 		results = await db.query({Object:{id:{$gte:0,$lte:99}}});
 		expect(results.length).equal(0);
 	}).timeout(100000);

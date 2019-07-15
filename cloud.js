@@ -288,7 +288,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					if(!(await db.unique(object,key,value))) {
+					if(!(await db.unique(object["#"],key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}
@@ -415,7 +415,7 @@
 				return a.startsWith(b); 
 			},
 			$endsWith(a,b) { 
-				return a.$endsWith(b); 
+				return a.endsWith(b); 
 			},
 			$near(n,target,range) {
 				let f = (n,target,range) => n >= target - range && n <= target + range;
@@ -447,20 +447,29 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,...array) {
-				return array.includes(a);
+			$in(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(a);
 			},
-			$nin(a,...array) {
-				return !array.includes(a);
+			$nin(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return !container[0].includes(a);
+				}
+				return !container.includes(a);
 			},
-			$includes(array,b) {
-				return array.includes(b);
+			$includes(value,included) {
+				return value===included;
 			},
-			$excludes(array,b) {
-				return !array.includes(b);
-			},
-			$intersects(a,b) {
-				return Array.isArray(a) && Array.isArray(b) && intersection(a,b).length>0;
+			/*$excludes(value,excluded) {
+				return value!==excluded;
+			},*/
+			$intersects(value,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(value);
 			},
 			$disjoint(a,b) {
 				return !joqular.$intersects(a,b);
@@ -498,17 +507,8 @@
 				}
 				return b.name===cname;
 			},
-			async $isArray() { 
-				const	edges = [];
-				for(const key in this.edges) {
-					if(key.startsWith("Array@") && isSoul(key)) {
-						edges.push(await getNextEdge(this,key,false));
-					}
-				}
-				if(edges.length>0) {
-					this.yield = edges;
-					return true;
-				}
+			async $isArray(a,bool) {
+				return bool===(joqular.$isArray.ctx === "Array") || joqular.$instanceof(a,"Array");
 			},
 			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
@@ -639,7 +639,7 @@
 					});
 				})) ? data : undefined;
 			},
-			toTest(key,keyTest) {
+			toTest(key,keyTest,{cname,parentPath,property}={}) {
 				const type  = typeof(key);
 				if(type==="function") {
 					return key;
@@ -965,7 +965,7 @@
 (function() {
 		module.exports = {
 		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "21271ea30170474c89d552e831ce7374",
+		 namespaceId: "980749484fd04458b982568fc75378d5",
 		 authEmail: "syblackwell@anywhichway.com",
 		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
 		 dboPassword: "dbo"
@@ -1274,7 +1274,9 @@ async function handleRequest(event) {
 		  }
 		  return new Response(JSON.stringify(value));*/
 		if(thunderhead[fname]) {
-			if(fname!=="createUser") {
+			if(fname==="createUser") {
+				request.user = thunderhead.dbo;
+			} else {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
@@ -1294,7 +1296,7 @@ async function handleRequest(event) {
 			//Object.freeze(request);
 			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
-				return new Response("null",{
+				return new Response(JSON.stringify(secured),{
 					status: 403,
 					headers:
 					{
@@ -1420,12 +1422,22 @@ async function handleRequest(event) {
 			},refresh)
 			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
 		}
+		async addRoles(userName,roles=[]) {
+			if(roles.length>=0) {
+				const user = await this.getUser(userName);
+				if(user) {
+					user.roles || (user.roles={});
+					roles.forEach((role) => user.roles[role]=true);
+					return this.putItem(user,{patch:true});
+				}
+			}
+		}
 		async authUser(userName,password) {
 			const request = this.request,
 				authed = request.user;
 			request.user = this.dbo;
 			return this.dbo;
-			const user = (await this.query({userName},{limit:1}))[0];
+			const user = await this.getUser(userName);
 			request.user = authed;
 			if(user && user.salt && user.hash===(await hashPassword(password,1000,hexStringToUint8Array(user.salt))).hash) {
 				secure.mapRoles(user);
@@ -1443,7 +1455,7 @@ async function handleRequest(event) {
 					password = Math.random().toString(36).substr(2,10);
 				}
 				if(!user) {
-					user = (await this.query({userName},{limit:1}))[0];
+					user = await this.getUser(userName);
 					if(!user) return;
 				}
 				Object.assign(user,await hashPassword(password,1000));
@@ -1451,9 +1463,11 @@ async function handleRequest(event) {
 				return password;
 			}
 		}
-		async createUser(userName,password) {
+		async createUser(userName,password,extras={}) {
 			let user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
+			delete extras.roles;
+			Object.assign(user,extras);
 			const request = this.request,
 				authed = request.user;
 			request.user = this.dbo;
@@ -1463,6 +1477,13 @@ async function handleRequest(event) {
 		}
 		async delete(key) {
 			return this.removeItem(key);
+		}
+		async deleteUser(userName) {
+			const user = await this.getUser(userName);
+			if(user) {
+				return this.removeItem(user);
+			}
+			return true;
 		}
 		//async get(key,options) {
 			//return this.get(key,options);
@@ -1489,6 +1510,9 @@ async function handleRequest(event) {
 					return new Schema(ctor.name||ctor,data);
 				}
 			}
+		}
+		async getUser(userName) {
+			return (await this.query({User:{userName}},{limit:1}))[0];
 		}
 		async index(data,options={},parentPath="",parentId) {
 			const type = typeof(data);
@@ -1528,46 +1552,13 @@ async function handleRequest(event) {
 						}
 					}
 				}
-				/*const id = parentId||data["#"]; // also need to index for # in case nested and id'd
-				if(id) {
-					for(const key in data) {
-						if(key!=="#" && (!options.schema || !options.schema[key] || !options.schema[key].noindex)) {
-							const value = data[key],
-								type = typeof(value);
-							const keypath = `${parentPath}!${key}`;
-							this.cache.put("!p"+keypath,1);
-							let node;
-							if(value && type==="object") {
-								await this.index(value,options,keypath,id);
-							} else {
-								if(type==="string") {
-									if(value.includes(" ")) {
-										let count = 0;
-										const grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token)));
-										for(const gram of grams) {	
-											this.cache.put(`!o${keypath}!${gram}!${id}`,1,options)	
-										}
-									}
-									if(value.length<=64) {
-										const valuekey = `${JSON.stringify(value)}`;
-										this.cache.put(`!v${keypath}!${valuekey}`,1);
-										this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
-									}
-								} else {
-									const valuekey = `${JSON.stringify(value)}`;
-									this.cache.put(`!v${keypath}!${valuekey}`,1);
-									this.cache.put(`!o${keypath}!${valuekey}!${id}`,1,options);
-								}
-							}
-						}
-					}
-				}*/
 			}
 		}
 		//async put(key,value) {
 		//	return this.put(key,value);
 		//}
 		async putItem(object,options={}) {
+			const {patch} = options;
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -1671,7 +1662,7 @@ async function handleRequest(event) {
 				top = true;
 			}
 			for(const key in pattern) {
-				const keytest = joqular.toTest(key,true),
+				const keytest = joqular.toTest(key,true,{cname,parentPath,property:key}),
 					value = pattern[key],
 					type = typeof(value);
 				if(keytest) { // if key can be converted to a test, assemble matching keys
@@ -1768,8 +1759,11 @@ async function handleRequest(event) {
 									const parts = key.split("!"), // offset should be based on parentPath length, not end
 										rawvalue = parts.pop(),
 										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
+									parts[1] = "o";
+									const path = parts.join("!");
+									//return [test.ctx.keypath, pvalue,await this.cache.keys(`!o${test.ctx.keypath}!`)];
 									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
-										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
+										const keys = await this.cache.keys(`${path}!${rawvalue}!`);
 										for(const key of keys) {
 											const parts = key.split("!"),
 												id = parts.pop();
@@ -1887,228 +1881,6 @@ async function handleRequest(event) {
 				return ids;
 			}
 			return [];
-			//"!p!edge"
-			//'!p!edge!edge
-			//'!t!edge!trigram|id
-			//"!o!edge!"\value\"!id
-			/*for(const key in pattern) {
-				const keytest = joqular.toTest(key,true),
-					value = pattern[key],
-					type = typeof(value);
-				if(keytest) { // if key can be converted to a test, assemble matching keys
-					keys = [];
-					const edges = await this.cache.keys(`!p${parentPath}!`);
-					for(const edge of edges) {
-						const [_1,_2,key] = edge.split("!"); // should be based on parentPath
-						if(keytest(key)) {
-							keys.push(key)
-						}
-					}
-					if(keys.length===0) {
-						return [];
-					}
-				} else { // else key list is just the literal key
-					keys = [key];
-				}
-				for(const key of keys) {
-					const keypath = `${parentPath}!${key}`,
-						securepath = keypath.replace(/\!/g,".").substring(1);
-					if(value && type==="object") {
-						const valuecopy = Object.assign({},value);
-						let predicates;
-						for(let [predicate,pvalue] of Object.entries(value)) {
-							if(predicate==="$return") continue;
-							const test = joqular.toTest(predicate);
-							if(predicate==="$search") {
-								predicates = true;
-								const value = Array.isArray(pvalue) ? pvalue[0] : pvalue,
-									grams = trigrams(tokenize(value).filter((token) => !stopwords.includes(token)).map((token) => stemmer(token))),
-									matchlevel = Array.isArray(pvalue) && pvalue[1] ? pvalue[1] * grams.length : .8;
-								let testids = {}, count = 0;
-								for(const gram of grams) {
-									count++;
-									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
-									for(const gkey of gkeys) {
-										const id = gkey.split("!").pop();
-										if(!filter || filter(id)) {
-											if(testids[id]) {
-												testids[id].sum++;
-												testids[id].avg = testids[id].sum / count;
-											} else {
-												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-												if(data && removed.length===0) {
-													testids[id] = {sum:1};
-											    } else {
-											    	testids[id] = {sum:-Infinity};
-											    }
-											}
-										}
-									}
-								}
-								if(!ids) {
-									ids = {};
-									count = 0;
-									for(const id in testids) {
-										if(testids[id].avg>=matchlevel) {
-											ids[id] = true;
-											count++;
-										}
-									}
-									if(count===0) {
-										return [];
-									}
-								} else {
-									for(const id in ids) {
-										if(!testids[id] || testids[id].avg<=matchlevel) { //  !secured[id] && 
-											delete ids[id];
-											count--;
-											if(count<=0) {
-												return [];
-											}
-										}
-									}
-								}
-							} else if(test) {
-								predicates = true;
-								const ptype = typeof(pvalue);
-								if(ptype==="string") {
-									if(pvalue.startsWith("Date@")) {
-										pvalue = new Date(parseInt(pvalue.split("@")[1]));
-									}
-								}
-								delete valuecopy[predicate];
-								const secured = {},
-									testids = {},
-									keys = await this.cache.keys(`!v${keypath}!`);
-								if(keys.length===0) {
-									await this.cache.delete(`!p${keypath}`);
-									return [];
-								}
-								for(const key of keys) {
-									const parts = key.split("!"), // offset should be based on parentPath length, not end
-										rawvalue = parts.pop(),
-										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
-									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
-										const keys = await this.cache.keys(`!o${keypath}!${rawvalue}`);
-										for(const key of keys) {
-											const parts = key.split("!"),
-												id = parts.pop();
-											if(!filter || filter(id)) {
-												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-												if(data && removed.length===0) {
-													testids[id] = true;
-											    }
-											}
-										}
-									}
-								}
-								if(!ids) {
-									ids = Object.assign({},testids);
-									count = Object.keys(ids).length;
-									if(count===0) {
-										return [];
-									}
-								} else {
-									for(const id in ids) {
-										if(!secured[id] && !testids[id]) { //  
-											delete ids[id];
-											count--;
-											if(count<=0) {
-												return [];
-											}
-										}
-									}
-								}
-							}
-						} 
-						if(!predicates){ // matching a nested object
-							const childids = await this.query(value,{partial},keypath);
-							if(childids.length===0) {
-								return [];
-							}
-							if(!ids) {
-								ids = Object.assign({},childids);
-								count = Object.keys(ids).length;
-								if(count===0) {
-									return [];
-								}
-							} else {
-								for(const id in ids) {
-									if(!childids[id]) { //  
-										delete ids[id];
-										count--;
-										if(count<=0) {
-											return [];
-										}
-									}
-								}
-							}
-						}
-					} else {
-						const valuekey = JSON.stringify(value),
-							secured = {},
-							valuepath = `${keypath}!${valuekey}`,
-							objectpath = `!o${valuepath}!`,
-							testids = {}, 
-							keys = await this.cache.keys(objectpath);
-						if(keys.length===0) {
-							await this.cache.delete(`!v${keypath}!${valuekey}`); // should we actually do this?
-							return [];
-						}
-						for(const key of keys) {
-							const id = key.split("!").pop(),
-								cname = id.split("@")[0];
-							if(!filter ||filter(id)) {
-								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
-								if(data && removed.length===0) {
-									testids[id] = true;
-							    }
-							}
-						}
-						if(!ids) {
-							ids = Object.assign({},testids);
-							count = Object.keys(ids).length;
-							if(count===0) {
-								return [];
-							}
-						} else {
-							for(const id in ids) {
-								if(!secured[id] && !testids[id]) { // 
-									delete ids[id];
-									count--;
-									if(count<=0) {
-										return [];
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-			if(ids) {
-				if(parentPath) {
-					return ids;
-				}
-				for(const id in ids) {
-					const object = await this.getItem(id);
-					if(object && (!filter || filter(object))) {
-						if(partial) {
-							for(const key in object) {
-								if(pattern[key]===undefined && key!=="#" && key!=="^") {
-									delete object[key];
-								}
-							}
-						}
-						results.push(object);
-						if(limit && results.length>=limit) {
-							break;
-						}
-					}
-				}
-			}
-			return results;*/
 		}
 		register(ctor) {
 			if(ctor.name && ctor.name!=="anonymous") {
@@ -2148,6 +1920,16 @@ async function handleRequest(event) {
 				}
 			}
 			return false;
+		}
+		async removeRoles(userName,roles=[]) {
+			if(roles.length>=0) {
+				const user = await this.getUser(userName);
+				if(user) {
+					user.roles || (user.roles={});
+					roles.forEach((role) => delete user.roles[role]);
+					return this.putItem(user,{patch:true});
+				}
+			}
 		}
 		async setItem(key,data,options={},secured) {
 			if(!secured && key[0]!=="!") {
@@ -2211,7 +1993,10 @@ async function handleRequest(event) {
 			const parts = id.split("@"),
 				cname = parts[0],
 				keys = await this.keys(`!o!${cname}!${property}!`,{batchSize:1});
-			return keys.length===0 || !keys[0] || keys[0].endsWith(`!${JSON.stringify(value)}!${id}`);
+			value = JSON.stringify(value);
+			let count = 0;
+			keys.forEach((key) => { if(key.includes(`!${value}!`)) count++;});
+			return keys.length===0 || !keys[0] || count===0 || (parts.length>1 && keys.some((key) => key.endsWith(`!${value}!${id}`)));
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
@@ -2243,13 +2028,25 @@ async function handleRequest(event) {
 			read: ["dbo"],
 			write: ["dbo"]
 		},
+		addRoles: {
+			execute: ["dbo"]
+		},
 		clear: { // only dbo can clear
+			execute: ["dbo"]
+		},
+		deleteUser: {
 			execute: ["dbo"]
 		},
 		entries: { // only dbo can list entries
 			execute: ["dbo"]
 		},
+		entry: {
+			execute: ["dbo"]
+		},
 		keys: { // only dbo can list keys
+			execute: ["dbo"]
+		},
+		removeRoles: {
 			execute: ["dbo"]
 		},
 		values: { // only dbo can list values
@@ -2765,6 +2562,21 @@ async function handleRequest(event) {
 				}
 				entries.push(result_info.cursor);
 				return entries;
+			},
+			entry: async function(key) {
+				const {result,result_info} = await getKeys(key,1,cursor);
+					keyspec  = result[0],
+					entry = keyspec ? [keyspec.name] : null;
+				if(entry) {
+					const value = await this.get(keyspec.name);
+					if(value!==undefined) {
+						entry.push(value);
+					}
+					if(key.expiration) {
+						entry.push(key.expiration);
+					}
+					return entry;
+				}
 			},
 			hasKey: async function(key) {
 				const {result} = await getKeys(key,100);

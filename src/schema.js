@@ -73,7 +73,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					if(!(await db.unique(object,key,value))) {
+					if(!(await db.unique(object["#"],key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}

@@ -136,7 +136,9 @@ async function handleRequest(event) {
 		  }
 		  return new Response(JSON.stringify(value));*/
 		if(thunderhead[fname]) {
-			if(fname!=="createUser") {
+			if(fname==="createUser") {
+				request.user = thunderhead.dbo;
+			} else {
 				// add user to request instead of passing in options?
 				const userName = request.headers.get("X-Auth-Username"),
 					password = request.headers.get("X-Auth-Password"),
@@ -156,7 +158,7 @@ async function handleRequest(event) {
 			//Object.freeze(request);
 			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
 			if(!secured.data || secured.removed.length>0) {
-				return new Response("null",{
+				return new Response(JSON.stringify(secured),{
 					status: 403,
 					headers:
 					{

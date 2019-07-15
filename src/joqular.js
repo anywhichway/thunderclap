@@ -81,7 +81,7 @@
 				return a.startsWith(b); 
 			},
 			$endsWith(a,b) { 
-				return a.$endsWith(b); 
+				return a.endsWith(b); 
 			},
 			$near(n,target,range) {
 				let f = (n,target,range) => n >= target - range && n <= target + range;
@@ -113,20 +113,29 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,...array) {
-				return array.includes(a);
+			$in(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(a);
 			},
-			$nin(a,...array) {
-				return !array.includes(a);
+			$nin(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return !container[0].includes(a);
+				}
+				return !container.includes(a);
 			},
-			$includes(array,b) {
-				return array.includes(b);
+			$includes(value,included) {
+				return value===included;
 			},
-			$excludes(array,b) {
-				return !array.includes(b);
-			},
-			$intersects(a,b) {
-				return Array.isArray(a) && Array.isArray(b) && intersection(a,b).length>0;
+			/*$excludes(value,excluded) {
+				return value!==excluded;
+			},*/
+			$intersects(value,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(value);
 			},
 			$disjoint(a,b) {
 				return !joqular.$intersects(a,b);
@@ -164,17 +173,8 @@
 				}
 				return b.name===cname;
 			},
-			async $isArray() { 
-				const	edges = [];
-				for(const key in this.edges) {
-					if(key.startsWith("Array@") && isSoul(key)) {
-						edges.push(await getNextEdge(this,key,false));
-					}
-				}
-				if(edges.length>0) {
-					this.yield = edges;
-					return true;
-				}
+			async $isArray(a,bool) {
+				return bool===(joqular.$isArray.ctx === "Array") || joqular.$instanceof(a,"Array");
 			},
 			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
@@ -305,7 +305,7 @@
 					});
 				})) ? data : undefined;
 			},
-			toTest(key,keyTest) {
+			toTest(key,keyTest,{cname,parentPath,property}={}) {
 				const type  = typeof(key);
 				if(type==="function") {
 					return key;

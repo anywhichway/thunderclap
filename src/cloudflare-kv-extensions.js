@@ -35,6 +35,21 @@
 				entries.push(result_info.cursor);
 				return entries;
 			},
+			entry: async function(key) {
+				const {result,result_info} = await getKeys(key,1,cursor);
+					keyspec  = result[0],
+					entry = keyspec ? [keyspec.name] : null;
+				if(entry) {
+					const value = await this.get(keyspec.name);
+					if(value!==undefined) {
+						entry.push(value);
+					}
+					if(key.expiration) {
+						entry.push(key.expiration);
+					}
+					return entry;
+				}
+			},
 			hasKey: async function(key) {
 				const {result} = await getKeys(key,100);
 				return result[0].name===key;

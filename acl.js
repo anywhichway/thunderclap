@@ -13,13 +13,25 @@
 			read: ["dbo"],
 			write: ["dbo"]
 		},
+		addRoles: {
+			execute: ["dbo"]
+		},
 		clear: { // only dbo can clear
+			execute: ["dbo"]
+		},
+		deleteUser: {
 			execute: ["dbo"]
 		},
 		entries: { // only dbo can list entries
 			execute: ["dbo"]
 		},
+		entry: {
+			execute: ["dbo"]
+		},
 		keys: { // only dbo can list keys
+			execute: ["dbo"]
+		},
+		removeRoles: {
 			execute: ["dbo"]
 		},
 		values: { // only dbo can list values

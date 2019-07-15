@@ -288,7 +288,7 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
-					if(!(await db.unique(object,key,value))) {
+					if(!(await db.unique(object["#"],key,value))) {
 						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
 					}
 				}
@@ -415,7 +415,7 @@
 				return a.startsWith(b); 
 			},
 			$endsWith(a,b) { 
-				return a.$endsWith(b); 
+				return a.endsWith(b); 
 			},
 			$near(n,target,range) {
 				let f = (n,target,range) => n >= target - range && n <= target + range;
@@ -447,20 +447,29 @@
 			$outside(a,lo,hi) { 
 				return !joqular.$between(a,lo,hi,true);
 			},
-			$in(a,...array) {
-				return array.includes(a);
+			$in(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(a);
 			},
-			$nin(a,...array) {
-				return !array.includes(a);
+			$nin(a,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return !container[0].includes(a);
+				}
+				return !container.includes(a);
 			},
-			$includes(array,b) {
-				return array.includes(b);
+			$includes(value,included) {
+				return value===included;
 			},
-			$excludes(array,b) {
-				return !array.includes(b);
-			},
-			$intersects(a,b) {
-				return Array.isArray(a) && Array.isArray(b) && intersection(a,b).length>0;
+			/*$excludes(value,excluded) {
+				return value!==excluded;
+			},*/
+			$intersects(value,...container) {
+				if(container.length===1 && typeof(a)==="string" && typeof(container[0])==="string") {
+					return container[0].includes(a);
+				}
+				return container.includes(value);
 			},
 			$disjoint(a,b) {
 				return !joqular.$intersects(a,b);
@@ -498,17 +507,8 @@
 				}
 				return b.name===cname;
 			},
-			async $isArray() { 
-				const	edges = [];
-				for(const key in this.edges) {
-					if(key.startsWith("Array@") && isSoul(key)) {
-						edges.push(await getNextEdge(this,key,false));
-					}
-				}
-				if(edges.length>0) {
-					this.yield = edges;
-					return true;
-				}
+			async $isArray(a,bool) {
+				return bool===(joqular.$isArray.ctx === "Array") || joqular.$instanceof(a,"Array");
 			},
 			$isCreditCard(a,bool) {
 				//  Visa || Mastercard || American Express || Diners Club || Discover || JCB 
@@ -639,7 +639,7 @@
 					});
 				})) ? data : undefined;
 			},
-			toTest(key,keyTest) {
+			toTest(key,keyTest,{cname,parentPath,property}={}) {
 				const type  = typeof(key);
 				if(type==="function") {
 					return key;
@@ -1018,11 +1018,18 @@ Copyright AnyWhichWay, LLC 2019
 						signature.push(encodeURIComponent(JSON.stringify(toSerializable(arg[i]))))
 					}
 					return fetch(`${this.endpoint}/db.json?${JSON.stringify(signature)}`,{headers:this.headers})
-		    			.then((response) => response.json())
-		    			.then((data) => create(data,this.ctors))
+						.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+						.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+						.then((data) => create(data,this.ctors));
 				}
 				Object.defineProperty(this,key,{enumerable:false,configurable:true,writable:true,value:f})
 			})
+		}
+		async addRoles(userName,roles=[]) {
+			return fetch(`${this.endpoint}/db.json?["addRoles",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(roles))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async clear(key="") {
 			return fetch(`${this.endpoint}/db.json?["clear",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -1042,8 +1049,8 @@ Copyright AnyWhichWay, LLC 2019
 		    		return password;
 		    	});
 		}
-		async createUser(userName,password,reAuth) {
-			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
+		async createUser(userName,password,extras={},reAuth) {
+			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))},${encodeURIComponent(JSON.stringify(extras))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
@@ -1055,9 +1062,23 @@ Copyright AnyWhichWay, LLC 2019
 		    		return user;
 		    	});
 		}
+		async deleteUser(userName) {
+			return fetch(`${this.endpoint}/db.json?["deleteUser",${encodeURIComponent(JSON.stringify(toSerializable(userName)))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
+		}
 		async entries(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["entries"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json());
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
+		}
+		async entry(key) {
+			return fetch(`${this.endpoint}/db.json?["entry"${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -1067,6 +1088,12 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async getSchema(className) {
 		    return fetch(`${this.endpoint}/db.json?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
+		}
+		async getUser(userName) {
+		    return fetch(`${this.endpoint}/db.json?["getUser",${encodeURIComponent(JSON.stringify(userName))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
@@ -1162,6 +1189,12 @@ Copyright AnyWhichWay, LLC 2019
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async removeRoles(userName,roles=[]) {
+			return fetch(`${this.endpoint}/db.json?["removeRoles",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(roles))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {

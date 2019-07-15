@@ -51,11 +51,18 @@ Copyright AnyWhichWay, LLC 2019
 						signature.push(encodeURIComponent(JSON.stringify(toSerializable(arg[i]))))
 					}
 					return fetch(`${this.endpoint}/db.json?${JSON.stringify(signature)}`,{headers:this.headers})
-		    			.then((response) => response.json())
-		    			.then((data) => create(data,this.ctors))
+						.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+						.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+						.then((data) => create(data,this.ctors));
 				}
 				Object.defineProperty(this,key,{enumerable:false,configurable:true,writable:true,value:f})
 			})
+		}
+		async addRoles(userName,roles=[]) {
+			return fetch(`${this.endpoint}/db.json?["addRoles",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(roles))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async clear(key="") {
 			return fetch(`${this.endpoint}/db.json?["clear",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -75,8 +82,8 @@ Copyright AnyWhichWay, LLC 2019
 		    		return password;
 		    	});
 		}
-		async createUser(userName,password,reAuth) {
-			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))}]`,{headers:this.headers})
+		async createUser(userName,password,extras={},reAuth) {
+			return fetch(`${this.endpoint}/db.json?["createUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(password))},${encodeURIComponent(JSON.stringify(extras))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
@@ -88,9 +95,23 @@ Copyright AnyWhichWay, LLC 2019
 		    		return user;
 		    	});
 		}
+		async deleteUser(userName) {
+			return fetch(`${this.endpoint}/db.json?["deleteUser",${encodeURIComponent(JSON.stringify(toSerializable(userName)))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
+		}
 		async entries(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["entries"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
-	    		.then((response) => response.json());
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
+		}
+		async entry(key) {
+			return fetch(`${this.endpoint}/db.json?["entry"${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors))
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -100,6 +121,12 @@ Copyright AnyWhichWay, LLC 2019
 		}
 		async getSchema(className) {
 		    return fetch(`${this.endpoint}/db.json?["getSchema",${encodeURIComponent(JSON.stringify(className))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
+		}
+		async getUser(userName) {
+		    return fetch(`${this.endpoint}/db.json?["getUser",${encodeURIComponent(JSON.stringify(userName))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
@@ -195,6 +222,12 @@ Copyright AnyWhichWay, LLC 2019
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async removeRoles(userName,roles=[]) {
+			return fetch(`${this.endpoint}/db.json?["removeRoles",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(roles))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
