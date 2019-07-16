@@ -965,7 +965,7 @@
 (function() {
 		module.exports = {
 		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "980749484fd04458b982568fc75378d5",
+		 namespaceId: "c35993d7286b4f6d9cd538ef5e51c768",
 		 authEmail: "syblackwell@anywhichway.com",
 		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
 		 dboPassword: "dbo"
@@ -1627,7 +1627,9 @@ async function handleRequest(event) {
 					}
 				}
 				if(changes) {
+					changes["#"] = data["#"];
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
+					await this.unindex(changes);
 				}
 			}
 			
@@ -1644,7 +1646,22 @@ async function handleRequest(event) {
 			}
 			return data;
 		}
-		async query(pattern,{partial,filter,limit}={},parentPath="",cname) {
+		async query(pattern,{partial,filter,limit}={}) {
+			let results = [];
+			for(const cname in pattern) {
+				if(cname==="_") {
+					for(const cname of ["Object"].concat(Object.keys(this.ctors))) {
+						results = results.concat(await this.queryAux(pattern["_"],{partial,filter,limit:limit-results.length},`!${cname}`,cname))
+					}
+				} else {
+					for(const cname in pattern) {
+						results = results.concat(await this.queryAux(pattern[cname],{partial,filter,limit:limit-results.length},`!${cname}`,cname))
+					}
+				}
+			}
+			return results;
+		}
+		async queryAux(pattern,{partial,filter,limit}={},parentPath="",cname,recursing) {
 			let ids,
 				count = 0,
 				results = [],
@@ -1654,13 +1671,7 @@ async function handleRequest(event) {
 			//'!p!edge!edge
 			//'!t!edge!trigram|id
 			//"!o!edge!"\value\"!id
-			if(!cname) {
-				const topkeys = Object.keys(pattern);
-				cname = topkeys[0];
-				pattern = pattern[cname];
-				parentPath = `!${cname}`;
-				top = true;
-			}
+			
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true,{cname,parentPath,property:key}),
 					value = pattern[key],
@@ -1796,7 +1807,7 @@ async function handleRequest(event) {
 							}
 						} 
 						if(!predicates){ // matching a nested object
-							const childids = await this.query(value,{partial},keypath,cname);
+							const childids = await this.queryAux(value,{partial},keypath,cname,true);
 							if(childids.length===0) {
 								return [];
 							}
@@ -1859,7 +1870,7 @@ async function handleRequest(event) {
 				}
 			}
 			if(ids) {
-				if(top) {
+				if(!recursing) {
 					for(const id in ids) {
 						const object = await this.getItem(id);
 						if(object && (!filter || filter(object))) {

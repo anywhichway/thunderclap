@@ -257,7 +257,9 @@
 					}
 				}
 				if(changes) {
+					changes["#"] = data["#"];
 					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
+					await this.unindex(changes);
 				}
 			}
 			
@@ -274,7 +276,22 @@
 			}
 			return data;
 		}
-		async query(pattern,{partial,filter,limit}={},parentPath="",cname) {
+		async query(pattern,{partial,filter,limit}={}) {
+			let results = [];
+			for(const cname in pattern) {
+				if(cname==="_") {
+					for(const cname of ["Object"].concat(Object.keys(this.ctors))) {
+						results = results.concat(await this.queryAux(pattern["_"],{partial,filter,limit:limit-results.length},`!${cname}`,cname))
+					}
+				} else {
+					for(const cname in pattern) {
+						results = results.concat(await this.queryAux(pattern[cname],{partial,filter,limit:limit-results.length},`!${cname}`,cname))
+					}
+				}
+			}
+			return results;
+		}
+		async queryAux(pattern,{partial,filter,limit}={},parentPath="",cname,recursing) {
 			let ids,
 				count = 0,
 				results = [],
@@ -284,13 +301,7 @@
 			//'!p!edge!edge
 			//'!t!edge!trigram|id
 			//"!o!edge!"\value\"!id
-			if(!cname) {
-				const topkeys = Object.keys(pattern);
-				cname = topkeys[0];
-				pattern = pattern[cname];
-				parentPath = `!${cname}`;
-				top = true;
-			}
+			
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true,{cname,parentPath,property:key}),
 					value = pattern[key],
@@ -426,7 +437,7 @@
 							}
 						} 
 						if(!predicates){ // matching a nested object
-							const childids = await this.query(value,{partial},keypath,cname);
+							const childids = await this.queryAux(value,{partial},keypath,cname,true);
 							if(childids.length===0) {
 								return [];
 							}
@@ -489,7 +500,7 @@
 				}
 			}
 			if(ids) {
-				if(top) {
+				if(!recursing) {
 					for(const id in ids) {
 						const object = await this.getItem(id);
 						if(object && (!filter || filter(object))) {

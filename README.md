@@ -290,8 +290,8 @@ db.query({Object:{[/a.*/]:{$eq: 1}}}) // match all Objects with properties start
 ```
 
 You may have noted above, the top level property names in a query should be class names. In MongoDB, these would 
-be collections. Currently, only one top level class name is supported. In the future it will be possible to query multiple
-class types at once or provide a wild card `_`.
+be collections. Using different top level keys you can query multiple "collections" at the sam etime. If you use the
+top leve wild card key `_`, all "collections" will be searched.
 
 The supported patterns are described below. All examples assume these two objects exist in the database:
 
@@ -828,10 +828,12 @@ includes the addition of graph queries a la GunDB and joins.
 
 # Change Log (reverse chronological order) [top](#top)
 
+2019-07-16 v0.0.28a Multiple classes can now be queried at the same time.
+
 2019-07-15 v0.0.27a Added many user management functions.
 
 2019-07-14 v0.0.26a Modified indexing and query approach to use classes at top level, i.e. `{<cname>:<pattern>}`
-instead of `<pattern>`. NAMESPACES must be recreated. The ability to query across classes will be re-introduce in 
+instead of `<pattern>`. NAMESPACES must be recreated. The ability to query across classes will be re-introduced in 
 a subsequent release using {_:<pattern>}. This change will improve performance is real-world cases by further
 partitioning keys and also making unique key look-up/verification much faster.
 
