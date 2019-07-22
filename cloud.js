@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 24);
+/******/ 	return __webpack_require__(__webpack_require__.s = 25);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -90,7 +90,7 @@
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(2);
+	const uid = __webpack_require__(1);
 	
 	class Entity {
 		constructor(config) {
@@ -113,12 +113,21 @@
 
 /***/ }),
 /* 1 */
+/***/ (function(module, exports) {
+
+(function() {
+	"use strict"
+	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
+}).call(this)
+
+/***/ }),
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
 	const Entity = __webpack_require__(0),
-		Coordinates = __webpack_require__(3);
+		Coordinates = __webpack_require__(4);
 	class Position extends Entity {
 		constructor({coords,timestamp}) {
 			super();
@@ -153,22 +162,33 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
-/***/ (function(module, exports) {
-
-(function() {
-	"use strict"
-	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
-}).call(this)
-
-/***/ }),
 /* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
+	const uuid4 = __webpack_require__(10),
+		isSoul = (value,checkUUID=true) => {
+			if(typeof(value)==="string") {
+				const parts = value.split("@"),
+					isnum = !isNaN(parseInt(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
+			}
+			return false;
+		};
+	module.exports = isSoul;
+})();
+
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
 	const Entity = __webpack_require__(0),
-		Position = __webpack_require__(1);
+		Position = __webpack_require__(2);
 	class Coordinates extends Entity {
 		constructor(coords) {
 			super();
@@ -188,26 +208,6 @@
 	}
 	module.exports = Coordinates;
 }).call(this);
-
-/***/ }),
-/* 4 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	"use strict"
-	const uuid4 = __webpack_require__(9),
-		isSoul = (value,checkUUID=true) => {
-			if(typeof(value)==="string") {
-				const parts = value.split("@"),
-					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
-			}
-			return false;
-		};
-	module.exports = isSoul;
-})();
-
-
 
 /***/ }),
 /* 5 */
@@ -288,8 +288,9 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
+					const cname = object["#"].split("@")[0];
 					if(!(await db.unique(object["#"],key,value))) {
-						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
+						errors.push(new TypeError(`"${key}" value "${value}" must be unique for ${cname}`));
 					}
 				}
 			},
@@ -330,6 +331,22 @@
 
 /***/ }),
 /* 7 */
+/***/ (function(module, exports) {
+
+(function() {
+		module.exports = {
+		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
+		 namespaceId: "c35993d7286b4f6d9cd538ef5e51c768",
+		 authEmail: "syblackwell@anywhichway.com",
+		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
+		 dboPassword: "dbo",
+		 mailgunKey: "YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
+		 mailgunHostName: "mailgun.anywhichway.com"
+		}
+	}).call(this)
+
+/***/ }),
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -338,11 +355,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(8),
-		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(10),
-		isFloat = __webpack_require__(11),
-		validateLuhn = __webpack_require__(12),
+	const soundex = __webpack_require__(9),
+		isSoul = __webpack_require__(3),
+		isInt = __webpack_require__(11),
+		isFloat = __webpack_require__(12),
+		validateLuhn = __webpack_require__(13),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -705,7 +722,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -716,7 +733,7 @@
 }).call(this);
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -750,7 +767,7 @@
 }).call(this);
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -759,7 +776,7 @@
 }).call(this)
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -768,7 +785,7 @@
 }).call(this)
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -797,7 +814,7 @@
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -845,12 +862,12 @@
 }).call(this);
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Position = __webpack_require__(1);
+	const Position = __webpack_require__(2);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
@@ -889,48 +906,176 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uid = __webpack_require__(1),
+		isSoul = __webpack_require__(3);
+	
+	function Edge({db,parent,path=["","e"]}) {
+		Object.defineProperty(this,"db",{enumerable:false,value:db});
+		this.parent = parent;
+		this.path = path;
+	}
+	Edge.prototype.delete = async function() {
+		const keys = await this.db.keys(this.path.join("!"));
+		if(keys.length===0 || keys[0]==="") {
+			return 0;
+		}
+		await this.db.removeItem(this.path.join("!"))
+		return this.db.clear(this.path.join("!"));
+	}
+	Edge.prototype.get = function(path) {
+		const parts = Array.isArray(path) ? path : path.split(".");
+		let parent = this,
+			part;
+		path = this.path.slice();
+		while(part = parts.shift()) {
+			path.push(part);
+			parent = new Edge({db:this.db,parent,path:path.slice()});
+		}
+		return parent;
+	}
+	Edge.prototype.put = async function(data,options={}) {
+		let node = this,
+			type = typeof(data);
+		if(data && type==="object") {
+			const id = data["#"];
+			// add id if not present?
+			// when here?
+			// transform here
+			// validate here
+			// secure here
+			// on here
+			if(id) { // if putting a first class object, reset to root
+				const cname = id.split("@")[0];
+				node = await (await this.db.get(`${cname}@`)).get(id);
+			}
+			for(const key in data) {
+				const value = data[key];
+				if(value && value["#"]) {
+					await this.db.put(value,options.expireRelated ? options : {});
+				} else {
+					//if(value && typeof(value)==="object") {
+					//	value["#"] = `${value.constructor.name}@${uid()}`
+					//}
+					const child = await node.get(key);
+					await child.put(value,options);
+				}
+			}
+		} else {
+			this.value(data,options);
+		}
+		return data;
+	}
+	Edge.prototype.restore = async function(data) {
+		if(typeof(data)!=="string") {
+			const path = this.path.slice();
+			path.shift(); // remove ""
+			if(path[0].endsWith("@")) {
+				path.splice(1,1); // remove id;
+			}
+			// security here using edge path
+			return data;
+		}
+		const cname = data.split("@")[0];
+		if(cname) {
+			const keys = await this.db.keys(`!e!${cname}@!${data}!`),
+				object = {};
+			for(const key of keys) {
+				const parts = key.split("!"),
+					value = await this.db.cache.get(key);
+				let node = object;
+				parts.shift(); // remove ""
+				parts.splice(1,1); // remove id
+				const vpath = parts.slice();
+				parts.shift(); // remove class
+				while(parts.length>1) { // walk down the object
+					const property = parts.shift(),
+					node = node[property];
+				}
+				node[parts[0]] = value;
+			}
+			return object;
+		}
+		return data;
+	}
+	Edge.prototype.value = async function(value,options={}) {
+		if(arguments.length>0) {
+			const vpath = this.path.slice();
+			vpath.shift(); // remove ""
+			if(vpath[0].endsWith("@")) {
+				vpath.splice(0,1); //remove id
+			}
+			// transform here
+			// validate here
+			// secure here
+			return this.db.cache.put(this.path.join("!"),value,options)
+		}
+		return await this.restore(await this.db.cache.get(this.path.join("!")));
+	}
+	module.exports = Edge;
+}).call(this)
+
+/***/ }),
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		browser: [
+		client: [
 			{
 				when: {testWhenBrowser:{$eq:true}},
-				transform: async (data,pattern) => {
+				transform({data,pattern,user,request}) {
 					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
 					return data;
 				},
-				call: async (data,pattern) => {
-					
-				}
-			}
-		],
-		cloud: [
-			{
-				when: {testWhen:{$eq:true}},
-				transform: async (data,pattern) => {
-					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
-					return data;
-				},
-				call: async (data,pattern) => {
+				call({data,pattern,user,request}) {
 					
 				}
 			}
 		],
 		worker: [
 			// not yet implemented
+		],
+		cloud: [
+			{
+				when: {testWhen:{$eq:true}},
+				transform({data,pattern,user,request}) {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call({data,pattern,user,request,db}) {
+					
+				}
+			}
+			/* Graph edge updates can also be monitored, although it is just as easy with triggers since edge updates are atomic
+			{
+				edge: {devices:{_:{alarm:true}}, // matches any time any device has alarm set to true
+				transform({data,pattern,user,request}) {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call({data,pattern,user,request,db}) {
+					
+				}
+			}
+			*/
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		browser: {
+		client: {
+			
+		},
+		worker: {
 			
 		},
 		cloud: {
@@ -940,15 +1085,12 @@
 			getDate() {
 				return new Date();
 			}
-		},
-		worker: {
-			
 		}
 	}
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 19 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -959,21 +1101,7 @@
 }).call(this);
 
 /***/ }),
-/* 18 */
-/***/ (function(module, exports) {
-
-(function() {
-		module.exports = {
-		 accountId: "92dcaefc91ea9f8eb9632c01148179af",
-		 namespaceId: "c35993d7286b4f6d9cd538ef5e51c768",
-		 authEmail: "syblackwell@anywhichway.com",
-		 authKey: "bb03a6b1c8604b0541f84cf2b70ea9c45953c",
-		 dboPassword: "dbo"
-		}
-	}).call(this)
-
-/***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1018,13 +1146,13 @@
 }).call(this)
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const acl = __webpack_require__(26),
-		roles = __webpack_require__(27),
+	const acl = __webpack_require__(27),
+		roles = __webpack_require__(28),
 		aclKeys = Object.keys(acl),
 		// compile rules that are RegExp based
 		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
@@ -1043,11 +1171,9 @@
 	
 	// applies acl rules for key and action
 	// if user is not permitted to take action, modifies data accordingly
-	async function secure({key,action,data,documentOnly}) {
-		const {request} = this,
-			{user} = request;
+	async function secure({key,action,data,documentOnly,request,user}) {
 		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : [],user};
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : data,user};
 		}
 		// assemble applicable rules
 		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
@@ -1060,7 +1186,7 @@
 		for(const rule of rules) {
 			if(rule[action]) {
 				if(typeof(rule[action])==="function") {
-					if(!(await rule[action].call(this,{action,user,data,request}))) {
+					if(!(await rule[action].call(this,{action,user,data,request,key,functionName:key,argumentsList:data}))) {
 						return {removed};
 					}
 				} else {
@@ -1076,31 +1202,30 @@
 					return {removed};
 				}
 			}
-			if(!documentOnly && rule.properties && data && typeof(data)==="object") {
-				const properties = rule.properties[action];
-				if(properties) {
-					for(const key of Object.keys(properties)) {
-						if(data[key]!==undefined) {
-							if(typeof(properties[key])==="function") {
-								if(!(await properties[key].call(this,{action,user,object:data,key,request}))) {
+			if(!documentOnly && rule.keys && data && typeof(data)==="object") {
+				if(typeof(rule.keys)==="function") {
+					for(const key in data) {
+						if(!(await rule.keys.call(this,{action,user,object:data,key,request}))) {
+							delete data[key];
+							removed.push(key);
+						}
+					}
+				} else {
+					for(const key in data) {
+						const constraint = rule.keys[key];
+						if(constraint && constraint[action]) {
+							if(typeof(constraint)==="function") {
+								if(!(await constraint.call(this,{action,user,object:data,key,request,functionName:key,argumentsList:data}))) {
 									delete data[key];
 									removed.push(key);
 								}
 							} else {
-								const roles = Array.isArray(properties[key]) ?  properties[key] : Object.keys(properties[key]);
+								const roles = Array.isArray(rule.keys[key]) ?  rule.keys[key] : Object.keys(rule.keys[key]);
 								if(!roles.some((role) => user.roles[role])) {
 									delete data[key];
 									removed.push(key);
 								}
 							}
-						}
-					}
-				}
-				if(rule.properties.filter) {
-					for(const key of Object.keys(data)) {
-						if(data[key]!==undefined && !(await rule.properties.filter.call(this,{action,user,object:data,key,request}))) {
-							delete data[key];
-							removed.push(key);
 						}
 					}
 				}
@@ -1129,10 +1254,10 @@
 }).call(this)
 
 /***/ }),
-/* 21 */,
 /* 22 */,
 /* 23 */,
-/* 24 */
+/* 24 */,
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1152,11 +1277,11 @@ const //uid = require("./uid.js"),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(19),
-	toSerializable = __webpack_require__(13),
-	Thunderhead = __webpack_require__(25),
-	dboPassword = __webpack_require__(18).dboPassword,
-	secure = __webpack_require__(20);
+	hashPassword = __webpack_require__(20),
+	toSerializable = __webpack_require__(14),
+	Thunderhead = __webpack_require__(26),
+	dboPassword = __webpack_require__(7).dboPassword,
+	secure = __webpack_require__(21);
 
 /*const thunderclapjs = `(function() 
 	{ 
@@ -1179,6 +1304,7 @@ const //uid = require("./uid.js"),
 
 let thunderhead;
 addEventListener('fetch', event => {
+	// if on localhost, use something like kv-store as a simulator
 	const request = event.request,
 		dbo = new User("dbo",{"#":"User@dbo",roles:{dbo:true}});
 	request.URL = new URL(request.url);
@@ -1191,27 +1317,6 @@ addEventListener('fetch', event => {
 
 async function handleRequest(event) {
 	const {request,response} = event;
-	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
-	  method: "POST",
-	  body:encodeURI(
-		"from=Excited User <syblackwell@anywhichway.com>&" +
-		"to=syblackwell@anywhichway.com&"+
-		"subject=Hello&"+
-		"text=Testing some Mailgun awesomeness!"
-	  ),
-	  headers: {
-	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
-	    "Content-Type": "application/x-www-form-urlencoded"
-	  }
-	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
-	.catch((e) => e.message+'Err');
-	return new Response(JSON.stringify(mail),{
-		headers:
-		{
-			"Content-Type":"text/plain",
-			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-		}
-	});*/
 	
 	let body = "Not Found",
 		status = 404;
@@ -1251,11 +1356,6 @@ async function handleRequest(event) {
 			});*/
 		}
 		let userschema = await thunderhead.getSchema(User);
-		if(!userschema) {
-			request.user = thunderhead.dbo;
-			const userschema = await thunderhead.putItem(new Schema(User));
-			request.user = undefined;
-		}
 		body = decodeURIComponent(request.URL.search.replace(/\+/g,"%20"));
 		const command = JSON.parse(body.substring(1)),
 			fname = command[0],
@@ -1294,7 +1394,7 @@ async function handleRequest(event) {
 				request.user = Object.freeze(user);
 			}
 			//Object.freeze(request);
-			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
+			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args,user:request.user,request});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response(JSON.stringify(secured),{
 					status: 403,
@@ -1309,7 +1409,7 @@ async function handleRequest(event) {
 			.then((result) => {
 				const type = typeof(result);
 				if(result && type==="object" && result instanceof Error) {
-					return new Response(JSON.stringify(result.errors.map(error => error+"")),
+					return new Response(JSON.stringify(result.errors ? result.errors.map(error => error+"") : result+""),
 						{
 							status:422,
 							headers:
@@ -1365,7 +1465,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1375,27 +1475,28 @@ async function handleRequest(event) {
 	Copyright AnyWhichWay, LLC 2019
 	 */
 	"use strict"
-	const uid = __webpack_require__(2),
-		isSoul = __webpack_require__(4),
-		joqular = __webpack_require__(7),
-		hashPassword = __webpack_require__(19),
-		secure = __webpack_require__(20),
-		trigrams = __webpack_require__(28),
-		tokenize = __webpack_require__(29),
-		stopwords = __webpack_require__(30),
-		stemmer = __webpack_require__(31),
-		respond = __webpack_require__(32)("cloud"),
-		fromSerializable = __webpack_require__(14),
+	const uid = __webpack_require__(1),
+		isSoul = __webpack_require__(3),
+		joqular = __webpack_require__(8),
+		hashPassword = __webpack_require__(20),
+		secure = __webpack_require__(21),
+		trigrams = __webpack_require__(29),
+		tokenize = __webpack_require__(30),
+		stopwords = __webpack_require__(31),
+		stemmer = __webpack_require__(32),
+		on = __webpack_require__(33)("cloud"),
+		fromSerializable = __webpack_require__(15),
+		sendMail = __webpack_require__(35),
 		User = __webpack_require__(6),
 		Schema = __webpack_require__(5),
-		Position = __webpack_require__(1),
-		Coordinates = __webpack_require__(3),
-		Cache = __webpack_require__(34),
-		when = __webpack_require__(15).cloud,
-		functions = __webpack_require__(16).cloud,
-		classes = __webpack_require__(17),
-		keys = __webpack_require__(18);
-	
+		Position = __webpack_require__(2),
+		Coordinates = __webpack_require__(4),
+		Cache = __webpack_require__(36),
+		Edge = __webpack_require__(16),
+		when = __webpack_require__(17).cloud,
+		functions = __webpack_require__(18).cloud,
+		classes = __webpack_require__(19),
+		keys = __webpack_require__(7);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1403,7 +1504,6 @@ async function handleRequest(event) {
 		constructor({namespace,request,dbo,refresh=5000}) {
 			this.ctors = {};
 			this.request = request;
-			//this.namespace = namespace;
 			this.dbo = dbo;
 			this.cache = new Cache({namespace});
 			this.register(Array);
@@ -1414,7 +1514,7 @@ async function handleRequest(event) {
 			this.register(Position);
 			this.register(Coordinates);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
-			__webpack_require__(35)(this);
+			__webpack_require__(37)(this);
 			joqular.db = this;
 			namespace.keys = this.keys;
 			setInterval(() => {
@@ -1428,6 +1528,7 @@ async function handleRequest(event) {
 				if(user) {
 					user.roles || (user.roles={});
 					roles.forEach((role) => user.roles[role]=true);
+					secure.mapRoles(user);
 					return this.putItem(user,{patch:true});
 				}
 			}
@@ -1466,7 +1567,7 @@ async function handleRequest(event) {
 		async createUser(userName,password,extras={}) {
 			let user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
-			delete extras.roles;
+			["hash","salt","password","roles"].forEach((key) => delete extras[key]);
 			Object.assign(user,extras);
 			const request = this.request,
 				authed = request.user;
@@ -1475,8 +1576,10 @@ async function handleRequest(event) {
 			request.user = authed;
 			return user;
 		}
-		async delete(key) {
-			return this.removeItem(key);
+		async delete(path) {
+			path = ["","e"].concat(Array.isArray(path) ? path : path.split("."));
+			const edge = new Edge({db:this,path});
+			return edge.delete();
 		}
 		async deleteUser(userName) {
 			const user = await this.getUser(userName);
@@ -1485,30 +1588,28 @@ async function handleRequest(event) {
 			}
 			return true;
 		}
-		//async get(key,options) {
-			//return this.get(key,options);
-		//}
+		async get(key) {
+			return (new Edge({db:this})).get(key);
+		}
 		async getItem(key) {
+			const request = this.request,
+				user = request.user;
 			let data = await this.cache.get(key);
 			if(data!=null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
 					const key = `${data["#"].split("@")[0]}@`,
-						secured = await secure.call(this,{key,action,data});
+						secured = await secure.call(this,{key,action,data,request,user});
 					data = secured.data;
 				}
-				const secured = await secure.call(this,{key,action,data});
+				const secured = await secure.call(this,{key,action,data,request,user});
 				data = secured.data;
 			}
 			return data==null ? undefined : data;
 		}
-		async getSchema(ctor) {
-			let data = await this.cache.get(`Schema@${ctor.name||ctor}`);
-			if(data) {
-				const secured = await secure.call(this,{key:"Schema",action:"read",data});
-				if(secured.data) {
-					return new Schema(ctor.name||ctor,data);
-				}
+		async getSchema(cname) {
+			if(this.ctors[cname]) {
+				return this.ctors[cname].schema;
 			}
 		}
 		async getUser(userName) {
@@ -1554,11 +1655,17 @@ async function handleRequest(event) {
 				}
 			}
 		}
-		//async put(key,value) {
-		//	return this.put(key,value);
-		//}
+		async put(data) {
+			const edge = new Edge({db:this});
+			for(const key in data) {
+				await (await edge.get(key)).put(data[key]);
+			}
+			return data;
+		}
 		async putItem(object,options={}) {
-			const {patch} = options;
+			const request = this.request,
+				user = request.user,
+				patch = options.patch;
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -1570,7 +1677,7 @@ async function handleRequest(event) {
 			}
 			const cname = id.split("@")[0],
 				key =`${cname}@`;
-			await respond.call(this,{key,when:"before",action:"put",data:object});
+			await on.call(this,{key,when:"before",action:"put",data:object,request,user});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -1582,14 +1689,14 @@ async function handleRequest(event) {
 				}
 			}
 			let original,
-				{data,removed} = await secure.call(this,{key,action:"write",data:object});
+				{data,removed} = await secure.call(this,{key,action:"write",data:object,request,user});
 			if(data) {
 				original = await this.getItem(id);
 				data = await this.setItem(id,data,options,true);
 			}
 			if(!data) {
 				const error = new Error();
-				error.errors = [new Error(`Denied 'write' for ${id}`)];
+				error.errors = [new Error(`Denied 'set' for ${id}`)];
 				return error;
 			}
 			const matches = when.reduce((accum,item) => {
@@ -1600,7 +1707,7 @@ async function handleRequest(event) {
 			},[]);
 			for(const match of matches) {
 				if(match.transform) {
-					data = await match.transform.call(this,data,match.when);
+					data = await match.transform.call(this,{data,pattern:match.when,request,user});
 				}
 			}
 			let changes;
@@ -1628,17 +1735,16 @@ async function handleRequest(event) {
 				}
 				if(changes) {
 					changes["#"] = data["#"];
-					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
+					await on.call(this,{key:id,when:"before",action:"update",data,changes,request,user});
 					await this.unindex(changes);
 				}
 			}
-			
 			await this.index(data,options);
 			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 			if(changes) {
-				await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
+				await on.call(this,{key:id,when:"after",action:"update",data:frozen,changes,request,user});
 			}
-			await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
+			await on.call(this,{key:id,when:"after",action:"put",data:frozen,request,user});
 			for(const match of matches) {
 				if(match.call) {
 					await match.call(this,data,match.when);
@@ -1671,7 +1777,8 @@ async function handleRequest(event) {
 			//'!p!edge!edge
 			//'!t!edge!trigram|id
 			//"!o!edge!"\value\"!id
-			
+			const request = this.request,
+				user = request.user;
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true,{cname,parentPath,property:key}),
 					value = pattern[key],
@@ -1717,7 +1824,7 @@ async function handleRequest(event) {
 												testids[id].avg = testids[id].sum / count;
 											} else {
 												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value,request,user}});
 												if(data && removed.length===0) {
 													testids[id] = {sum:1};
 											    } else {
@@ -1772,14 +1879,13 @@ async function handleRequest(event) {
 										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
 									parts[1] = "o";
 									const path = parts.join("!");
-									//return [test.ctx.keypath, pvalue,await this.cache.keys(`!o${test.ctx.keypath}!`)];
 									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 										const keys = await this.cache.keys(`${path}!${rawvalue}!`);
 										for(const key of keys) {
 											const parts = key.split("!"),
 												id = parts.pop();
 											if(!filter || filter(id)) {
-												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
 												if(data && removed.length===0) {
 													testids[id] = true;
 											    }
@@ -1843,7 +1949,7 @@ async function handleRequest(event) {
 						for(const key of keys) {
 							const id = key.split("!").pop();
 							if(!filter ||filter(id)) {
-								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
 								if(data && removed.length===0) {
 									testids[id] = true;
 							    }
@@ -1899,7 +2005,9 @@ async function handleRequest(event) {
 			}
 		}
 		async removeItem(keyOrObject) {
-			const type = typeof(keyOrObject);
+			const type = typeof(keyOrObject),
+				request = this.request,
+				user = request.user;
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
@@ -1911,22 +2019,22 @@ async function handleRequest(event) {
 				const action = "write",
 					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
 				if(key) {
-					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
+					if(!(await on.call(this,{key,when:"before",action:"remove",data:value,object:value,request,user}))) {
 						return false;
 					}
 				}
-				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+				if(!(await on.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value,request,user}))) {
 					return false;
 				}
-				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
+				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true,request,user});
 				if(data && removed.length===0) {
 					await this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
-						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
+						await on.call(this,{key,when:"after",action:"remove",data:frozen,request,user});
 					}
-					await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
+					await on.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen,request,user});
 					return true;
 				}
 			}
@@ -1942,25 +2050,53 @@ async function handleRequest(event) {
 				}
 			}
 		}
+		async resetPassword(userName,method="email") {
+			
+		}
+		async sendMail(config) {
+			const email = this.request.user.email;
+			if(!email) {
+				return;
+			}
+			config.from = email;
+			return sendMail(config);
+		}
 		async setItem(key,data,options={},secured) {
+			const request = this.request,
+				user = request.user;
 			if(!secured && key[0]!=="!") {
 				const action = "write";
-				await respond.call(this,{key,when:"before",action:"set",data});
-				const secured = await secure.call(this,{key,action,data});
+				await on.call(this,{key,when:"before",action,data,request,user});
+				const secured = await secure.call(this,{key,action,data,request,user});
+				if(secured.removed===data || secured.removed.length>0) {
+					return;
+				}
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure.call(this,{key,action,data});
+						secured = await secure.call(this,{key,action,data,request,user});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
 				await this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
+				//await on.call(this,{key,when:"after",action:"write",data:frozen,request,user});
 			}
 			return data;
-		} 
+		}
+		async updateUser(userName,properties={}) {
+			const authed = this.request.user;
+			let user = await this.authUser(userName,oldPassword);
+			if(authed.userName===userName && !user) {
+				return false;
+			}
+			["hash","salt","password","roles"].forEach((key) => delete properties[key]);
+			user = await this.getUser(userName);
+			Object.assign(user,properties);
+			await this.putItem(user);
+			return user;
+		}
 		async unindex(object,parentPath="",parentId) {
 			const id = parentId||object["#"];
 			if(!parentId) {
@@ -2002,12 +2138,19 @@ async function handleRequest(event) {
 		}
 		async unique(id,property,value) {
 			const parts = id.split("@"),
-				cname = parts[0],
-				keys = await this.keys(`!o!${cname}!${property}!`,{batchSize:1});
-			value = JSON.stringify(value);
-			let count = 0;
-			keys.forEach((key) => { if(key.includes(`!${value}!`)) count++;});
-			return keys.length===0 || !keys[0] || count===0 || (parts.length>1 && keys.some((key) => key.endsWith(`!${value}!${id}`)));
+				cname = parts[0];
+			if(parts.length===1) {
+				const results = await this.query({[cname]:{[property]:value}});
+				return results.length===0
+			}
+
+			const results = await this.query({[cname]:{[property]:value}});
+			return results.length===0 || (results.length===1 && results[0]["#"]===id);
+		}
+		async value(path,data,options={}) {
+			path = ["","e"].concat(Array.isArray(path) ? path : path.split("."));
+			const edge = new Edge({db:this,path});
+			return arguments.length>1 ? edge.value(data,options) : edge.value();
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
@@ -2021,16 +2164,16 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports) {
 
-(function () {
+(function() {
 	module.exports = {
 		securedTestReadKey: { // for testing purposes
-			read: [] // no reads allowed
+			read: [] // no gets allowed
 		},
 		securedTestWriteKey: { // for testing purposes
-			write: [] // no writes allowed
+			write: [] // no sets allowed
 		},
 		securedTestFunction: { // for testing purposes
 			execute: [] // no execution allowed
@@ -2039,7 +2182,7 @@ async function handleRequest(event) {
 			read: ["dbo"],
 			write: ["dbo"]
 		},
-		addRoles: {
+		addRoles: { // only dbo can add roles to a user
 			execute: ["dbo"]
 		},
 		clear: { // only dbo can clear
@@ -2060,50 +2203,76 @@ async function handleRequest(event) {
 		removeRoles: {
 			execute: ["dbo"]
 		},
+		resetPassword: { // only user themself or dbo can start a password reset
+			execute({argumentsList,user}) {
+				return user.roles.dbo || argumentsList[0]===user.userName
+			}
+		},
+		sendMail: { // only dbo can send mail
+			execute: ["dbo"]
+		},
+		updateUser: {  // only user themself or dbo can update user properties
+			execute({argumentsList,user}) {
+				return user.roles.dbo || argumentsList[0]===user.userName
+			}
+		},
 		values: { // only dbo can list values
 			execute: ["dbo"]
 		},
 		"User@": { // key to control, use <cname>@ for classes
 			
-			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
-			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
+			// read: ["<role>",...], // array or map of roles to allow get, not specifying means all have get
+			// write: {<role>:true}, // array or map of roles to allow set, not specifying means all have set
 			// a filter function can also be used
-			// action with be "read" or "write", not returning anything will result in denial
-			// not specifying a filter function will allow all read and write, unless controlled above
+			// action with be "get" or "set", not returning anything will result in denial
+			// not specifying a filter function will allow all get and set, unless controlled above
 			// a function with the same call signature can also be used as a property value above
-			filter: async function({action,user,data,request}) {
+			filter({action,user,data,request}) {
 				// very restrictive, don't return a user record unless requested by the dbo or data subject
 				if(user.roles.dbo || user.userName===data.userName) {
 					return data;
 				}
 			},
-			properties: { // only applies to objects
-				read: {
-					roles: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName, // example of using a function, only dbo's can get roles
-					hash: ["dbo"], // only dbo's can read passwod hashes
-					salt: {
-						dbo: true // example of alternate control form, only dbo's can read password salts
-					}
+			keys: { // only applies to objects
+				roles: {
+					// only dbo's and data subject can get roles
+					get({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
 				},
-				write: {
-					password: {
-						// a propery named password can never be written
+				hash: {
+					// only dbo's can get password hashes
+					read: ["dbo"],
+					// only the dbo and data subject can set a hash
+					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+				},
+				salt: {
+					// example of alternate control form, only dbo's can get password salts
+					read: {
+						dbo: true
 					},
-					// only the dbo and data subject can write a hash and salt
-					hash: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
-					salt: ({action,user,object,key,request}) => user.roles.dbo || object.userName===user.userName,
-					//userName: ({action,user,object,key,request}) => object.userName!=="dbo" // can't change name of primary dbo
+					// only the dbo and data subject can set a salt
+					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
 				},
-				filter: async function({action,user,object,key}) {
-					return true; // allows all other properties to be read or written, same as having no filter at all
+				name({action,user,data,request}) { return data; } // example, same as no access control
+			}
+			/* keys could also be a function
+			keys({action,user,data,key,request})
+			 */
+		}
+		/* Edges are just nested keys or wildcards, e.g.
+		people: {
+			_: { // matches any sub-edge
+				secretPhrase: { // matches secrePhrase edge
+					get(...) { ... },
+					set(...) { ... }
 				}
 			}
 		}
+		*/
 	}
 }).call(this);
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2115,7 +2284,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2133,7 +2302,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2144,7 +2313,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2166,7 +2335,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2357,127 +2526,131 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	let triggers,
-		triggersKeys,
+	let actions,
+		actionsKeys,
 		compiled;
 		
-	async function respond({key,when,action,data,changes}) {
-		// assemble applicable triggers
-		const {request} = this,
-			{user} = request,
-			triggers = compiled.triggersRegExps.reduce((accum,{regexp,trigger}) => {
+	async function on({key,when,action,data,changes,request,user}) {
+		// assemble applicable actions
+		const actions = compiled.actionsRegExps.reduce((accum,{regexp,action}) => {
 				if(regexp.test(key)) {
 					accum.push(key);
 				}
 				return accum;
-			},[]).concat(compiled.triggersLiterals[key]||[]);
-		for(const trigger of triggers) {
-			if(trigger[when] && trigger[when][action]) {
+			},[]).concat(compiled.actionsLiterals[key]||[]);
+		for(const action of actions) {
+			if(action[when] && action[when][action]) {
 				if(action==="before") {
-					if(!(await trigger[when][action].call(this,{action,user,data,changes,request}))) {
+					if(!(await action[when][action].call(this,{action,user,data,changes,request}))) {
 						return false;
 					}
 				}
-				await trigger[when][action].call(this,{action,user,data,changes,request})
+				await action[when][action].call(this,{action,user,data,changes,request})
 			}
 		}
 		return true
 	}
 	module.exports = (type) => {
-		triggers = __webpack_require__(33)[type],
-		triggersKeys = Object.keys(triggers),
-		compiled = triggersKeys.reduce(({triggersRegExps,triggersLiterals},key) => {
+		actions = __webpack_require__(34)[type],
+		actionsKeys = Object.keys(actions),
+		compiled = actionsKeys.reduce(({actionsRegExps,actionsLiterals},key) => {
 			const parts = key.split("/");
 			if(parts.length===3 && parts[0]==="") {
 				try {
-					triggersRegExps.push({regexp:new RegExp(parts[1],parts[2]),trigger:triggers[key]})
+					actionsRegExps.push({regexp:new RegExp(parts[1],parts[2]),action:actions[key]})
 				} catch(e) {
-					triggersLiterals[key] = triggers[key];
+					actionsLiterals[key] = actions[key];
 				}
 			} else {
-				triggersLiterals[key] = triggers[key];
+				actionsLiterals[key] = actions[key];
 			}
-			return {triggersRegExps,triggersLiterals};
-		},{triggersRegExps:[],triggersLiterals:{}});
-		return respond;
+			return {actionsRegExps,actionsLiterals};
+		},{actionsRegExps:[],actionsLiterals:{}});
+		return on;
 	};
 }).call(this);
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		browser: {
+		client: {
 			
 		},
+		worker: {
+
+		},
 		cloud: {
-			"<keyOrRegExp>": {
-				before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
-					put({user,data,request}) {
-						// if data is an object, it can be modified
-						return true; // return true to continue processing
-					},
-					remove({user,data,request}) {
-						
-						return true; // return true to continue processing
-					}
+			"User@": {
+				get({value,key,user,request}) {
+					; // called after get
 				},
-				after: { // will be awaited if asynchronous
-					put({user,data,request}) {
-						// might send e-mail
-						// call a webhook, etc.
-						
-					},
-					remove({user,data,request}) {
-						
-					}
-				}
-			},
-			"<className>@": {
-				before: { // will be awaited if asynchronous, user and request are frozen, data can be modified
-					put({user,object,request}) {
-						// can modify the object
-						return true; // return true to continue processing
-					},
-					update({user,object,property,value,oldValue,request}) {
-						
-						return true;
-					},
-					remove({user,object,request}) {
-						
-						return true;
-					}
+				set({value,key,oldValue,user,request}) {
+					// if value!==oldValue it is a change
+					// if oldValue===undefined it is new
+					// if value===undefined it is delete
+					; // called after set
 				},
-				after: { // will be awaited if asynchronous
-					put({user,object,request}) {
-						// might send e-mail
-						// call a webhook, etc.
-					},
-					update({user,object,property,value,oldValue,request}) {
-						
-					},
-					remove({user,object,request}) {
-						
+				apply({value,key,args,user,request}) {
+					; // called after execute, value is the result, key is the function name
+				},
+				keys: {
+					password: {
+						set({value,key,oldValue,user,request}) {
+							; // called after set
+						}
 					}
 				}
 			}
-		},
-		worker: {
-			// not yet implemented
-		}
-		
+			/* Edges are just nested keys or wildcards, e.g.
+			people: {
+				_: { // matches any sub-edge
+					secretPhrase: { // matches secrePhrase edge
+						get(...) { ... },
+						set(...) { ... }
+					}
+				}
+			}
+			*/
+		}	
 	}
 }).call(this);
 
 /***/ }),
-/* 34 */
+/* 35 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const {mailgunKey,mailgunHostName} = __webpack_require__(7);
+	
+	function sendMail({from,to,cc,bcc,subject,body}) {
+		return fetch(`https://api.mailgun.net/v3/${mailgunHostName}/messages`, {
+		  method: "POST",
+		  body:encodeURI(
+			`from=${from}&` +
+			`to=${to}&`+
+			`subject=${subject}&`+
+			`text=${body}`
+		  ),
+		  headers: {
+		    Authorization: `Basic ${mailgunKey}`,
+		    "Content-Type": "application/x-www-form-urlencoded"
+		  }
+		}).then((response) => response.ok ? true : response.text())
+		.catch((e) => e.message);
+	}
+	module.exports = sendMail;
+}).call(this);
+
+/***/ }),
+/* 36 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2534,12 +2707,12 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 35 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(18),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(7),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			limit = Math.max(limit,1000);
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
@@ -2548,14 +2721,16 @@ async function handleRequest(event) {
 		},
 		methods = {
 			clear: async function(prefix="") {
-				let keys, cursor;
+				let keys, cursor, count = 0;
 				do {
 					keys = await this.keys(prefix,{cursor});
 					cursor = keys.pop();
 					for(const key of keys) {
 						this.delete(key);
+						count++;
 					}
 				} while(keys.length>0 && cursor);
+				return count;
 			},
 			entries: async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),

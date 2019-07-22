@@ -41,6 +41,7 @@ const //uid = require("./uid.js"),
 
 let thunderhead;
 addEventListener('fetch', event => {
+	// if on localhost, use something like kv-store as a simulator
 	const request = event.request,
 		dbo = new User("dbo",{"#":"User@dbo",roles:{dbo:true}});
 	request.URL = new URL(request.url);
@@ -53,27 +54,6 @@ addEventListener('fetch', event => {
 
 async function handleRequest(event) {
 	const {request,response} = event;
-	/*const mail = await fetch("https://api.mailgun.net/v3/mailgun.anywhichway.com/messages", {
-	  method: "POST",
-	  body:encodeURI(
-		"from=Excited User <syblackwell@anywhichway.com>&" +
-		"to=syblackwell@anywhichway.com&"+
-		"subject=Hello&"+
-		"text=Testing some Mailgun awesomeness!"
-	  ),
-	  headers: {
-	    Authorization: "Basic YXBpOmM4MDE0N2UzYjhjOTVlNzQ1MmU1YmE5MjUxMWQ0MGFhLTI5Yjc0ODhmLWQwMzI5YWVh",
-	    "Content-Type": "application/x-www-form-urlencoded"
-	  }
-	}).then(async (response) => `${response.ok} ${response.status} ${JSON.stringify(await response.json())}`)
-	.catch((e) => e.message+'Err');
-	return new Response(JSON.stringify(mail),{
-		headers:
-		{
-			"Content-Type":"text/plain",
-			"Access-Control-Allow-Origin": `"${request.URL.protocol}//${request.URL.hostname}"`
-		}
-	});*/
 	
 	let body = "Not Found",
 		status = 404;
@@ -113,11 +93,6 @@ async function handleRequest(event) {
 			});*/
 		}
 		let userschema = await thunderhead.getSchema(User);
-		if(!userschema) {
-			request.user = thunderhead.dbo;
-			const userschema = await thunderhead.putItem(new Schema(User));
-			request.user = undefined;
-		}
 		body = decodeURIComponent(request.URL.search.replace(/\+/g,"%20"));
 		const command = JSON.parse(body.substring(1)),
 			fname = command[0],
@@ -156,7 +131,7 @@ async function handleRequest(event) {
 				request.user = Object.freeze(user);
 			}
 			//Object.freeze(request);
-			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args});
+			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args,user:request.user,request});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response(JSON.stringify(secured),{
 					status: 403,
@@ -171,7 +146,7 @@ async function handleRequest(event) {
 			.then((result) => {
 				const type = typeof(result);
 				if(result && type==="object" && result instanceof Error) {
-					return new Response(JSON.stringify(result.errors.map(error => error+"")),
+					return new Response(JSON.stringify(result.errors ? result.errors.map(error => error+"") : result+""),
 						{
 							status:422,
 							headers:

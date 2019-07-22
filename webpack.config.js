@@ -15,7 +15,7 @@ try {
 		throw e;
 	}
 }
-
+// change so thunderclap.json is just thunderclap.config.js to avoid a lot of the below
 const CLOUDFLARED = config.cloudflaredPath, 
 	ACCOUNT_ID = config.cloudflareAccountId, 
 	AUTH_KEY = config.cloudflareAuthKey,
@@ -29,6 +29,8 @@ const CLOUDFLARED = config.cloudflaredPath,
 	DEV_HOST = config.devHost,
 	DEV_NAMESPACE_ID = config.devNameSpaceId,
 	DBO_PASSWORD = config.dboPassword||"dbo",
+	MAILGUN_KEY = config.mailgunKey,
+	MAILGUN_HOST = config.mailgunHostName,
 	MINIMIZE = !!config.minimize,
 	host = `${MODE==="development" ? DEV_HOST+'-' : ''}thunderclap.${HOSTNAME}`,
 	namespace = `${MODE==="development" ? DEV_NAMESPACE_ID : NAMESPACE_ID}`,
@@ -43,25 +45,11 @@ const CLOUDFLARED = config.cloudflaredPath,
 		 namespaceId: "${namespace}",
 		 authEmail: "${EMAIL}",
 		 authKey: "${AUTH_KEY}",
-		 dboPassword: "${DBO_PASSWORD}"
+		 dboPassword: "${DBO_PASSWORD}",
+		 mailgunKey: "${MAILGUN_KEY}",
+		 mailgunHostName: "${MAILGUN_HOST}"
 		}
 	}).call(this)`;
-	/*`(function() {
-		function getKeys(prefix,cursor) { 
-			return fetch(\`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${namespace}/keys?limit=1000\${cursor ? "&cursor="+cursor : ""}\${prefix ? "&prefix="+prefix : ""}\`,
-				{headers:{"X-Auth-Email":"${EMAIL}","X-Auth-Key":"${AUTH_KEY}"}})
-				.then((result) => result.json())
-		}
-		module.exports = async function keys(prefix,cursor) {
-			if(cursor!=="") {
-				let {result,result_info} = await getKeys(prefix,cursor);
-				result = result.map((item) => item.name);
-				result.push(result_info.cursor);
-				return result;
-			}
-			return [];
-		}
-	}).call(this)`;*/
 
 	var liveServer = require("live-server");
 

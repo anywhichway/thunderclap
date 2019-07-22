@@ -11,16 +11,24 @@ Copyright AnyWhichWay, LLC 2019
 		toSerializable = require("./to-serializable.js"),
 		create = require("./create.js"),
 		Schema = require("./schema.js"),
+		Edge = require("./edge.js"),
 		User = require("./user.js"),
 		Position = require("./position.js"),
 		Coordinates = require("./coordinates.js"),
-		when = require("../when.js").browser,
-		functions = require("../functions.js").browser,
+		when = require("../when.js").client,
+		functions = require("../functions.js").client,
 		classes = require("../classes.js");
 		
 	var fetch;
 	if(typeof(fetch)==="undefined") {
 		fetch = require("node-fetch");
+	}
+	
+	// patch Edge value for client
+	Edge.prototype.value = async function(value,options={}) {
+		const path = this.path.slice();
+		path.splice(0,2);
+		return arguments.length>0 ? this.db.value(path,value,options) : this.db.value(path);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -40,6 +48,7 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
+			this.register(Edge);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
@@ -95,6 +104,12 @@ Copyright AnyWhichWay, LLC 2019
 		    		return user;
 		    	});
 		}
+		async delete(path) {
+			return fetch(`${this.endpoint}/db.json?["delete",${encodeURIComponent(JSON.stringify(path))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
+		}
 		async deleteUser(userName) {
 			return fetch(`${this.endpoint}/db.json?["deleteUser",${encodeURIComponent(JSON.stringify(toSerializable(userName)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
@@ -112,6 +127,13 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async get(key) {
+		    return fetch(`${this.endpoint}/db.json?["get",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors))
+		    	.then((data) => { data.db = this; return new Edge(data); });
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -145,6 +167,45 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async put(object) {
+			this.register(object.constructor);
+			let data = Object.assign({},object),
+				id = data["#"],
+				cname = id ? id.split("@")[0] : null;
+			if(cname) {
+				let schema = this.schema[cname];
+				if(!schema) {
+					this.schema[cname] = schema = await this.getSchema(cname) || "anonymous";
+				}
+				if(schema && schema!=="anonymous") {
+					schema = new Schema(cname,schema);
+					const errors = await schema.validate(object,this);
+					if(errors.length>0) {
+						const error = new Error();
+						error.errors = errors;
+						throw error;
+					}
+				}
+			}
+			const matches = when.reduce((accum,item) => {
+				if(joqular.matches(item.when,object)) {
+					accum.push(item);
+				}
+				return accum;
+			},[]);
+			for(const match of matches) {
+				if(match.transform) {
+					data = await match.transform.call(this,data,match.when);
+				}
+			}
+			if(!data || typeof(data)!=="object") {
+				return;
+			}
+		    return fetch(`${this.endpoint}/db.json?["put",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
@@ -229,6 +290,12 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
+		async resetPassword(userName,method="email") {
+			return fetch(`${this.endpoint}/db.json?["resetPassword",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(method))}]`,{headers:this.headers})
+	    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
+		}
 		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
@@ -238,9 +305,21 @@ Copyright AnyWhichWay, LLC 2019
 				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((data) => create(data,this.ctors));
 		}
+		async sendMail(mail={}) {
+			return fetch(`${this.endpoint}/db.json?["sendMail",${encodeURIComponent(JSON.stringify(mail))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors));
+		}
 		async setSchema(className,config) {
 			const object = new Schema(className,config);
 			return this.putItem(object);
+		}
+		async updateUser(userName,properties={}) {
+			return fetch(`${this.endpoint}/db.json?["updateUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(properties))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors));
 		}
 		async unique(objectOrIdOrCname,property,value="") {
 			objectOrIdOrCname = typeof(objectOrIdOrCname)==="string" ? objectOrIdOrCname : objectOrIdOrCname["#"];
@@ -251,6 +330,12 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async value(path,data,options={}) {
+			return fetch(`${this.endpoint}/db.json?["value",${encodeURIComponent(JSON.stringify(path))}${data!==undefined ? ","+encodeURIComponent(JSON.stringify(toSerializable(data))) : ""}${data!==undefined ? ","+encodeURIComponent(JSON.stringify(toSerializable(options))) : ""}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
 		}
 		async values(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})

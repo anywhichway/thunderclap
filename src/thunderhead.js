@@ -14,18 +14,19 @@
 		tokenize = require("./tokenize.js"),
 		stopwords = require("./stopwords.js"),
 		stemmer = require("./stemmer.js"),
-		respond = require("./respond.js")("cloud"),
+		on = require("./on.js")("cloud"),
 		fromSerializable = require("./from-serializable.js"),
+		sendMail = require("./sendmail.js"),
 		User = require("./user.js"),
 		Schema = require("./schema.js"),
 		Position = require("./position.js"),
 		Coordinates = require("./coordinates.js"),
 		Cache = require("./cache.js"),
+		Edge = require("./edge.js"),
 		when = require("../when.js").cloud,
 		functions = require("../functions.js").cloud,
 		classes = require("../classes.js"),
 		keys = require("../keys.js");
-	
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -33,7 +34,6 @@
 		constructor({namespace,request,dbo,refresh=5000}) {
 			this.ctors = {};
 			this.request = request;
-			//this.namespace = namespace;
 			this.dbo = dbo;
 			this.cache = new Cache({namespace});
 			this.register(Array);
@@ -58,6 +58,7 @@
 				if(user) {
 					user.roles || (user.roles={});
 					roles.forEach((role) => user.roles[role]=true);
+					secure.mapRoles(user);
 					return this.putItem(user,{patch:true});
 				}
 			}
@@ -96,7 +97,7 @@
 		async createUser(userName,password,extras={}) {
 			let user = new User(userName);
 			Object.assign(user,await hashPassword(password,1000));
-			delete extras.roles;
+			["hash","salt","password","roles"].forEach((key) => delete extras[key]);
 			Object.assign(user,extras);
 			const request = this.request,
 				authed = request.user;
@@ -105,8 +106,10 @@
 			request.user = authed;
 			return user;
 		}
-		async delete(key) {
-			return this.removeItem(key);
+		async delete(path) {
+			path = ["","e"].concat(Array.isArray(path) ? path : path.split("."));
+			const edge = new Edge({db:this,path});
+			return edge.delete();
 		}
 		async deleteUser(userName) {
 			const user = await this.getUser(userName);
@@ -115,30 +118,28 @@
 			}
 			return true;
 		}
-		//async get(key,options) {
-			//return this.get(key,options);
-		//}
+		async get(key) {
+			return (new Edge({db:this})).get(key);
+		}
 		async getItem(key) {
+			const request = this.request,
+				user = request.user;
 			let data = await this.cache.get(key);
 			if(data!=null) {
 				const action = "read";
 				if(isSoul(data["#"],false)) {
 					const key = `${data["#"].split("@")[0]}@`,
-						secured = await secure.call(this,{key,action,data});
+						secured = await secure.call(this,{key,action,data,request,user});
 					data = secured.data;
 				}
-				const secured = await secure.call(this,{key,action,data});
+				const secured = await secure.call(this,{key,action,data,request,user});
 				data = secured.data;
 			}
 			return data==null ? undefined : data;
 		}
-		async getSchema(ctor) {
-			let data = await this.cache.get(`Schema@${ctor.name||ctor}`);
-			if(data) {
-				const secured = await secure.call(this,{key:"Schema",action:"read",data});
-				if(secured.data) {
-					return new Schema(ctor.name||ctor,data);
-				}
+		async getSchema(cname) {
+			if(this.ctors[cname]) {
+				return this.ctors[cname].schema;
 			}
 		}
 		async getUser(userName) {
@@ -184,11 +185,17 @@
 				}
 			}
 		}
-		//async put(key,value) {
-		//	return this.put(key,value);
-		//}
+		async put(data) {
+			const edge = new Edge({db:this});
+			for(const key in data) {
+				await (await edge.get(key)).put(data[key]);
+			}
+			return data;
+		}
 		async putItem(object,options={}) {
-			const {patch} = options;
+			const request = this.request,
+				user = request.user,
+				patch = options.patch;
 			if(!object || typeof(object)!=="object") {
 				const error = new Error();
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
@@ -200,7 +207,7 @@
 			}
 			const cname = id.split("@")[0],
 				key =`${cname}@`;
-			await respond.call(this,{key,when:"before",action:"put",data:object});
+			await on.call(this,{key,when:"before",action:"put",data:object,request,user});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -212,14 +219,14 @@
 				}
 			}
 			let original,
-				{data,removed} = await secure.call(this,{key,action:"write",data:object});
+				{data,removed} = await secure.call(this,{key,action:"write",data:object,request,user});
 			if(data) {
 				original = await this.getItem(id);
 				data = await this.setItem(id,data,options,true);
 			}
 			if(!data) {
 				const error = new Error();
-				error.errors = [new Error(`Denied 'write' for ${id}`)];
+				error.errors = [new Error(`Denied 'set' for ${id}`)];
 				return error;
 			}
 			const matches = when.reduce((accum,item) => {
@@ -230,7 +237,7 @@
 			},[]);
 			for(const match of matches) {
 				if(match.transform) {
-					data = await match.transform.call(this,data,match.when);
+					data = await match.transform.call(this,{data,pattern:match.when,request,user});
 				}
 			}
 			let changes;
@@ -258,17 +265,16 @@
 				}
 				if(changes) {
 					changes["#"] = data["#"];
-					await respond.call(this,{key:id,when:"before",action:"update",data,changes});
+					await on.call(this,{key:id,when:"before",action:"update",data,changes,request,user});
 					await this.unindex(changes);
 				}
 			}
-			
 			await this.index(data,options);
 			const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
 			if(changes) {
-				await respond.call(this,{key:id,when:"after",action:"update",data:frozen,changes});
+				await on.call(this,{key:id,when:"after",action:"update",data:frozen,changes,request,user});
 			}
-			await respond.call(this,{key:id,when:"after",action:"put",data:frozen});
+			await on.call(this,{key:id,when:"after",action:"put",data:frozen,request,user});
 			for(const match of matches) {
 				if(match.call) {
 					await match.call(this,data,match.when);
@@ -301,7 +307,8 @@
 			//'!p!edge!edge
 			//'!t!edge!trigram|id
 			//"!o!edge!"\value\"!id
-			
+			const request = this.request,
+				user = request.user;
 			for(const key in pattern) {
 				const keytest = joqular.toTest(key,true,{cname,parentPath,property:key}),
 					value = pattern[key],
@@ -347,7 +354,7 @@
 												testids[id].avg = testids[id].sum / count;
 											} else {
 												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value,request,user}});
 												if(data && removed.length===0) {
 													testids[id] = {sum:1};
 											    } else {
@@ -402,14 +409,13 @@
 										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
 									parts[1] = "o";
 									const path = parts.join("!");
-									//return [test.ctx.keypath, pvalue,await this.cache.keys(`!o${test.ctx.keypath}!`)];
 									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 										const keys = await this.cache.keys(`${path}!${rawvalue}!`);
 										for(const key of keys) {
 											const parts = key.split("!"),
 												id = parts.pop();
 											if(!filter || filter(id)) {
-												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
 												if(data && removed.length===0) {
 													testids[id] = true;
 											    }
@@ -473,7 +479,7 @@
 						for(const key of keys) {
 							const id = key.split("!").pop();
 							if(!filter ||filter(id)) {
-								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value}});
+								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
 								if(data && removed.length===0) {
 									testids[id] = true;
 							    }
@@ -529,7 +535,9 @@
 			}
 		}
 		async removeItem(keyOrObject) {
-			const type = typeof(keyOrObject);
+			const type = typeof(keyOrObject),
+				request = this.request,
+				user = request.user;
 			if(keyOrObject && type==="object") {
 				keyOrObject = keyOrObject["#"];
 			}
@@ -541,22 +549,22 @@
 				const action = "write",
 					key = isSoul(keyOrObject) ? `${keyOrObject.split("@")[0]}@` : null;
 				if(key) {
-					if(!(await respond.call(this,{key,when:"before",action:"remove",data:value,object:value}))) {
+					if(!(await on.call(this,{key,when:"before",action:"remove",data:value,object:value,request,user}))) {
 						return false;
 					}
 				}
-				if(!(await respond.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value}))) {
+				if(!(await on.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value,request,user}))) {
 					return false;
 				}
-				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true});
+				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true,request,user});
 				if(data && removed.length===0) {
 					await this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
 					if(key) {
 						await this.unindex(value);
-						await respond.call(this,{key,when:"after",action:"remove",data:frozen});
+						await on.call(this,{key,when:"after",action:"remove",data:frozen,request,user});
 					}
-					await respond.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen});
+					await on.call(this,{key:keyOrObject,when:"after",action:"remove",data:frozen,request,user});
 					return true;
 				}
 			}
@@ -572,25 +580,53 @@
 				}
 			}
 		}
+		async resetPassword(userName,method="email") {
+			
+		}
+		async sendMail(config) {
+			const email = this.request.user.email;
+			if(!email) {
+				return;
+			}
+			config.from = email;
+			return sendMail(config);
+		}
 		async setItem(key,data,options={},secured) {
+			const request = this.request,
+				user = request.user;
 			if(!secured && key[0]!=="!") {
 				const action = "write";
-				await respond.call(this,{key,when:"before",action:"set",data});
-				const secured = await secure.call(this,{key,action,data});
+				await on.call(this,{key,when:"before",action,data,request,user});
+				const secured = await secure.call(this,{key,action,data,request,user});
+				if(secured.removed===data || secured.removed.length>0) {
+					return;
+				}
 				data = secured.data;
 				if(data && typeof(data)==="object") {
 					const key = isSoul(data["#"],false) ? data["#"].split("@")[0] : "Object",
-						secured = await secure.call(this,{key,action,data});
+						secured = await secure.call(this,{key,action,data,request,user});
 					data = secured.data;
 				}
 			}
 			if(data!==undefined) {
 				await this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				//await respond.call(this,{key,when:"after",action:"set",data:frozen});
+				//await on.call(this,{key,when:"after",action:"write",data:frozen,request,user});
 			}
 			return data;
-		} 
+		}
+		async updateUser(userName,properties={}) {
+			const authed = this.request.user;
+			let user = await this.authUser(userName,oldPassword);
+			if(authed.userName===userName && !user) {
+				return false;
+			}
+			["hash","salt","password","roles"].forEach((key) => delete properties[key]);
+			user = await this.getUser(userName);
+			Object.assign(user,properties);
+			await this.putItem(user);
+			return user;
+		}
 		async unindex(object,parentPath="",parentId) {
 			const id = parentId||object["#"];
 			if(!parentId) {
@@ -632,12 +668,19 @@
 		}
 		async unique(id,property,value) {
 			const parts = id.split("@"),
-				cname = parts[0],
-				keys = await this.keys(`!o!${cname}!${property}!`,{batchSize:1});
-			value = JSON.stringify(value);
-			let count = 0;
-			keys.forEach((key) => { if(key.includes(`!${value}!`)) count++;});
-			return keys.length===0 || !keys[0] || count===0 || (parts.length>1 && keys.some((key) => key.endsWith(`!${value}!${id}`)));
+				cname = parts[0];
+			if(parts.length===1) {
+				const results = await this.query({[cname]:{[property]:value}});
+				return results.length===0
+			}
+
+			const results = await this.query({[cname]:{[property]:value}});
+			return results.length===0 || (results.length===1 && results[0]["#"]===id);
+		}
+		async value(path,data,options={}) {
+			path = ["","e"].concat(Array.isArray(path) ? path : path.split("."));
+			const edge = new Edge({db:this,path});
+			return arguments.length>1 ? edge.value(data,options) : edge.value();
 		}
 	}
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));

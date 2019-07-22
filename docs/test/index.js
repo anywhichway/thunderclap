@@ -269,13 +269,10 @@ describe("tests",function() {
 		expect(typeof(results[0])).equal("object");
 		expect(typeof(results[0].NaN)==="number" && isNaN(results[0].NaN)).equal(true);
 	});
-	xit("$isArray",function(done) {
-		let some = 0;
-		db.query({Object:{favoriteNumbers:{$isArray:true}}}).forEach(object => { 
-			some++; 
-			expect(object.favoriteNumbers.length).equal(4);
-			})
-			.then(() => some ? done() : done(new Error("Missing result"))).catch(e => done(e));
+	it("$isArray",async function() {
+		const results = await db.query({Object:{favoriteNumbers:{$isArray:true}}});
+		expect(typeof(results[0])).equal("object");
+		expect(results[0].favoriteNumbers.length).equal(4);
 	});
 	it("$isEmail",async function() {
 		const results = await db.query({Object:{email:{$isEmail:true}}});

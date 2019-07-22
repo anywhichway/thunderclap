@@ -73,8 +73,9 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
+					const cname = object["#"].split("@")[0];
 					if(!(await db.unique(object["#"],key,value))) {
-						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
+						errors.push(new TypeError(`"${key}" value "${value}" must be unique for ${cname}`));
 					}
 				}
 			},

@@ -9,14 +9,16 @@
 		},
 		methods = {
 			clear: async function(prefix="") {
-				let keys, cursor;
+				let keys, cursor, count = 0;
 				do {
 					keys = await this.keys(prefix,{cursor});
 					cursor = keys.pop();
 					for(const key of keys) {
 						this.delete(key);
+						count++;
 					}
 				} while(keys.length>0 && cursor);
+				return count;
 			},
 			entries: async function(prefix="",{batchSize=1000,cursor}) {
 				const {result,result_info} = await getKeys(prefix,batchSize,cursor),

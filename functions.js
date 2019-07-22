@@ -1,6 +1,9 @@
 (function() {
 	module.exports = {
-		browser: {
+		client: {
+			
+		},
+		worker: {
 			
 		},
 		cloud: {
@@ -10,9 +13,6 @@
 			getDate() {
 				return new Date();
 			}
-		},
-		worker: {
-			
 		}
 	}
 }).call(this);

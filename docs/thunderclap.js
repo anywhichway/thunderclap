@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 21);
+/******/ 	return __webpack_require__(__webpack_require__.s = 22);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -90,7 +90,7 @@
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(2);
+	const uid = __webpack_require__(1);
 	
 	class Entity {
 		constructor(config) {
@@ -113,12 +113,21 @@
 
 /***/ }),
 /* 1 */
+/***/ (function(module, exports) {
+
+(function() {
+	"use strict"
+	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
+}).call(this)
+
+/***/ }),
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
 	const Entity = __webpack_require__(0),
-		Coordinates = __webpack_require__(3);
+		Coordinates = __webpack_require__(4);
 	class Position extends Entity {
 		constructor({coords,timestamp}) {
 			super();
@@ -153,22 +162,33 @@
 }).call(this);
 
 /***/ }),
-/* 2 */
-/***/ (function(module, exports) {
-
-(function() {
-	"use strict"
-	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
-}).call(this)
-
-/***/ }),
 /* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
+	const uuid4 = __webpack_require__(10),
+		isSoul = (value,checkUUID=true) => {
+			if(typeof(value)==="string") {
+				const parts = value.split("@"),
+					isnum = !isNaN(parseInt(parts[1]));
+				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
+			}
+			return false;
+		};
+	module.exports = isSoul;
+})();
+
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
 	const Entity = __webpack_require__(0),
-		Position = __webpack_require__(1);
+		Position = __webpack_require__(2);
 	class Coordinates extends Entity {
 		constructor(coords) {
 			super();
@@ -188,26 +208,6 @@
 	}
 	module.exports = Coordinates;
 }).call(this);
-
-/***/ }),
-/* 4 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	"use strict"
-	const uuid4 = __webpack_require__(9),
-		isSoul = (value,checkUUID=true) => {
-			if(typeof(value)==="string") {
-				const parts = value.split("@"),
-					isnum = !isNaN(parseInt(parts[1]));
-				return parts.length===2 && parts[0]!=="" && ((parts[0]==="Date" && isnum) || (parts[0]!=="Date" && (!checkUUID || uuid4.is(parts[1]))));
-			}
-			return false;
-		};
-	module.exports = isSoul;
-})();
-
-
 
 /***/ }),
 /* 5 */
@@ -288,8 +288,9 @@
 			},
 			async unique(constraint,object,key,value,errors,db) {
 				if(constraint) {
+					const cname = object["#"].split("@")[0];
 					if(!(await db.unique(object["#"],key,value))) {
-						errors.push(new TypeError(`"${key}" value "${value}" must be unique`));
+						errors.push(new TypeError(`"${key}" value "${value}" must be unique for ${cname}`));
 					}
 				}
 			},
@@ -329,7 +330,8 @@
 })();
 
 /***/ }),
-/* 7 */
+/* 7 */,
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -338,11 +340,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(8),
-		isSoul = __webpack_require__(4),
-		isInt = __webpack_require__(10),
-		isFloat = __webpack_require__(11),
-		validateLuhn = __webpack_require__(12),
+	const soundex = __webpack_require__(9),
+		isSoul = __webpack_require__(3),
+		isInt = __webpack_require__(11),
+		isFloat = __webpack_require__(12),
+		validateLuhn = __webpack_require__(13),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -705,7 +707,7 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -716,7 +718,7 @@
 }).call(this);
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -750,7 +752,7 @@
 }).call(this);
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -759,7 +761,7 @@
 }).call(this)
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -768,7 +770,7 @@
 }).call(this)
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -797,7 +799,7 @@
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -845,12 +847,12 @@
 }).call(this);
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Position = __webpack_require__(1);
+	const Position = __webpack_require__(2);
 	function fromSerializable(data,classes={}) {
 		const type = typeof(data);
 		if(data==="@undefined") {
@@ -889,48 +891,176 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 16 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	const uid = __webpack_require__(1),
+		isSoul = __webpack_require__(3);
+	
+	function Edge({db,parent,path=["","e"]}) {
+		Object.defineProperty(this,"db",{enumerable:false,value:db});
+		this.parent = parent;
+		this.path = path;
+	}
+	Edge.prototype.delete = async function() {
+		const keys = await this.db.keys(this.path.join("!"));
+		if(keys.length===0 || keys[0]==="") {
+			return 0;
+		}
+		await this.db.removeItem(this.path.join("!"))
+		return this.db.clear(this.path.join("!"));
+	}
+	Edge.prototype.get = function(path) {
+		const parts = Array.isArray(path) ? path : path.split(".");
+		let parent = this,
+			part;
+		path = this.path.slice();
+		while(part = parts.shift()) {
+			path.push(part);
+			parent = new Edge({db:this.db,parent,path:path.slice()});
+		}
+		return parent;
+	}
+	Edge.prototype.put = async function(data,options={}) {
+		let node = this,
+			type = typeof(data);
+		if(data && type==="object") {
+			const id = data["#"];
+			// add id if not present?
+			// when here?
+			// transform here
+			// validate here
+			// secure here
+			// on here
+			if(id) { // if putting a first class object, reset to root
+				const cname = id.split("@")[0];
+				node = await (await this.db.get(`${cname}@`)).get(id);
+			}
+			for(const key in data) {
+				const value = data[key];
+				if(value && value["#"]) {
+					await this.db.put(value,options.expireRelated ? options : {});
+				} else {
+					//if(value && typeof(value)==="object") {
+					//	value["#"] = `${value.constructor.name}@${uid()}`
+					//}
+					const child = await node.get(key);
+					await child.put(value,options);
+				}
+			}
+		} else {
+			this.value(data,options);
+		}
+		return data;
+	}
+	Edge.prototype.restore = async function(data) {
+		if(typeof(data)!=="string") {
+			const path = this.path.slice();
+			path.shift(); // remove ""
+			if(path[0].endsWith("@")) {
+				path.splice(1,1); // remove id;
+			}
+			// security here using edge path
+			return data;
+		}
+		const cname = data.split("@")[0];
+		if(cname) {
+			const keys = await this.db.keys(`!e!${cname}@!${data}!`),
+				object = {};
+			for(const key of keys) {
+				const parts = key.split("!"),
+					value = await this.db.cache.get(key);
+				let node = object;
+				parts.shift(); // remove ""
+				parts.splice(1,1); // remove id
+				const vpath = parts.slice();
+				parts.shift(); // remove class
+				while(parts.length>1) { // walk down the object
+					const property = parts.shift(),
+					node = node[property];
+				}
+				node[parts[0]] = value;
+			}
+			return object;
+		}
+		return data;
+	}
+	Edge.prototype.value = async function(value,options={}) {
+		if(arguments.length>0) {
+			const vpath = this.path.slice();
+			vpath.shift(); // remove ""
+			if(vpath[0].endsWith("@")) {
+				vpath.splice(0,1); //remove id
+			}
+			// transform here
+			// validate here
+			// secure here
+			return this.db.cache.put(this.path.join("!"),value,options)
+		}
+		return await this.restore(await this.db.cache.get(this.path.join("!")));
+	}
+	module.exports = Edge;
+}).call(this)
+
+/***/ }),
+/* 17 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		browser: [
+		client: [
 			{
 				when: {testWhenBrowser:{$eq:true}},
-				transform: async (data,pattern) => {
+				transform({data,pattern,user,request}) {
 					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
 					return data;
 				},
-				call: async (data,pattern) => {
-					
-				}
-			}
-		],
-		cloud: [
-			{
-				when: {testWhen:{$eq:true}},
-				transform: async (data,pattern) => {
-					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
-					return data;
-				},
-				call: async (data,pattern) => {
+				call({data,pattern,user,request}) {
 					
 				}
 			}
 		],
 		worker: [
 			// not yet implemented
+		],
+		cloud: [
+			{
+				when: {testWhen:{$eq:true}},
+				transform({data,pattern,user,request}) {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call({data,pattern,user,request,db}) {
+					
+				}
+			}
+			/* Graph edge updates can also be monitored, although it is just as easy with triggers since edge updates are atomic
+			{
+				edge: {devices:{_:{alarm:true}}, // matches any time any device has alarm set to true
+				transform({data,pattern,user,request}) {
+					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
+					return data;
+				},
+				call({data,pattern,user,request,db}) {
+					
+				}
+			}
+			*/
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports) {
 
 (function() {
 	module.exports = {
-		browser: {
+		client: {
+			
+		},
+		worker: {
 			
 		},
 		cloud: {
@@ -940,15 +1070,12 @@
 			getDate() {
 				return new Date();
 			}
-		},
-		worker: {
-			
 		}
 	}
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 19 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -959,10 +1086,9 @@
 }).call(this);
 
 /***/ }),
-/* 18 */,
-/* 19 */,
 /* 20 */,
-/* 21 */
+/* 21 */,
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -973,21 +1099,29 @@ Copyright AnyWhichWay, LLC 2019
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(2),
-		joqular = __webpack_require__(7),
-		toSerializable = __webpack_require__(13),
-		create = __webpack_require__(22),
+	const uid = __webpack_require__(1),
+		joqular = __webpack_require__(8),
+		toSerializable = __webpack_require__(14),
+		create = __webpack_require__(23),
 		Schema = __webpack_require__(5),
+		Edge = __webpack_require__(16),
 		User = __webpack_require__(6),
-		Position = __webpack_require__(1),
-		Coordinates = __webpack_require__(3),
-		when = __webpack_require__(15).browser,
-		functions = __webpack_require__(16).browser,
-		classes = __webpack_require__(17);
+		Position = __webpack_require__(2),
+		Coordinates = __webpack_require__(4),
+		when = __webpack_require__(17).client,
+		functions = __webpack_require__(18).client,
+		classes = __webpack_require__(19);
 		
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(23);
+		fetch = __webpack_require__(24);
+	}
+	
+	// patch Edge value for client
+	Edge.prototype.value = async function(value,options={}) {
+		const path = this.path.slice();
+		path.splice(0,2);
+		return arguments.length>0 ? this.db.value(path,value,options) : this.db.value(path);
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -1007,6 +1141,7 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(Schema);
 			this.register(Position);
 			this.register(Coordinates);
+			this.register(Edge);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
@@ -1062,6 +1197,12 @@ Copyright AnyWhichWay, LLC 2019
 		    		return user;
 		    	});
 		}
+		async delete(path) {
+			return fetch(`${this.endpoint}/db.json?["delete",${encodeURIComponent(JSON.stringify(path))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
+		}
 		async deleteUser(userName) {
 			return fetch(`${this.endpoint}/db.json?["deleteUser",${encodeURIComponent(JSON.stringify(toSerializable(userName)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
@@ -1079,6 +1220,13 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async get(key) {
+		    return fetch(`${this.endpoint}/db.json?["get",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors))
+		    	.then((data) => { data.db = this; return new Edge(data); });
 		}
 		async getItem(key) {
 		    return fetch(`${this.endpoint}/db.json?["getItem",${encodeURIComponent(JSON.stringify(key))}]`,{headers:this.headers})
@@ -1112,6 +1260,45 @@ Copyright AnyWhichWay, LLC 2019
 	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async put(object) {
+			this.register(object.constructor);
+			let data = Object.assign({},object),
+				id = data["#"],
+				cname = id ? id.split("@")[0] : null;
+			if(cname) {
+				let schema = this.schema[cname];
+				if(!schema) {
+					this.schema[cname] = schema = await this.getSchema(cname) || "anonymous";
+				}
+				if(schema && schema!=="anonymous") {
+					schema = new Schema(cname,schema);
+					const errors = await schema.validate(object,this);
+					if(errors.length>0) {
+						const error = new Error();
+						error.errors = errors;
+						throw error;
+					}
+				}
+			}
+			const matches = when.reduce((accum,item) => {
+				if(joqular.matches(item.when,object)) {
+					accum.push(item);
+				}
+				return accum;
+			},[]);
+			for(const match of matches) {
+				if(match.transform) {
+					data = await match.transform.call(this,data,match.when);
+				}
+			}
+			if(!data || typeof(data)!=="object") {
+				return;
+			}
+		    return fetch(`${this.endpoint}/db.json?["put",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
 		}
 		async putItem(object,options={}) {
 			this.register(object.constructor);
@@ -1196,6 +1383,12 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
 		}
+		async resetPassword(userName,method="email") {
+			return fetch(`${this.endpoint}/db.json?["resetPassword",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(method))}]`,{headers:this.headers})
+	    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+		    	.then((data) => create(data,this.ctors));
+		}
 		async setItem(key,data,options={}) {
 			if(data && typeof(data)==="object") {
 				this.register(data.constructor);
@@ -1205,9 +1398,21 @@ Copyright AnyWhichWay, LLC 2019
 				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 				.then((data) => create(data,this.ctors));
 		}
+		async sendMail(mail={}) {
+			return fetch(`${this.endpoint}/db.json?["sendMail",${encodeURIComponent(JSON.stringify(mail))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors));
+		}
 		async setSchema(className,config) {
 			const object = new Schema(className,config);
 			return this.putItem(object);
+		}
+		async updateUser(userName,properties={}) {
+			return fetch(`${this.endpoint}/db.json?["updateUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(properties))}]`,{headers:this.headers})
+		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+			    .then((data) => create(data,this.ctors));
 		}
 		async unique(objectOrIdOrCname,property,value="") {
 			objectOrIdOrCname = typeof(objectOrIdOrCname)==="string" ? objectOrIdOrCname : objectOrIdOrCname["#"];
@@ -1218,6 +1423,12 @@ Copyright AnyWhichWay, LLC 2019
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
+		}
+		async value(path,data,options={}) {
+			return fetch(`${this.endpoint}/db.json?["value",${encodeURIComponent(JSON.stringify(path))}${data!==undefined ? ","+encodeURIComponent(JSON.stringify(toSerializable(data))) : ""}${data!==undefined ? ","+encodeURIComponent(JSON.stringify(toSerializable(options))) : ""}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
 		}
 		async values(prefix="",options={}) {
 			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
@@ -1233,12 +1444,12 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const fromSerializable = __webpack_require__(14);
+	const fromSerializable = __webpack_require__(15);
 	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
@@ -1276,7 +1487,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
