@@ -15,7 +15,7 @@ Thunderclap uses a [JavaScript client](#javascript) client to support:
 
 1) [Special storage for Infinity, NaN, Dates](#special-storage)
 
-2) [Built in User, Position, and Coordinate Classes](#built-in-classes)
+2) [Built in User, Edge, Position, and Coordinate Classes](#built-in-classes)
 
 3) [role based access control mechanisms](#access-control)
 
@@ -200,7 +200,7 @@ By default it can only be called by a user with the `dbo` role. A loop can be us
 indexes the object and stores it with `setItem` using the id as the key. In most cases, the unique id will be of the form 
 `<className>@xxxxxxxxxxxxx`. The `options` can be one of: `{expiration: secondsSinceEpoch}` or `{expirationTtl: secondsFromNow}`.
 
-`boolean async removeItem(string|object keyOrObject) - Removes the keyOrObject. If the argument is an indexed object 
+`boolean async removeItem(string|object keyOrObject)` - Removes the keyOrObject. If the argument is an indexed object 
 or a key that resolves to an indexed object, the index entries are also removed from the database so long as the user has 
 the appropriate privileges. If the key exists but can't be removed, the function returns `false`. If the key does not exist
 or removal succeeds, the function returns `true`.
@@ -557,50 +557,55 @@ The default `secure.js` file is show below.
 ```javacript
 (function() {
 	module.exports = {
-		securedTestReadKey: { // for testing purposes
-			read: [] // no gets allowed
-		},
-		securedTestWriteKey: { // for testing purposes
-			write: [] // no sets allowed
-		},
-		securedTestFunction: { // for testing purposes
-			execute: [] // no execution allowed
-		},
-		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
-			read: ["dbo"],
-			write: ["dbo"]
-		},
-		addRoles: {
-			execute: ["dbo"]
-		},
-		clear: { // only dbo can clear
-			execute: ["dbo"]
-		},
-		deleteUser: {
-			execute: ["dbo"]
-		},
-		entries: { // only dbo can list entries
-			execute: ["dbo"]
-		},
-		entry: {
-			execute: ["dbo"]
-		},
-		keys: { // only dbo can list keys
-			execute: ["dbo"]
-		},
-		removeRoles: {
-			execute: ["dbo"]
-		},
-		values: { // only dbo can list values
-			execute: ["dbo"]
+		"Function@": {
+			securedTestFunction: { // for testing purposes
+				execute: [] // no execution allowed
+			},
+			addRoles: { // only dbo can add roles to a user
+				execute: ["dbo"]
+			},
+			clear: { // only dbo can clear
+				execute: ["dbo"]
+			},
+			deleteUser: {
+				execute: ["dbo"]
+			},
+			entries: { // only dbo can list entries
+				execute: ["dbo"]
+			},
+			entry: {
+				execute: ["dbo"]
+			},
+			keys: { // only dbo can list keys
+				execute: ["dbo"]
+			},
+			removeRoles: {
+				execute: ["dbo"]
+			},
+			resetPassword: { // only user themself or dbo can start a password reset
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			sendMail: { // only dbo can send mail
+				execute: ["dbo"]
+			},
+			updateUser: {  // only user themself or dbo can update user properties
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			values: { // only dbo can list values
+				execute: ["dbo"]
+			}
 		},
 		"User@": { // key to control, use <cname>@ for classes
 			
-			// read: ["<role>",...], // array or map of roles to allow read, not specifying means all have read
-			// write: {<role>:true}, // array or map of roles to allow write, not specifying means all have write
+			// read: ["<role>",...], // array or map of roles to allow get, not specifying means all have get
+			// write: {<role>:true}, // array or map of roles to allow set, not specifying means all have set
 			// a filter function can also be used
-			// action with be "read" or "write", not returning anything will result in denial
-			// not specifying a filter function will allow all read and write, unless controlled above
+			// action with be "get" or "set", not returning anything will result in denial
+			// not specifying a filter function will allow all get and set, unless controlled above
 			// a function with the same call signature can also be used as a property value above
 			filter({action,user,data,request}) {
 				// very restrictive, don't return a user record unless requested by the dbo or data subject
@@ -610,32 +615,45 @@ The default `secure.js` file is show below.
 			},
 			keys: { // only applies to objects
 				roles: {
-					// only dbo's and data subject can read roles
-					read({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
+					// only dbo's and data subject can get roles
+					get({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
 				},
 				hash: {
-					// only dbo's can read password hashes
+					// only dbo's can get password hashes
 					read: ["dbo"],
-					// only the dbo and data subject can write a hash
-					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+					// only the dbo and data subject can set a hash
+					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
 				},
 				salt: {
-					// example of alternate control form, only dbo's can read password salts
+					// example of alternate control form, only dbo's can get password salts
 					read: {
 						dbo: true
 					},
-					// only the dbo and data subject can write a salt
-					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+					// only the dbo and data subject can set a salt
+					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
 				},
 				name({action,user,data,request}) { return data; } // example, same as no access control
 			}
+			/* keys could also be a function
+			keys({action,user,data,key,request})
+			 */
+		},
+		securedTestReadKey: { // for testing purposes
+			read: [] // no gets allowed
+		},
+		securedTestWriteKey: { // for testing purposes
+			write: [] // no sets allowed
+		},
+		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
+			read: ["dbo"],
+			write: ["dbo"]
 		}
 		/* Edges are just nested keys or wildcards, e.g.
 		people: {
 			_: { // matches any sub-edge
 				secretPhrase: { // matches secrePhrase edge
-					read(...) { ... },
-					write(...) { ... }
+					get(...) { ... },
+					set(...) { ... }
 				}
 			}
 		}
@@ -694,18 +712,6 @@ Below is an example.
 					
 				}
 			}
-			/* Graph edge updates can also be monitored, although it is just as easy with triggers since edge updates are atomic
-			{
-				edge: {devices:{_:{alarm:true}}, // matches any time any device has alarm set to true
-				transform({data,pattern,user,request}) {
-					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
-					return data;
-				},
-				call({data,pattern,user,request,db}) {
-					
-				}
-			}
-			*/
 		]
 	}
 }).call(this);
@@ -733,16 +739,16 @@ Triggers can be executed in the browser, a service worker, or the cloud.
 		},
 		cloud: {
 			"User@": {
-				get({value,key,user,request}) {
+				read({value,key,user,request}) {
 					; // called after get
 				},
-				set({value,key,oldValue,user,request}) {
+				write({value,key,oldValue,user,request}) {
 					// if value!==oldValue it is a change
 					// if oldValue===undefined it is new
 					// if value===undefined it is delete
 					; // called after set
 				},
-				apply({value,key,args,user,request}) {
+				execute({value,key,args,user,request}) {
 					; // called after execute, value is the result, key is the function name
 				},
 				keys: {
@@ -894,8 +900,12 @@ but many features found in ReasonDB will make their way into Thunderclap if inte
 
 # Change Log (reverse chronological order) [top](#top)
 
+2019-07-23 v0.0.31a Slight performance inmprovements. Fixed broken `$search`.
+
+2019-07-22 v0.0.30a Security now works on graph paths.
+
 2019-07-22 v0.0.29a Started adding graph database capability. Not yet tied to triggers, security, etc. Reworked triggers, 
-security, when so that they will work across all of key-value, JSON, and graph storage. If you are using any, they will 
+security, so that they will work across all of key-value, JSON, and graph storage. If you are using any, they will 
 need substantive re-work.
 
 2019-07-16 v0.0.28a Multiple classes can now be queried at the same time.

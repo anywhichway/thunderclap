@@ -1,6 +1,7 @@
 (function() {
 	const uid = require("./uid.js"),
-		isSoul = require("./is-soul.js");
+		isSoul = require("./is-soul.js"),
+		secure = require("./secure.js");
 	
 	function Edge({db,parent,path=["","e"]}) {
 		Object.defineProperty(this,"db",{enumerable:false,value:db});
@@ -91,18 +92,22 @@
 		return data;
 	}
 	Edge.prototype.value = async function(value,options={}) {
+		const request = this.db.request,
+			user = request.user,
+			vpath = this.path.slice();
+		vpath.splice(0,2);
 		if(arguments.length>0) {
-			const vpath = this.path.slice();
-			vpath.shift(); // remove ""
-			if(vpath[0].endsWith("@")) {
-				vpath.splice(0,1); //remove id
-			}
 			// transform here
 			// validate here
 			// secure here
-			return this.db.cache.put(this.path.join("!"),value,options)
+			const {data,removed} = await secure.call(this,{key:vpath,action:"write",data:value,request,user});
+			if(data!==undefined) {
+				return this.db.cache.put(this.path.join("!"),data,options)
+			}
 		}
-		return await this.restore(await this.db.cache.get(this.path.join("!")));
+		value = await this.restore(await this.db.cache.get(this.path.join("!")));
+		const {data} = await secure.call(this,{key:vpath,action:"read",data:value,request,user});
+		return data;
 	}
 	module.exports = Edge;
 }).call(this)

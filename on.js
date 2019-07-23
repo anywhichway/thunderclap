@@ -8,16 +8,16 @@
 		},
 		cloud: {
 			"User@": {
-				get({value,key,user,request}) {
+				read({value,key,user,request}) {
 					; // called after get
 				},
-				set({value,key,oldValue,user,request}) {
+				write({value,key,oldValue,user,request}) {
 					// if value!==oldValue it is a change
 					// if oldValue===undefined it is new
 					// if value===undefined it is delete
 					; // called after set
 				},
-				apply({value,key,args,user,request}) {
+				execute({value,key,args,user,request}) {
 					; // called after execute, value is the result, key is the function name
 				},
 				keys: {
@@ -31,9 +31,9 @@
 			/* Edges are just nested keys or wildcards, e.g.
 			people: {
 				_: { // matches any sub-edge
-					secretPhrase: { // matches secrePhrase edge
-						get(...) { ... },
-						set(...) { ... }
+					secretPhrase: { // matches secretPhrase edge
+						read(...) { ... },
+						write(...) { ... }
 					}
 				}
 			}

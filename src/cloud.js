@@ -131,7 +131,7 @@ async function handleRequest(event) {
 				request.user = Object.freeze(user);
 			}
 			//Object.freeze(request);
-			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args,user:request.user,request});
+			const secured = await secure.call(thunderhead,{key:`Function@.${fname}`,action:"execute",data:args,user:request.user,request});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response(JSON.stringify(secured),{
 					status: 403,

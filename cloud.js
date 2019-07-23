@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 25);
+/******/ 	return __webpack_require__(__webpack_require__.s = 28);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -167,7 +167,7 @@
 
 (function() {
 	"use strict"
-	const uuid4 = __webpack_require__(10),
+	const uuid4 = __webpack_require__(12),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -211,6 +211,128 @@
 
 /***/ }),
 /* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
+	const toRegExp = __webpack_require__(7),
+		acl = __webpack_require__(19),
+		roles = __webpack_require__(20);
+	
+	// applies acl rules for key and action
+	// if user is not permitted to take action, modifies data accordingly
+	async function secure({key,action,data,documentOnly,request,user}) {
+		if(!user || !user.roles) {
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : data,user};
+		}
+		const removed = [],
+			rules = [];
+		let parts = Array.isArray(key) ? key.slice() : key.split("."),
+			rule = acl,
+			next = rule,
+			l1 = parts[0]==="Function@" ? false : true,
+			part;
+		while((part = parts.shift()) && (rule = next) && 
+			Object.keys(rule).some((key) => {
+				const regexp = toRegExp(key);
+				if(key==="_" || regexp && regexp.test(part)) {
+					next = l1 ? rule[key].keys : rule[key];
+					rule = rule[key];
+					l1 = false;
+					return rule;
+				}
+			})) { true; };
+		if(parts.length===0) {
+			rules.push(rule)
+		}
+		parts = Array.isArray(key) ? key.slice() : key.split(".");
+		rule = acl;
+		next = rule;
+		l1 = parts[0]==="Function@" ? false : true;
+		while((part = parts.shift()) && (rule = next) &&
+			Object.keys(rule).some((key) => {
+				if(key==="_" || key===part) {
+					next = l1 ? rule[key].keys : rule[key];
+					rule = rule[key];
+					l1 = false;
+					return rule;
+				}
+			})) { true; };
+		if(parts.length===0) {
+			rules.push(rule)
+		}
+		for(const rule of rules) {
+			if(rule[action]) {
+				if(typeof(rule[action])==="function") {
+					if(!(await rule[action].call(this,{action,user,data,request,key,functionName:key,argumentsList:data}))) {
+						return {removed};
+					}
+				} else {
+					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
+					if(!roles.some((role) => user.roles[role])) {
+						return {removed};
+					}
+				}
+			}
+			if(rule.filter) {
+				data = await rule.filter.call(this,{action,user,data,request});
+				if(data==undefined) {
+					return {removed};
+				}
+			}
+			if(!documentOnly && rule.keys && data && typeof(data)==="object") {
+				if(typeof(rule.keys)==="function") {
+					for(const key in data) {
+						if(!(await rule.keys.call(this,{action,user,object:data,key,request}))) {
+							delete data[key];
+							removed.push(key);
+						}
+					}
+				} else {
+					for(const key in data) {
+						const constraint = rule.keys[key];
+						if(constraint && constraint[action]) {
+							if(typeof(constraint)==="function") {
+								if(!(await constraint.call(this,{action,user,object:data,key,request,functionName:key,argumentsList:data}))) {
+									delete data[key];
+									removed.push(key);
+								}
+							} else {
+								const roles = Array.isArray(rule.keys[key]) ?  rule.keys[key] : Object.keys(rule.keys[key]);
+								if(!roles.some((role) => user.roles[role])) {
+									delete data[key];
+									removed.push(key);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return {data,removed};
+	}
+	secure.mapRoles = (user) => {
+		if(user && user.roles) {
+			let changes;
+			do {
+				changes = false;
+				Object.keys(roles).forEach((role) => {
+					if(user.roles[role]) {
+						Object.keys(roles[role]).forEach((childRole) => {
+							if(!user.roles[childRole]) {
+								changes = user.roles[childRole] = true;
+							}
+						})
+					}
+				});
+			} while(changes);
+		}
+	}
+	module.exports = secure;
+}).call(this)
+
+/***/ }),
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -302,7 +424,26 @@
 })();
 
 /***/ }),
-/* 6 */
+/* 7 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (string) => {
+		if(typeof(string)==="string") {
+			const parts = string.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					return new RegExp(parts[1],parts[2]);
+				} catch(e) {
+					;
+				}
+			}
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -330,7 +471,7 @@
 })();
 
 /***/ }),
-/* 7 */
+/* 9 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -346,7 +487,7 @@
 	}).call(this)
 
 /***/ }),
-/* 8 */
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -355,11 +496,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(9),
+	const soundex = __webpack_require__(11),
 		isSoul = __webpack_require__(3),
-		isInt = __webpack_require__(11),
-		isFloat = __webpack_require__(12),
-		validateLuhn = __webpack_require__(13),
+		isInt = __webpack_require__(13),
+		isFloat = __webpack_require__(14),
+		validateLuhn = __webpack_require__(15),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -722,7 +863,7 @@
 }).call(this);
 
 /***/ }),
-/* 9 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -733,7 +874,7 @@
 }).call(this);
 
 /***/ }),
-/* 10 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -767,7 +908,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -776,7 +917,7 @@
 }).call(this)
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -785,7 +926,7 @@
 }).call(this)
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -814,7 +955,7 @@
 
 
 /***/ }),
-/* 14 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -862,7 +1003,7 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -906,12 +1047,13 @@
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	const uid = __webpack_require__(1),
-		isSoul = __webpack_require__(3);
+		isSoul = __webpack_require__(3),
+		secure = __webpack_require__(5);
 	
 	function Edge({db,parent,path=["","e"]}) {
 		Object.defineProperty(this,"db",{enumerable:false,value:db});
@@ -1002,24 +1144,155 @@
 		return data;
 	}
 	Edge.prototype.value = async function(value,options={}) {
+		const request = this.db.request,
+			user = request.user,
+			vpath = this.path.slice();
+		vpath.splice(0,2);
 		if(arguments.length>0) {
-			const vpath = this.path.slice();
-			vpath.shift(); // remove ""
-			if(vpath[0].endsWith("@")) {
-				vpath.splice(0,1); //remove id
-			}
 			// transform here
 			// validate here
 			// secure here
-			return this.db.cache.put(this.path.join("!"),value,options)
+			const {data,removed} = await secure.call(this,{key:vpath,action:"write",data:value,request,user});
+			if(data!==undefined) {
+				return this.db.cache.put(this.path.join("!"),data,options)
+			}
 		}
-		return await this.restore(await this.db.cache.get(this.path.join("!")));
+		value = await this.restore(await this.db.cache.get(this.path.join("!")));
+		const {data} = await secure.call(this,{key:vpath,action:"read",data:value,request,user});
+		return data;
 	}
 	module.exports = Edge;
 }).call(this)
 
 /***/ }),
-/* 17 */
+/* 19 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		"Function@": {
+			securedTestFunction: { // for testing purposes
+				execute: [] // no execution allowed
+			},
+			addRoles: { // only dbo can add roles to a user
+				execute: ["dbo"]
+			},
+			clear: { // only dbo can clear
+				execute: ["dbo"]
+			},
+			deleteUser: {
+				execute: ["dbo"]
+			},
+			entries: { // only dbo can list entries
+				execute: ["dbo"]
+			},
+			entry: {
+				execute: ["dbo"]
+			},
+			keys: { // only dbo can list keys
+				execute: ["dbo"]
+			},
+			removeRoles: {
+				execute: ["dbo"]
+			},
+			resetPassword: { // only user themself or dbo can start a password reset
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			sendMail: { // only dbo can send mail
+				execute: ["dbo"]
+			},
+			updateUser: {  // only user themself or dbo can update user properties
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			values: { // only dbo can list values
+				execute: ["dbo"]
+			}
+		},
+		"User@": { // key to control, use <cname>@ for classes
+			
+			// read: ["<role>",...], // array or map of roles to allow get, not specifying means all have get
+			// write: {<role>:true}, // array or map of roles to allow set, not specifying means all have set
+			// a filter function can also be used
+			// action with be "get" or "set", not returning anything will result in denial
+			// not specifying a filter function will allow all get and set, unless controlled above
+			// a function with the same call signature can also be used as a property value above
+			filter({action,user,data,request}) {
+				// very restrictive, don't return a user record unless requested by the dbo or data subject
+				if(user.roles.dbo || user.userName===data.userName) {
+					return data;
+				}
+			},
+			keys: { // only applies to objects
+				roles: {
+					// only dbo's and data subject can get roles
+					read({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
+				},
+				hash: {
+					// only dbo's can get password hashes
+					read: ["dbo"],
+					// only the dbo and data subject can set a hash
+					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+				},
+				salt: {
+					// example of alternate control form, only dbo's can get password salts
+					read: {
+						dbo: true
+					},
+					// only the dbo and data subject can set a salt
+					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+				},
+				name({action,user,data,request}) { return data; } // example, same as no access control
+			}
+			/* keys could also be a function
+			keys({action,user,data,key,request})
+			 */
+		},
+		securedTestReadKey: { // for testing purposes
+			read: [] // no gets allowed
+		},
+		securedTestWriteKey: { // for testing purposes
+			write: [] // no sets allowed
+		},
+		// Edges are just nested keys or wildcards, e.g.
+		securedTestEdge: {
+			keys: {
+				_: { // matches any sub-edge
+					public: {
+						read() { return true; },
+						write() { return true; }
+					},
+					private: {
+						read() { return false; },
+						write() { return false; }
+					}
+				}
+			}
+		},
+		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
+			read: ["dbo"],
+			write: ["dbo"]
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 20 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		dbo: {
+			user: true // all dbo's are also users
+		}
+	};
+}).call(this);
+
+/***/ }),
+/* 21 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1050,24 +1323,12 @@
 					
 				}
 			}
-			/* Graph edge updates can also be monitored, although it is just as easy with triggers since edge updates are atomic
-			{
-				edge: {devices:{_:{alarm:true}}, // matches any time any device has alarm set to true
-				transform({data,pattern,user,request}) {
-					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
-					return data;
-				},
-				call({data,pattern,user,request,db}) {
-					
-				}
-			}
-			*/
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 22 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1090,7 +1351,7 @@
 }).call(this);
 
 /***/ }),
-/* 19 */
+/* 23 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1101,7 +1362,7 @@
 }).call(this);
 
 /***/ }),
-/* 20 */
+/* 24 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1146,118 +1407,10 @@
 }).call(this)
 
 /***/ }),
-/* 21 */
-/***/ (function(module, exports, __webpack_require__) {
-
-(function() {
-	"use strict"
-	const acl = __webpack_require__(27),
-		roles = __webpack_require__(28),
-		aclKeys = Object.keys(acl),
-		// compile rules that are RegExp based
-		{aclRegExps,aclLiterals} = aclKeys.reduce(({aclRegExps,aclLiterals},key) => {
-			const parts = key.split("/");
-			if(parts.length===3 && parts[0]==="") {
-				try {
-					aclRegExps.push({regexp:new RegExp(parts[1],parts[2]),rule:acl[key]})
-				} catch(e) {
-					aclLiterals[key] = acl[key];
-				}
-			} else {
-				aclLiterals[key] = acl[key];
-			}
-			return {aclRegExps,aclLiterals};
-		},{aclRegExps:[],aclLiterals:{}});
-	
-	// applies acl rules for key and action
-	// if user is not permitted to take action, modifies data accordingly
-	async function secure({key,action,data,documentOnly,request,user}) {
-		if(!user || !user.roles) {
-			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : data,user};
-		}
-		// assemble applicable rules
-		const rules = aclRegExps.reduce((accum,{regexp,rule}) => {
-				if(regexp.test(key)) {
-					accum.push(key);
-				}
-				return accum;
-			},[]).concat(aclLiterals[key]||[]),
-			removed = [];
-		for(const rule of rules) {
-			if(rule[action]) {
-				if(typeof(rule[action])==="function") {
-					if(!(await rule[action].call(this,{action,user,data,request,key,functionName:key,argumentsList:data}))) {
-						return {removed};
-					}
-				} else {
-					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
-					if(!roles.some((role) => user.roles[role])) {
-						return {removed};
-					}
-				}
-			}
-			if(rule.filter) {
-				data = await rule.filter.call(this,{action,user,data,request});
-				if(data==undefined) {
-					return {removed};
-				}
-			}
-			if(!documentOnly && rule.keys && data && typeof(data)==="object") {
-				if(typeof(rule.keys)==="function") {
-					for(const key in data) {
-						if(!(await rule.keys.call(this,{action,user,object:data,key,request}))) {
-							delete data[key];
-							removed.push(key);
-						}
-					}
-				} else {
-					for(const key in data) {
-						const constraint = rule.keys[key];
-						if(constraint && constraint[action]) {
-							if(typeof(constraint)==="function") {
-								if(!(await constraint.call(this,{action,user,object:data,key,request,functionName:key,argumentsList:data}))) {
-									delete data[key];
-									removed.push(key);
-								}
-							} else {
-								const roles = Array.isArray(rule.keys[key]) ?  rule.keys[key] : Object.keys(rule.keys[key]);
-								if(!roles.some((role) => user.roles[role])) {
-									delete data[key];
-									removed.push(key);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		return {data,removed};
-	}
-	secure.mapRoles = (user) => {
-		if(user && user.roles) {
-			let changes;
-			do {
-				changes = false;
-				Object.keys(roles).forEach((role) => {
-					if(user.roles[role]) {
-						Object.keys(roles[role]).forEach((childRole) => {
-							if(!user.roles[childRole]) {
-								changes = user.roles[childRole] = true;
-							}
-						})
-					}
-				});
-			} while(changes);
-		}
-	}
-	module.exports = secure;
-}).call(this)
-
-/***/ }),
-/* 22 */,
-/* 23 */,
-/* 24 */,
-/* 25 */
+/* 25 */,
+/* 26 */,
+/* 27 */,
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1272,16 +1425,16 @@ const //uid = require("./uid.js"),
 	//fromSerializable = require("./from-serializable.js"),
 	//toSerializable = require("./to-serializable.js"),
 	//Entity = require("./entity.js"),
-	Schema = __webpack_require__(5),
-	User = __webpack_require__(6),
+	Schema = __webpack_require__(6),
+	User = __webpack_require__(8),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(20),
-	toSerializable = __webpack_require__(14),
-	Thunderhead = __webpack_require__(26),
-	dboPassword = __webpack_require__(7).dboPassword,
-	secure = __webpack_require__(21);
+	hashPassword = __webpack_require__(24),
+	toSerializable = __webpack_require__(16),
+	Thunderhead = __webpack_require__(29),
+	dboPassword = __webpack_require__(9).dboPassword,
+	secure = __webpack_require__(5);
 
 /*const thunderclapjs = `(function() 
 	{ 
@@ -1394,7 +1547,7 @@ async function handleRequest(event) {
 				request.user = Object.freeze(user);
 			}
 			//Object.freeze(request);
-			const secured = await secure.call(thunderhead,{key:fname,action:"execute",data:args,user:request.user,request});
+			const secured = await secure.call(thunderhead,{key:`Function@.${fname}`,action:"execute",data:args,user:request.user,request});
 			if(!secured.data || secured.removed.length>0) {
 				return new Response(JSON.stringify(secured),{
 					status: 403,
@@ -1465,7 +1618,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 26 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1477,26 +1630,27 @@ async function handleRequest(event) {
 	"use strict"
 	const uid = __webpack_require__(1),
 		isSoul = __webpack_require__(3),
-		joqular = __webpack_require__(8),
-		hashPassword = __webpack_require__(20),
-		secure = __webpack_require__(21),
-		trigrams = __webpack_require__(29),
-		tokenize = __webpack_require__(30),
-		stopwords = __webpack_require__(31),
-		stemmer = __webpack_require__(32),
-		on = __webpack_require__(33)("cloud"),
-		fromSerializable = __webpack_require__(15),
-		sendMail = __webpack_require__(35),
-		User = __webpack_require__(6),
-		Schema = __webpack_require__(5),
+		toClassName = __webpack_require__(39),
+		joqular = __webpack_require__(10),
+		hashPassword = __webpack_require__(24),
+		secure = __webpack_require__(5),
+		trigrams = __webpack_require__(30),
+		tokenize = __webpack_require__(31),
+		stopwords = __webpack_require__(32),
+		stemmer = __webpack_require__(33),
+		on = __webpack_require__(34)("cloud"),
+		fromSerializable = __webpack_require__(17),
+		sendMail = __webpack_require__(36),
+		User = __webpack_require__(8),
+		Schema = __webpack_require__(6),
 		Position = __webpack_require__(2),
 		Coordinates = __webpack_require__(4),
-		Cache = __webpack_require__(36),
-		Edge = __webpack_require__(16),
-		when = __webpack_require__(17).cloud,
-		functions = __webpack_require__(18).cloud,
-		classes = __webpack_require__(19),
-		keys = __webpack_require__(7);
+		Cache = __webpack_require__(37),
+		Edge = __webpack_require__(18),
+		when = __webpack_require__(21).cloud,
+		functions = __webpack_require__(22).cloud,
+		classes = __webpack_require__(23),
+		keys = __webpack_require__(9);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1514,13 +1668,12 @@ async function handleRequest(event) {
 			this.register(Position);
 			this.register(Coordinates);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
-			__webpack_require__(37)(this);
+			__webpack_require__(38)(this);
 			joqular.db = this;
 			namespace.keys = this.keys;
 			setInterval(() => {
 				this.cache = new Cache({namespace});
-			},refresh)
-			//Object.defineProperty(this,"keys",{configurable:true,writable:true,value:keys});
+			},refresh);
 		}
 		async addRoles(userName,roles=[]) {
 			if(roles.length>=0) {
@@ -1620,8 +1773,7 @@ async function handleRequest(event) {
 			if(data && type==="object") {
 				const id = parentId||data["#"];
 				if(!parentId) {
-					const cname = id.split("@")[0];
-					parentPath = `!${cname}`;
+					parentPath = `!${toClassName(id)}`;
 				}
 				if(id) {
 					for(const key in data) {
@@ -1671,13 +1823,14 @@ async function handleRequest(event) {
 				error.errors = [new Error(`Attempt to put a non-object: ${object}`)];
 				return error;
 			}
+			object = Object.assign({},object);
 			let id = object["#"];
 			if(!id) {
 				id = object["#"]  = `${object.constructor.name}@${uid()}`;
 			}
-			const cname = id.split("@")[0],
+			const cname = toClassName(id),
 				key =`${cname}@`;
-			await on.call(this,{key,when:"before",action:"put",data:object,request,user});
+			await on.call(this,{key,when:"before",action:"write",data:object,request,user});
 			let schema = await this.getSchema(cname);
 			if(schema) {
 				options.schema = schema = new Schema(cname,schema);
@@ -1744,7 +1897,7 @@ async function handleRequest(event) {
 			if(changes) {
 				await on.call(this,{key:id,when:"after",action:"update",data:frozen,changes,request,user});
 			}
-			await on.call(this,{key:id,when:"after",action:"put",data:frozen,request,user});
+			await on.call(this,{key:id,when:"after",action:"write",data:frozen,request,user});
 			for(const match of matches) {
 				if(match.call) {
 					await match.call(this,data,match.when);
@@ -1773,10 +1926,10 @@ async function handleRequest(event) {
 				results = [],
 				keys,
 				top;
-			//"!p!edge"
+			//"!p!edge" p = property index
 			//'!p!edge!edge
-			//'!t!edge!trigram|id
-			//"!o!edge!"\value\"!id
+			//'!v!edge!"\value\" v = value index
+			//"!o!edge!"\value\"!id o = object index
 			const request = this.request,
 				user = request.user;
 			for(const key in pattern) {
@@ -1817,14 +1970,13 @@ async function handleRequest(event) {
 									count++;
 									const gkeys = await this.cache.keys(`!o${keypath}!${gram}!`);
 									for(const gkey of gkeys) {
-										const id = gkey.split("!").pop();
+										const id = gkey.substring(gkey.lastIndexOf("!")+1);
 										if(!filter || filter(id)) {
 											if(testids[id]) {
 												testids[id].sum++;
 												testids[id].avg = testids[id].sum / count;
 											} else {
-												const cname = id.split("@")[0],
-													{data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value,request,user}});
+												const {data,removed} = await secure.call(this,{key:`${toClassName(id)}@`,action:"read",data:{[key]:value},request,user});
 												if(data && removed.length===0) {
 													testids[id] = {sum:1};
 											    } else {
@@ -1868,22 +2020,21 @@ async function handleRequest(event) {
 								delete valuecopy[predicate];
 								const secured = {},
 									testids = {},
-									keys = await this.cache.keys(`!v${keypath}!`);
+									keys = await this.cache.keys(`!v${keypath}!`); // all the values for a key
 								if(keys.length===0) {
-									await this.cache.delete(`!p${keypath}`);
+									this.cache.delete(`!p${keypath}`); // clean-up index, there are no values for property
 									return [];
 								}
 								for(const key of keys) {
 									const parts = key.split("!"), // offset should be based on parentPath length, not end
-										rawvalue = parts.pop(),
+										rawvalue =  parts.pop(), 
 										value = fromSerializable(JSON.parse(rawvalue),this.ctors);
 									parts[1] = "o";
 									const path = parts.join("!");
 									if(await test.call(this,value,...(Array.isArray(pvalue) ? pvalue : [pvalue]))) {
 										const keys = await this.cache.keys(`${path}!${rawvalue}!`);
 										for(const key of keys) {
-											const parts = key.split("!"),
-												id = parts.pop();
+											const id = key.substring(key.lastIndexOf("!")+1);
 											if(!filter || filter(id)) {
 												const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
 												if(data && removed.length===0) {
@@ -1938,19 +2089,17 @@ async function handleRequest(event) {
 					} else {
 						const valuekey = JSON.stringify(value),
 							secured = {},
-							valuepath = `${keypath}!${valuekey}`,
-							objectpath = `!o${valuepath}!`,
 							testids = {}, 
-							keys = await this.cache.keys(objectpath);
+							keys = await this.cache.keys(`!o${keypath}!${valuekey}!`);
 						if(keys.length===0) {
-							await this.cache.delete(`!v${keypath}!${valuekey}`);
+							this.cache.delete(`!v${keypath}!${valuekey}`); // clean-up index, there are no objects with value
 							return [];
 						}
 						for(const key of keys) {
-							const id = key.split("!").pop();
+							const id = key.substring(key.lastIndexOf("!")+1);
 							if(!filter ||filter(id)) {
 								const {data,removed} = await secure.call(this,{key:`${cname}@`,action:"read",data:{[key]:value},request,user});
-								if(data && removed.length===0) {
+								if(data && removed!==data && removed.length===0) {
 									testids[id] = true;
 							    }
 							}
@@ -1964,7 +2113,7 @@ async function handleRequest(event) {
 						} else {
 							for(const id in ids) {
 								if(!secured[id] && !testids[id]) { // 
-									delete ids[id];
+									ids[id] = null;
 									count--;
 									if(count<=0) {
 										return [];
@@ -1978,18 +2127,20 @@ async function handleRequest(event) {
 			if(ids) {
 				if(!recursing) {
 					for(const id in ids) {
-						const object = await this.getItem(id);
-						if(object && (!filter || filter(object))) {
-							if(partial) {
-								for(const key in object) {
-									if(pattern[key]===undefined && key!=="#" && key!=="^") {
-										delete object[key];
+						if(id) {
+							const object = await this.getItem(id);
+							if(object && (!filter || filter(object))) {
+								if(partial) {
+									for(const key in object) {
+										if(pattern[key]===undefined && key!=="#" && key!=="^") {
+											delete object[key];
+										}
 									}
 								}
-							}
-							results.push(object);
-							if(limit && results.length>=limit) {
-								break;
+								results.push(object);
+								if(limit && results.length>=limit) {
+									break;
+								}
 							}
 						}
 					}
@@ -2026,7 +2177,7 @@ async function handleRequest(event) {
 				if(!(await on.call(this,{key:keyOrObject,when:"before",action:"remove",data:value,object:value,request,user}))) {
 					return false;
 				}
-				const {data,removed} = await secure.call(this,{key,action,data:value,documentOnly:true,request,user});
+				const {data,removed} = await secure.call(this,{key:keyOrObject,action,data:value,documentOnly:true,request,user});
 				if(data && removed.length===0) {
 					await this.cache.delete(keyOrObject);
 					const frozen = value && typeof(value)==="object" ? Object.freeze(value) : value;
@@ -2063,9 +2214,9 @@ async function handleRequest(event) {
 		}
 		async setItem(key,data,options={},secured) {
 			const request = this.request,
-				user = request.user;
+				user = request.user,
+				action = "write";
 			if(!secured && key[0]!=="!") {
-				const action = "write";
 				await on.call(this,{key,when:"before",action,data,request,user});
 				const secured = await secure.call(this,{key,action,data,request,user});
 				if(secured.removed===data || secured.removed.length>0) {
@@ -2081,7 +2232,7 @@ async function handleRequest(event) {
 			if(data!==undefined) {
 				await this.cache.put(key,data,options);
 				const frozen = data && typeof(data)==="object" ? Object.freeze(data) : data;
-				//await on.call(this,{key,when:"after",action:"write",data:frozen,request,user});
+				await on.call(this,{key,when:"after",action,data:frozen,request,user});
 			}
 			return data;
 		}
@@ -2100,8 +2251,7 @@ async function handleRequest(event) {
 		async unindex(object,parentPath="",parentId) {
 			const id = parentId||object["#"];
 			if(!parentId) {
-				const cname = id.split("@")[0];
-				parentPath = `!${cname}`;
+				parentPath = `!${toClassName(id)}`;
 			}
 			if(object && typeof(object)==="object" && id) {
 				for(const key in object) {
@@ -2125,12 +2275,10 @@ async function handleRequest(event) {
 								}
 							}
 							if(value.length<64) {
-								const valuekey = `${JSON.stringify(value)}`;
-								this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+								this.cache.delete(`!o${keypath}!${JSON.stringify(value)}!${id}`);
 							}
 						} else {
-							const valuekey = `${JSON.stringify(value)}`;
-							this.cache.delete(`!o${keypath}!${valuekey}!${id}`);
+							this.cache.delete(`!o${keypath}!${JSON.stringify(value)}!${id}`);
 						}
 					}
 				}
@@ -2143,16 +2291,16 @@ async function handleRequest(event) {
 				const results = await this.query({[cname]:{[property]:value}});
 				return results.length===0
 			}
-
 			const results = await this.query({[cname]:{[property]:value}});
 			return results.length===0 || (results.length===1 && results[0]["#"]===id);
 		}
 		async value(path,data,options={}) {
-			path = ["","e"].concat(Array.isArray(path) ? path : path.split("."));
-			const edge = new Edge({db:this,path});
+			path = Array.isArray(path) ? path : path.split(".");
+			const edge = await (new Edge({db:this})).get(path);
 			return arguments.length>1 ? edge.value(data,options) : edge.value();
 		}
 	}
+	// add developer defined functions to Thunderhead
 	const predefined = Object.keys(Object.getOwnPropertyDescriptors(Thunderhead.prototype));
 	Object.keys(functions).forEach((fname) => {
 		if(!predefined.includes(fname)) {
@@ -2164,127 +2312,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 27 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = {
-		securedTestReadKey: { // for testing purposes
-			read: [] // no gets allowed
-		},
-		securedTestWriteKey: { // for testing purposes
-			write: [] // no sets allowed
-		},
-		securedTestFunction: { // for testing purposes
-			execute: [] // no execution allowed
-		},
-		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
-			read: ["dbo"],
-			write: ["dbo"]
-		},
-		addRoles: { // only dbo can add roles to a user
-			execute: ["dbo"]
-		},
-		clear: { // only dbo can clear
-			execute: ["dbo"]
-		},
-		deleteUser: {
-			execute: ["dbo"]
-		},
-		entries: { // only dbo can list entries
-			execute: ["dbo"]
-		},
-		entry: {
-			execute: ["dbo"]
-		},
-		keys: { // only dbo can list keys
-			execute: ["dbo"]
-		},
-		removeRoles: {
-			execute: ["dbo"]
-		},
-		resetPassword: { // only user themself or dbo can start a password reset
-			execute({argumentsList,user}) {
-				return user.roles.dbo || argumentsList[0]===user.userName
-			}
-		},
-		sendMail: { // only dbo can send mail
-			execute: ["dbo"]
-		},
-		updateUser: {  // only user themself or dbo can update user properties
-			execute({argumentsList,user}) {
-				return user.roles.dbo || argumentsList[0]===user.userName
-			}
-		},
-		values: { // only dbo can list values
-			execute: ["dbo"]
-		},
-		"User@": { // key to control, use <cname>@ for classes
-			
-			// read: ["<role>",...], // array or map of roles to allow get, not specifying means all have get
-			// write: {<role>:true}, // array or map of roles to allow set, not specifying means all have set
-			// a filter function can also be used
-			// action with be "get" or "set", not returning anything will result in denial
-			// not specifying a filter function will allow all get and set, unless controlled above
-			// a function with the same call signature can also be used as a property value above
-			filter({action,user,data,request}) {
-				// very restrictive, don't return a user record unless requested by the dbo or data subject
-				if(user.roles.dbo || user.userName===data.userName) {
-					return data;
-				}
-			},
-			keys: { // only applies to objects
-				roles: {
-					// only dbo's and data subject can get roles
-					get({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
-				},
-				hash: {
-					// only dbo's can get password hashes
-					read: ["dbo"],
-					// only the dbo and data subject can set a hash
-					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
-				},
-				salt: {
-					// example of alternate control form, only dbo's can get password salts
-					read: {
-						dbo: true
-					},
-					// only the dbo and data subject can set a salt
-					set({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
-				},
-				name({action,user,data,request}) { return data; } // example, same as no access control
-			}
-			/* keys could also be a function
-			keys({action,user,data,key,request})
-			 */
-		}
-		/* Edges are just nested keys or wildcards, e.g.
-		people: {
-			_: { // matches any sub-edge
-				secretPhrase: { // matches secrePhrase edge
-					get(...) { ... },
-					set(...) { ... }
-				}
-			}
-		}
-		*/
-	}
-}).call(this);
-
-/***/ }),
-/* 28 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = {
-		dbo: {
-			user: true // all dbo's are also users
-		}
-	};
-}).call(this);
-
-/***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2302,7 +2330,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2313,7 +2341,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2335,7 +2363,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2526,57 +2554,64 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	let actions,
-		actionsKeys,
-		compiled;
-		
+	const toRegExp = __webpack_require__(7);
+	
+	let actions;
 	async function on({key,when,action,data,changes,request,user}) {
-		// assemble applicable actions
-		const actions = compiled.actionsRegExps.reduce((accum,{regexp,action}) => {
-				if(regexp.test(key)) {
-					accum.push(key);
+		const triggers = [];
+		let parts = Array.isArray(key) ? key.slice() : key.split("."),
+			trigger = actions,
+			part,
+			l1 = true;
+		while((part = parts.shift()) && actions &&
+			Object.keys(trigger).some((key) => {
+				const regexp = toRegExp(key);
+				if(key==="_" || regexp && regexp.test(part)) {
+					trigger = l1 ? trigger[key].keys : trigger[key];
+					l1 = false;
+					return trigger;
 				}
-				return accum;
-			},[]).concat(compiled.actionsLiterals[key]||[]);
-		for(const action of actions) {
-			if(action[when] && action[when][action]) {
-				if(action==="before") {
-					if(!(await action[when][action].call(this,{action,user,data,changes,request}))) {
-						return false;
-					}
-				}
-				await action[when][action].call(this,{action,user,data,changes,request})
-			}
+			})) { true; };
+		if(parts.length===0 && trigger[when] && trigger[when][action]) {
+			triggers.push(triggertrigger[when][action]);
 		}
-		return true
+		parts = Array.isArray(key) ? key.slice() : key.split(".");
+		trigger = actions;
+		l1 = true;
+		while((part = parts.shift()) && actions &&
+				Object.keys(trigger).some((key) => {
+					if(key==="_" || key===part) {
+						trigger = l1 ? trigger[key].keys : trigger[key];
+						l1 = false;
+						return trigger;
+					}
+				})) { true; };
+		if(parts.length===0  && trigger[when] && trigger[when][action]) {
+			triggers.push(triggertrigger[when][action]);
+		}
+		for(const trigger of triggers) {
+			if(action==="before") {
+				if(!(await trigger.call(this,{action,user,data,changes,request}))) {
+					return false;
+				}
+			}
+			await trigger.call(this,{action,user,data,changes,request})
+		}
+		return true;
 	}
 	module.exports = (type) => {
-		actions = __webpack_require__(34)[type],
-		actionsKeys = Object.keys(actions),
-		compiled = actionsKeys.reduce(({actionsRegExps,actionsLiterals},key) => {
-			const parts = key.split("/");
-			if(parts.length===3 && parts[0]==="") {
-				try {
-					actionsRegExps.push({regexp:new RegExp(parts[1],parts[2]),action:actions[key]})
-				} catch(e) {
-					actionsLiterals[key] = actions[key];
-				}
-			} else {
-				actionsLiterals[key] = actions[key];
-			}
-			return {actionsRegExps,actionsLiterals};
-		},{actionsRegExps:[],actionsLiterals:{}});
+		actions = __webpack_require__(35)[type];
 		return on;
 	};
 }).call(this);
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2589,16 +2624,16 @@ async function handleRequest(event) {
 		},
 		cloud: {
 			"User@": {
-				get({value,key,user,request}) {
+				read({value,key,user,request}) {
 					; // called after get
 				},
-				set({value,key,oldValue,user,request}) {
+				write({value,key,oldValue,user,request}) {
 					// if value!==oldValue it is a change
 					// if oldValue===undefined it is new
 					// if value===undefined it is delete
 					; // called after set
 				},
-				apply({value,key,args,user,request}) {
+				execute({value,key,args,user,request}) {
 					; // called after execute, value is the result, key is the function name
 				},
 				keys: {
@@ -2612,9 +2647,9 @@ async function handleRequest(event) {
 			/* Edges are just nested keys or wildcards, e.g.
 			people: {
 				_: { // matches any sub-edge
-					secretPhrase: { // matches secrePhrase edge
-						get(...) { ... },
-						set(...) { ... }
+					secretPhrase: { // matches secretPhrase edge
+						read(...) { ... },
+						write(...) { ... }
 					}
 				}
 			}
@@ -2624,11 +2659,11 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {mailgunKey,mailgunHostName} = __webpack_require__(7);
+	const {mailgunKey,mailgunHostName} = __webpack_require__(9);
 	
 	function sendMail({from,to,cc,bcc,subject,body}) {
 		return fetch(`https://api.mailgun.net/v3/${mailgunHostName}/messages`, {
@@ -2650,7 +2685,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2707,12 +2742,12 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(7),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(9),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			limit = Math.max(limit,1000);
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
@@ -2794,6 +2829,14 @@ async function handleRequest(event) {
 		Object.assign(namespace,methods);
 	}
 }).call(this);
+
+/***/ }),
+/* 39 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (id) => id.substring(0,id.indexOf("@"));
+}).call(this)
 
 /***/ })
 /******/ ]);

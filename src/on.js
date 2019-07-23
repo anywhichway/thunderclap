@@ -1,45 +1,52 @@
 (function() {
 	"use strict"
-	let actions,
-		actionsKeys,
-		compiled;
-		
+	const toRegExp = require("./to-regexp.js");
+	
+	let actions;
 	async function on({key,when,action,data,changes,request,user}) {
-		// assemble applicable actions
-		const actions = compiled.actionsRegExps.reduce((accum,{regexp,action}) => {
-				if(regexp.test(key)) {
-					accum.push(key);
+		const triggers = [];
+		let parts = Array.isArray(key) ? key.slice() : key.split("."),
+			trigger = actions,
+			part,
+			l1 = true;
+		while((part = parts.shift()) && actions &&
+			Object.keys(trigger).some((key) => {
+				const regexp = toRegExp(key);
+				if(key==="_" || regexp && regexp.test(part)) {
+					trigger = l1 ? trigger[key].keys : trigger[key];
+					l1 = false;
+					return trigger;
 				}
-				return accum;
-			},[]).concat(compiled.actionsLiterals[key]||[]);
-		for(const action of actions) {
-			if(action[when] && action[when][action]) {
-				if(action==="before") {
-					if(!(await action[when][action].call(this,{action,user,data,changes,request}))) {
-						return false;
-					}
-				}
-				await action[when][action].call(this,{action,user,data,changes,request})
-			}
+			})) { true; };
+		if(parts.length===0 && trigger[when] && trigger[when][action]) {
+			triggers.push(triggertrigger[when][action]);
 		}
-		return true
+		parts = Array.isArray(key) ? key.slice() : key.split(".");
+		trigger = actions;
+		l1 = true;
+		while((part = parts.shift()) && actions &&
+				Object.keys(trigger).some((key) => {
+					if(key==="_" || key===part) {
+						trigger = l1 ? trigger[key].keys : trigger[key];
+						l1 = false;
+						return trigger;
+					}
+				})) { true; };
+		if(parts.length===0  && trigger[when] && trigger[when][action]) {
+			triggers.push(triggertrigger[when][action]);
+		}
+		for(const trigger of triggers) {
+			if(action==="before") {
+				if(!(await trigger.call(this,{action,user,data,changes,request}))) {
+					return false;
+				}
+			}
+			await trigger.call(this,{action,user,data,changes,request})
+		}
+		return true;
 	}
 	module.exports = (type) => {
-		actions = require("../on.js")[type],
-		actionsKeys = Object.keys(actions),
-		compiled = actionsKeys.reduce(({actionsRegExps,actionsLiterals},key) => {
-			const parts = key.split("/");
-			if(parts.length===3 && parts[0]==="") {
-				try {
-					actionsRegExps.push({regexp:new RegExp(parts[1],parts[2]),action:actions[key]})
-				} catch(e) {
-					actionsLiterals[key] = actions[key];
-				}
-			} else {
-				actionsLiterals[key] = actions[key];
-			}
-			return {actionsRegExps,actionsLiterals};
-		},{actionsRegExps:[],actionsLiterals:{}});
+		actions = require("../on.js")[type];
 		return on;
 	};
 }).call(this);

@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 22);
+/******/ 	return __webpack_require__(__webpack_require__.s = 25);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -167,7 +167,7 @@
 
 (function() {
 	"use strict"
-	const uuid4 = __webpack_require__(10),
+	const uuid4 = __webpack_require__(12),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -211,6 +211,128 @@
 
 /***/ }),
 /* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
+	"use strict"
+	const toRegExp = __webpack_require__(7),
+		acl = __webpack_require__(19),
+		roles = __webpack_require__(20);
+	
+	// applies acl rules for key and action
+	// if user is not permitted to take action, modifies data accordingly
+	async function secure({key,action,data,documentOnly,request,user}) {
+		if(!user || !user.roles) {
+			return {data,removed:data && typeof(data)==="object" ? Object.keys(data) : data,user};
+		}
+		const removed = [],
+			rules = [];
+		let parts = Array.isArray(key) ? key.slice() : key.split("."),
+			rule = acl,
+			next = rule,
+			l1 = parts[0]==="Function@" ? false : true,
+			part;
+		while((part = parts.shift()) && (rule = next) && 
+			Object.keys(rule).some((key) => {
+				const regexp = toRegExp(key);
+				if(key==="_" || regexp && regexp.test(part)) {
+					next = l1 ? rule[key].keys : rule[key];
+					rule = rule[key];
+					l1 = false;
+					return rule;
+				}
+			})) { true; };
+		if(parts.length===0) {
+			rules.push(rule)
+		}
+		parts = Array.isArray(key) ? key.slice() : key.split(".");
+		rule = acl;
+		next = rule;
+		l1 = parts[0]==="Function@" ? false : true;
+		while((part = parts.shift()) && (rule = next) &&
+			Object.keys(rule).some((key) => {
+				if(key==="_" || key===part) {
+					next = l1 ? rule[key].keys : rule[key];
+					rule = rule[key];
+					l1 = false;
+					return rule;
+				}
+			})) { true; };
+		if(parts.length===0) {
+			rules.push(rule)
+		}
+		for(const rule of rules) {
+			if(rule[action]) {
+				if(typeof(rule[action])==="function") {
+					if(!(await rule[action].call(this,{action,user,data,request,key,functionName:key,argumentsList:data}))) {
+						return {removed};
+					}
+				} else {
+					const roles = Array.isArray(rule[action]) ? rule[action] : Object.keys(rule[action]);
+					if(!roles.some((role) => user.roles[role])) {
+						return {removed};
+					}
+				}
+			}
+			if(rule.filter) {
+				data = await rule.filter.call(this,{action,user,data,request});
+				if(data==undefined) {
+					return {removed};
+				}
+			}
+			if(!documentOnly && rule.keys && data && typeof(data)==="object") {
+				if(typeof(rule.keys)==="function") {
+					for(const key in data) {
+						if(!(await rule.keys.call(this,{action,user,object:data,key,request}))) {
+							delete data[key];
+							removed.push(key);
+						}
+					}
+				} else {
+					for(const key in data) {
+						const constraint = rule.keys[key];
+						if(constraint && constraint[action]) {
+							if(typeof(constraint)==="function") {
+								if(!(await constraint.call(this,{action,user,object:data,key,request,functionName:key,argumentsList:data}))) {
+									delete data[key];
+									removed.push(key);
+								}
+							} else {
+								const roles = Array.isArray(rule.keys[key]) ?  rule.keys[key] : Object.keys(rule.keys[key]);
+								if(!roles.some((role) => user.roles[role])) {
+									delete data[key];
+									removed.push(key);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return {data,removed};
+	}
+	secure.mapRoles = (user) => {
+		if(user && user.roles) {
+			let changes;
+			do {
+				changes = false;
+				Object.keys(roles).forEach((role) => {
+					if(user.roles[role]) {
+						Object.keys(roles[role]).forEach((childRole) => {
+							if(!user.roles[childRole]) {
+								changes = user.roles[childRole] = true;
+							}
+						})
+					}
+				});
+			} while(changes);
+		}
+	}
+	module.exports = secure;
+}).call(this)
+
+/***/ }),
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -302,7 +424,26 @@
 })();
 
 /***/ }),
-/* 6 */
+/* 7 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (string) => {
+		if(typeof(string)==="string") {
+			const parts = string.split("/");
+			if(parts.length===3 && parts[0]==="") {
+				try {
+					return new RegExp(parts[1],parts[2]);
+				} catch(e) {
+					;
+				}
+			}
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -330,8 +471,8 @@
 })();
 
 /***/ }),
-/* 7 */,
-/* 8 */
+/* 9 */,
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -340,11 +481,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(9),
+	const soundex = __webpack_require__(11),
 		isSoul = __webpack_require__(3),
-		isInt = __webpack_require__(11),
-		isFloat = __webpack_require__(12),
-		validateLuhn = __webpack_require__(13),
+		isInt = __webpack_require__(13),
+		isFloat = __webpack_require__(14),
+		validateLuhn = __webpack_require__(15),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -707,7 +848,7 @@
 }).call(this);
 
 /***/ }),
-/* 9 */
+/* 11 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -718,7 +859,7 @@
 }).call(this);
 
 /***/ }),
-/* 10 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -752,7 +893,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -761,7 +902,7 @@
 }).call(this)
 
 /***/ }),
-/* 12 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -770,7 +911,7 @@
 }).call(this)
 
 /***/ }),
-/* 13 */
+/* 15 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -799,7 +940,7 @@
 
 
 /***/ }),
-/* 14 */
+/* 16 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -847,7 +988,7 @@
 }).call(this);
 
 /***/ }),
-/* 15 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -891,12 +1032,13 @@
 }).call(this);
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	const uid = __webpack_require__(1),
-		isSoul = __webpack_require__(3);
+		isSoul = __webpack_require__(3),
+		secure = __webpack_require__(5);
 	
 	function Edge({db,parent,path=["","e"]}) {
 		Object.defineProperty(this,"db",{enumerable:false,value:db});
@@ -987,24 +1129,155 @@
 		return data;
 	}
 	Edge.prototype.value = async function(value,options={}) {
+		const request = this.db.request,
+			user = request.user,
+			vpath = this.path.slice();
+		vpath.splice(0,2);
 		if(arguments.length>0) {
-			const vpath = this.path.slice();
-			vpath.shift(); // remove ""
-			if(vpath[0].endsWith("@")) {
-				vpath.splice(0,1); //remove id
-			}
 			// transform here
 			// validate here
 			// secure here
-			return this.db.cache.put(this.path.join("!"),value,options)
+			const {data,removed} = await secure.call(this,{key:vpath,action:"write",data:value,request,user});
+			if(data!==undefined) {
+				return this.db.cache.put(this.path.join("!"),data,options)
+			}
 		}
-		return await this.restore(await this.db.cache.get(this.path.join("!")));
+		value = await this.restore(await this.db.cache.get(this.path.join("!")));
+		const {data} = await secure.call(this,{key:vpath,action:"read",data:value,request,user});
+		return data;
 	}
 	module.exports = Edge;
 }).call(this)
 
 /***/ }),
-/* 17 */
+/* 19 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		"Function@": {
+			securedTestFunction: { // for testing purposes
+				execute: [] // no execution allowed
+			},
+			addRoles: { // only dbo can add roles to a user
+				execute: ["dbo"]
+			},
+			clear: { // only dbo can clear
+				execute: ["dbo"]
+			},
+			deleteUser: {
+				execute: ["dbo"]
+			},
+			entries: { // only dbo can list entries
+				execute: ["dbo"]
+			},
+			entry: {
+				execute: ["dbo"]
+			},
+			keys: { // only dbo can list keys
+				execute: ["dbo"]
+			},
+			removeRoles: {
+				execute: ["dbo"]
+			},
+			resetPassword: { // only user themself or dbo can start a password reset
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			sendMail: { // only dbo can send mail
+				execute: ["dbo"]
+			},
+			updateUser: {  // only user themself or dbo can update user properties
+				execute({argumentsList,user}) {
+					return user.roles.dbo || argumentsList[0]===user.userName
+				}
+			},
+			values: { // only dbo can list values
+				execute: ["dbo"]
+			}
+		},
+		"User@": { // key to control, use <cname>@ for classes
+			
+			// read: ["<role>",...], // array or map of roles to allow get, not specifying means all have get
+			// write: {<role>:true}, // array or map of roles to allow set, not specifying means all have set
+			// a filter function can also be used
+			// action with be "get" or "set", not returning anything will result in denial
+			// not specifying a filter function will allow all get and set, unless controlled above
+			// a function with the same call signature can also be used as a property value above
+			filter({action,user,data,request}) {
+				// very restrictive, don't return a user record unless requested by the dbo or data subject
+				if(user.roles.dbo || user.userName===data.userName) {
+					return data;
+				}
+			},
+			keys: { // only applies to objects
+				roles: {
+					// only dbo's and data subject can get roles
+					read({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; }, 
+				},
+				hash: {
+					// only dbo's can get password hashes
+					read: ["dbo"],
+					// only the dbo and data subject can set a hash
+					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+				},
+				salt: {
+					// example of alternate control form, only dbo's can get password salts
+					read: {
+						dbo: true
+					},
+					// only the dbo and data subject can set a salt
+					write({action,user,object,key,request}) { return user.roles.dbo || object.userName===user.userName; },
+				},
+				name({action,user,data,request}) { return data; } // example, same as no access control
+			}
+			/* keys could also be a function
+			keys({action,user,data,key,request})
+			 */
+		},
+		securedTestReadKey: { // for testing purposes
+			read: [] // no gets allowed
+		},
+		securedTestWriteKey: { // for testing purposes
+			write: [] // no sets allowed
+		},
+		// Edges are just nested keys or wildcards, e.g.
+		securedTestEdge: {
+			keys: {
+				_: { // matches any sub-edge
+					public: {
+						read() { return true; },
+						write() { return true; }
+					},
+					private: {
+						read() { return false; },
+						write() { return false; }
+					}
+				}
+			}
+		},
+		[/\!.*/]: { // prevent direct index access by anyone other than a dbo, changing this may create a data inference leak
+			read: ["dbo"],
+			write: ["dbo"]
+		}
+	}
+}).call(this);
+
+/***/ }),
+/* 20 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = {
+		dbo: {
+			user: true // all dbo's are also users
+		}
+	};
+}).call(this);
+
+/***/ }),
+/* 21 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1035,24 +1308,12 @@
 					
 				}
 			}
-			/* Graph edge updates can also be monitored, although it is just as easy with triggers since edge updates are atomic
-			{
-				edge: {devices:{_:{alarm:true}}, // matches any time any device has alarm set to true
-				transform({data,pattern,user,request}) {
-					Object.keys(data).forEach((key) => { if(!pattern[key]) delete data[key]; });
-					return data;
-				},
-				call({data,pattern,user,request,db}) {
-					
-				}
-			}
-			*/
 		]
 	}
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 22 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1075,7 +1336,7 @@
 }).call(this);
 
 /***/ }),
-/* 19 */
+/* 23 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1086,9 +1347,8 @@
 }).call(this);
 
 /***/ }),
-/* 20 */,
-/* 21 */,
-/* 22 */
+/* 24 */,
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -1100,21 +1360,21 @@ Copyright AnyWhichWay, LLC 2019
 (function() {
 	"use strict"
 	const uid = __webpack_require__(1),
-		joqular = __webpack_require__(8),
-		toSerializable = __webpack_require__(14),
-		create = __webpack_require__(23),
-		Schema = __webpack_require__(5),
-		Edge = __webpack_require__(16),
-		User = __webpack_require__(6),
+		joqular = __webpack_require__(10),
+		toSerializable = __webpack_require__(16),
+		create = __webpack_require__(26),
+		Schema = __webpack_require__(6),
+		Edge = __webpack_require__(18),
+		User = __webpack_require__(8),
 		Position = __webpack_require__(2),
 		Coordinates = __webpack_require__(4),
-		when = __webpack_require__(17).client,
-		functions = __webpack_require__(18).client,
-		classes = __webpack_require__(19);
+		when = __webpack_require__(21).client,
+		functions = __webpack_require__(22).client,
+		classes = __webpack_require__(23);
 		
 	var fetch;
 	if(typeof(fetch)==="undefined") {
-		fetch = __webpack_require__(24);
+		fetch = __webpack_require__(27);
 	}
 	
 	// patch Edge value for client
@@ -1444,12 +1704,12 @@ Copyright AnyWhichWay, LLC 2019
 
 
 /***/ }),
-/* 23 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const fromSerializable = __webpack_require__(15);
+	const fromSerializable = __webpack_require__(17);
 	async function create(data,ctors={}) {
 		const type = typeof(data);
 		if(type==="string") {
@@ -1487,7 +1747,7 @@ Copyright AnyWhichWay, LLC 2019
 }).call(this);
 
 /***/ }),
-/* 24 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

@@ -1,6 +1,6 @@
 {
   "name": "thunderclap",
-  "version": "v0.0.29a",
+  "version": "v0.0.31a",
   "description": "Thunderclap: An key-value, indexed JSON, and graph database plus function oriented server for Cloudflare",
   "engines": {
     "node": "10.x"
