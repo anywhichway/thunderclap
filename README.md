@@ -166,7 +166,7 @@ e.g. `entries("Person@")` might return:
 Entries can be used in a loop just like `keys` below.
 
 `Array entry(string key)` - Returns the entry for a key as a two or three element array or `undefined`. By default,
-only a user with the role `dbo` can call this function.. For example, `entry("Person@jxmc9cc1kswqak4ga")` 
+only a user with the role `dbo` can call this function. For example, `entry("Person@jxmc9cc1kswqak4ga")` 
 might return:
 
 ```javascript
@@ -652,8 +652,8 @@ The default `secure.js` file is show below.
 		people: {
 			_: { // matches any sub-edge
 				secretPhrase: { // matches secrePhrase edge
-					get(...) { ... },
-					set(...) { ... }
+					read(...) { ... },
+					write(...) { ... }
 				}
 			}
 		}
@@ -753,7 +753,7 @@ Triggers can be executed in the browser, a service worker, or the cloud.
 				},
 				keys: {
 					password: {
-						set({value,key,oldValue,user,request}) {
+						write({value,key,oldValue,user,request}) {
 							; // called after set
 						}
 					}
@@ -763,8 +763,8 @@ Triggers can be executed in the browser, a service worker, or the cloud.
 			people: {
 				_: { // matches any sub-edge
 					secretPhrase: { // matches secrePhrase edge
-						get(...) { ... },
-						set(...) { ... }
+						read(...) { ... },
+						write(...) { ... }
 					}
 				}
 			}
@@ -899,6 +899,8 @@ Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB de
 but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. 
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-24 v0.0.32a Minor documentation fixes.
 
 2019-07-23 v0.0.31a Slight performance inmprovements. Fixed broken `$search`.
 

@@ -1,6 +1,6 @@
 {
   "name": "thunderclap",
-  "version": "v0.0.31a",
+  "version": "v0.0.32a",
   "description": "Thunderclap: An key-value, indexed JSON, and graph database plus function oriented server for Cloudflare",
   "engines": {
     "node": "10.x"
@@ -13,7 +13,7 @@
     "type": "git",
     "url": "git+https://github.com/eventscope/thunderclap.git"
   },
-  "keywords": [],
+  "keywords": ["MongoDB","ArrangoDB","Redis","Cloudflare","Hbase"],
   "author": "Simon Y. Blackwell <syblackwell@anywhichway.com> (http://app.github.com/anywhichway)",
   "bugs": {
     "url": "https://github.com/eventscope/thunderclap/issues"
