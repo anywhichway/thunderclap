@@ -8,6 +8,25 @@
 		this.parent = parent;
 		this.path = path;
 	}
+	Edge.prototype.add = async function(data,options) {
+		let set = await this.db.getItem(this.path.join("!"));
+		if(!set || !set.startsWith("MapSet@")) {
+			set = `MapSet@${uid()}`;
+			await this.value(set);
+		}
+		if(data && typeof(data)==="object") {
+			let id = data["#"];
+			if(!id) {
+				id = data["#"] = `${data.constructor.name}@${uid()}`;
+				await this.db.put(data,options);
+			}
+			await this.db.put({"#":set,id},options);
+		} else {
+			const key = JSON.stringify(data);
+			await this.db.put({"#":set,[key]:data},options);
+		}
+		return this;
+	}
 	Edge.prototype.delete = async function() {
 		const keys = await this.db.keys(this.path.join("!"));
 		if(keys.length===0 || keys[0]==="") {
@@ -16,23 +35,22 @@
 		await this.db.removeItem(this.path.join("!"))
 		return this.db.clear(this.path.join("!"));
 	}
-	Edge.prototype.get = function(path) {
+	Edge.prototype.get = async function(path) {
 		const parts = Array.isArray(path) ? path : path.split(".");
-		let parent = this,
+		let node = this,
 			part;
 		path = this.path.slice();
 		while(part = parts.shift()) {
 			path.push(part);
-			parent = new Edge({db:this.db,parent,path:path.slice()});
+			node = new Edge({db:this.db,parent:node,path:path.slice()});
 		}
-		return parent;
+		return node;
 	}
 	Edge.prototype.put = async function(data,options={}) {
 		let node = this,
 			type = typeof(data);
 		if(data && type==="object") {
 			const id = data["#"];
-			// add id if not present?
 			// when here?
 			// transform here
 			// validate here
@@ -59,19 +77,55 @@
 		}
 		return data;
 	}
+	Edge.prototype.remove = async function(data) {
+		const set = await this.db.getItem(this.path.join("!"));
+		if(!set || !set.startsWith('MapSet@')) {
+			return this;
+		}
+		let key;
+		if(data && typeof(data)==="object") {
+			key = data["#"];
+		} else {
+			key = JSON.stringify(data);
+		}
+		if(key) {
+			const path = `!e!MapSet@!${set}!${key}`;
+			await this.db.removeItem(path);
+			await this.db.clear(path);
+		}
+		return this;
+	}
 	Edge.prototype.restore = async function(data) {
 		if(typeof(data)!=="string") {
-			const path = this.path.slice();
-			path.shift(); // remove ""
-			if(path[0].endsWith("@")) {
-				path.splice(1,1); // remove id;
-			}
+			//const path = this.path.slice();
+			//path.shift(); // remove ""
+			//if(path[0].endsWith("@")) {
+			//	path.splice(1,1); // remove id;
+			//}
 			// security here using edge path
 			return data;
 		}
-		const cname = data.split("@")[0];
-		if(cname) {
-			const keys = await this.db.keys(`!e!${cname}@!${data}!`),
+		if(data.startsWith("MapSet@")) {
+			const path = `!e!MapSet@!${data}!`,
+				keys = await this.db.keys(path),
+				set = new Set();
+			set["#"] = data;
+			for(const key of keys) {
+				const parts = key.split("!"),
+					value = parts[parts.length-1];
+				if(value && value!=="#") {
+					if(isSoul(parts[0],false)) {
+						set.add(await this.restore(value));
+					} else {
+						set.add(JSON.parse(value));
+					}
+				}
+			}
+			return set;
+		}
+		if(isSoul(data,false)) {
+			const cname = data.split("@")[0],
+				keys = await this.db.keys(`!e!${cname}@!${data}!`),
 				object = {};
 			for(const key of keys) {
 				const parts = key.split("!"),
@@ -104,10 +158,13 @@
 			if(data!==undefined) {
 				return this.db.cache.put(this.path.join("!"),data,options)
 			}
+			return;
 		}
 		value = await this.restore(await this.db.cache.get(this.path.join("!")));
 		const {data} = await secure.call(this,{key:vpath,action:"read",data:value,request,user});
-		return data;
+		if(data===value) {
+			return value;
+		}
 	}
 	module.exports = Edge;
 }).call(this)

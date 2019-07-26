@@ -279,11 +279,15 @@ create a user and store it in the database use `createUser`.
 The `Edge` object is used to support graph database options. The graph API is similar to, but no identical to, the 
 GunDB graph API. It has a number of methods:
 
+`Edge async add(string|Array path,any data[,options={}])` - Adds data to a Set at `path`.
+
 `number async delete(string|Array path)` - Deletes the sub-graph, if any, at `path`. Returns the number of nodes deleted.
 
 `Edge async get(string|Array path)` - Gets the sub-edge at `path`.
 
 `object async put(object data)` - Explodes the object into a sub-graph on the current Edge.
+
+`Edge async remove(string|Array path,any data)` - Removes data from a Set at `path`.
 
 `any async value(string|Array path [,any value [,object options={}])` - Get's or sets the value associated with the Edge.
 
@@ -899,6 +903,8 @@ Many of the concepts in Thunderclap were first explored in ReasonDB. ReasonDB de
 but many features found in ReasonDB will make their way into Thunderclap if interest is shown in the software. 
 
 # Change Log (reverse chronological order) [top](#top)
+
+2019-07-24 v0.0.33a Added graph `add` and `remove` for set operations on values.
 
 2019-07-24 v0.0.32a Minor documentation fixes.
 

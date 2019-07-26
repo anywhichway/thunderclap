@@ -23,7 +23,17 @@ function submit(event) {
 	}
 	thunderclap[fname](...args)
 		.then((result => {
-			stdout.innerText = JSON.stringify(result);
+			let id;
+			if(result && typeof(result)==="object") {
+				if(result instanceof(Set)) {
+					id = result["#"];
+					result = Array.from(result);
+					if(id) {
+						result["#"] = id;
+					}
+				}
+			}
+			stdout.innerText = `${JSON.stringify(result)}${id ? `.${id}` : ""}`;
 			}))
 		.catch((e) => {
 			stdout.innerHTML = e.errors ? JSON.stringify(e.errors.map((e) => e+"")) : e+"";

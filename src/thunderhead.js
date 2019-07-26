@@ -52,6 +52,10 @@
 				this.cache = new Cache({namespace});
 			},refresh);
 		}
+		async add(path,data,options={}) {
+			const edge = await this.get(path);
+			return edge.add(data,options);
+		}
 		async addRoles(userName,roles=[]) {
 			if(roles.length>=0) {
 				const user = await this.getUser(userName);
@@ -184,12 +188,12 @@
 				}
 			}
 		}
-		async put(data) {
+		async put(data,options={}) {
 			const edge = new Edge({db:this});
-			for(const key in data) {
-				await (await edge.get(key)).put(data[key]);
-			}
-			return data;
+			//for(const key in data) {
+			//	await (await edge.get(key)).put(data[key],options);
+			//}
+			edge.put(data);
 		}
 		async putItem(object,options={}) {
 			const request = this.request,
@@ -531,6 +535,10 @@
 			if(ctor.name && ctor.name!=="anonymous") {
 				this.ctors[ctor.name] = ctor;
 			}
+		}
+		async remove(path,data) {
+			const edge = await this.get(path);
+			return await edge.remove(data);
 		}
 		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject),

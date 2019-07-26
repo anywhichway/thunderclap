@@ -11,6 +11,7 @@ Copyright AnyWhichWay, LLC 2019
 		toSerializable = require("./to-serializable.js"),
 		create = require("./create.js"),
 		Schema = require("./schema.js"),
+		MapSet = require("./map-set.js"),
 		Edge = require("./edge.js"),
 		User = require("./user.js"),
 		Position = require("./position.js"),
@@ -18,7 +19,7 @@ Copyright AnyWhichWay, LLC 2019
 		when = require("../when.js").client,
 		functions = require("../functions.js").client,
 		classes = require("../classes.js");
-		
+	
 	var fetch;
 	if(typeof(fetch)==="undefined") {
 		fetch = require("node-fetch");
@@ -26,9 +27,11 @@ Copyright AnyWhichWay, LLC 2019
 	
 	// patch Edge value for client
 	Edge.prototype.value = async function(value,options={}) {
-		const path = this.path.slice();
-		path.splice(0,2);
-		return arguments.length>0 ? this.db.value(path,value,options) : this.db.value(path);
+		if(arguments.length>0) {
+			return this.db.value(path,value,options);
+		} else {
+			return this.db.value(this.path.join("!"));
+		}
 	}
 	
 	// "https://cloudworker.io/db.json";
@@ -49,6 +52,7 @@ Copyright AnyWhichWay, LLC 2019
 			this.register(Position);
 			this.register(Coordinates);
 			this.register(Edge);
+			this.register(MapSet);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
 			Object.keys(functions).forEach((key) => {
 				if(this[key]) {
@@ -66,6 +70,19 @@ Copyright AnyWhichWay, LLC 2019
 				}
 				Object.defineProperty(this,key,{enumerable:false,configurable:true,writable:true,value:f})
 			})
+		}
+		async add(path,data,options={}) {
+			if(data && typeof(data)==="object") {
+				this.register(data.constructor);
+				let id = data["#"];
+				if(!id) {
+					id = data["#"]  = `${data.constructor.name}@${uid()}`;
+				}
+			}
+			return fetch(`${this.endpoint}/db.json?["add",${encodeURIComponent(JSON.stringify(path))},${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
 		}
 		async addRoles(userName,roles=[]) {
 			return fetch(`${this.endpoint}/db.json?["addRoles",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(roles))}]`,{headers:this.headers})
@@ -168,7 +185,7 @@ Copyright AnyWhichWay, LLC 2019
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))
 		}
-		async put(object) {
+		async put(object,options={}) {
 			this.register(object.constructor);
 			let data = Object.assign({},object),
 				id = data["#"],
@@ -202,7 +219,7 @@ Copyright AnyWhichWay, LLC 2019
 			if(!data || typeof(data)!=="object") {
 				return;
 			}
-		    return fetch(`${this.endpoint}/db.json?["put",${encodeURIComponent(JSON.stringify(data))}]`,{headers:this.headers})
+		    return fetch(`${this.endpoint}/db.json?["put",${encodeURIComponent(JSON.stringify(toSerializable(data)))},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 		    	.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 		    	.then((data) => create(data,this.ctors));
@@ -278,6 +295,15 @@ Copyright AnyWhichWay, LLC 2019
 				return this.ctors[name] = ctor;
 			}
 		}
+		async remove(path,data) {
+			if(data && typeof(data)==="object") {
+				this.register(object.constructor);
+			}
+			return fetch(`${this.endpoint}/db.json?["remove",${encodeURIComponent(JSON.stringify(path))},${encodeURIComponent(JSON.stringify(toSerializable(data)))}]`,{headers:this.headers})
+				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
+				.then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
+				.then((data) => create(data,this.ctors));
+		}
 		async removeItem(keyOrObject) {
 			return fetch(`${this.endpoint}/db.json?["removeItem",${encodeURIComponent(JSON.stringify(toSerializable(keyOrObject)))}]`,{headers:this.headers})
 				.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
@@ -316,7 +342,7 @@ Copyright AnyWhichWay, LLC 2019
 			return this.putItem(object);
 		}
 		async updateUser(userName,properties={}) {
-			return fetch(`${this.endpoint}/db.json?["updateUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(properties))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["updateUser",${encodeURIComponent(JSON.stringify(userName))},${encodeURIComponent(JSON.stringify(toSerializable(properties)))}]`,{headers:this.headers})
 		    	.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors));
@@ -338,7 +364,7 @@ Copyright AnyWhichWay, LLC 2019
 				.then((data) => create(data,this.ctors));
 		}
 		async values(prefix="",options={}) {
-			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(options))}]`,{headers:this.headers})
+			return fetch(`${this.endpoint}/db.json?["values"${prefix!=null ? ","+encodeURIComponent(JSON.stringify(prefix)) : ""},${encodeURIComponent(JSON.stringify(toSerializable(options)))}]`,{headers:this.headers})
 	    		.then((response) => response.status===200 ? response.text() : new Error(`Request failed: ${response.status}`)) 
 			    .then((data) => { if(typeof(data)==="string") { return JSON.parse(data) } throw data; })
 			    .then((data) => create(data,this.ctors))

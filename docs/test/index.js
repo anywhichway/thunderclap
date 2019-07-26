@@ -522,7 +522,19 @@ describe("tests",function() {
 				done();
 			})
 		});
-	}).timeout(5000)
+	}).timeout(5000);
+	it("create graph",async function() {
+		const result = await db.put({l1:{l2:{l3:{l4:{l5:"value"}}}}});
+		expect(typeof(result)).equal("object");
+	});
+	it("get graph via index",async function() {
+		const result = await db.getItem("!e!l1!l2!l3!l4!l5");
+		expect(result).equal("value");
+	});
+	it("get graph via value",async function() {
+		const result = await db.value("l1.l2.l3.l4.l5");
+		expect(result).equal("value");
+	});
 });
 
 

@@ -1,5 +1,7 @@
 (function() {
 	"use strict"
+	const MapSet = require("./map-set.js");
+	
 	function toSerializable(data,copy) {
 		const type = typeof(data),
 			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
@@ -18,6 +20,9 @@
 		if(data && type==="object") {
 			if(data instanceof Date) {
 				return `Date@${data.getTime()}`;
+			}
+			if(data instanceof Set) {
+				return new MapSet({id:data["#"],set:data});
 			}
 			if(data.serialize) {
 				return data.serialize();

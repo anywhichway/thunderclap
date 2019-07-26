@@ -81,16 +81,25 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 28);
+/******/ 	return __webpack_require__(__webpack_require__.s = 29);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports) {
+
+(function() {
+	"use strict"
+	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
+}).call(this)
+
+/***/ }),
+/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const uid = __webpack_require__(1);
+	const uid = __webpack_require__(0);
 	
 	class Entity {
 		constructor(config) {
@@ -112,21 +121,12 @@
 }).call(this);
 
 /***/ }),
-/* 1 */
-/***/ (function(module, exports) {
-
-(function() {
-	"use strict"
-	module.exports = function uid() { return Date.now().toString(36) +  Math.random().toString(36).substr(2,9); }
-}).call(this)
-
-/***/ }),
 /* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(0),
+	const Entity = __webpack_require__(1),
 		Coordinates = __webpack_require__(4);
 	class Position extends Entity {
 		constructor({coords,timestamp}) {
@@ -167,7 +167,7 @@
 
 (function() {
 	"use strict"
-	const uuid4 = __webpack_require__(12),
+	const uuid4 = __webpack_require__(13),
 		isSoul = (value,checkUUID=true) => {
 			if(typeof(value)==="string") {
 				const parts = value.split("@"),
@@ -187,7 +187,7 @@
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(0),
+	const Entity = __webpack_require__(1),
 		Position = __webpack_require__(2);
 	class Coordinates extends Entity {
 		constructor(coords) {
@@ -215,9 +215,9 @@
 
 (function() {
 	"use strict"
-	const toRegExp = __webpack_require__(7),
-		acl = __webpack_require__(19),
-		roles = __webpack_require__(20);
+	const toRegExp = __webpack_require__(8),
+		acl = __webpack_require__(20),
+		roles = __webpack_require__(21);
 	
 	// applies acl rules for key and action
 	// if user is not permitted to take action, modifies data accordingly
@@ -336,8 +336,31 @@
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
+	"use strict";
+	const uid = __webpack_require__(0);
+	class MapSet {
+		constructor({id,set}={}) {
+			if(!id) {
+				id = `MapSet@${uid()}`;
+			}
+			Object.assign(this,{"#":id,set:Array.from(set)});
+		}
+	}
+	MapSet.create = (config) => {
+		const set = new Set(config.set||[]);
+		set["#"] = config["#"];
+		return set;
+	}
+	module.exports = MapSet;
+}).call(this);
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+(function() {
 	"use strict"
-	const Entity = __webpack_require__(0);
+	const Entity = __webpack_require__(1);
 	
 	class Schema extends Entity {
 		constructor(ctor,config=ctor.schema) {
@@ -424,7 +447,7 @@
 })();
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -443,12 +466,12 @@
 }).call(this);
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const Entity = __webpack_require__(0);
+	const Entity = __webpack_require__(1);
 	
 	class User extends Entity {
 		constructor(userName,config) {
@@ -471,7 +494,7 @@
 })();
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -487,7 +510,7 @@
 	}).call(this)
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -496,11 +519,11 @@
 	MIT License
 	Copyright AnyWhichWay, LLC 2019
 	 */
-	const soundex = __webpack_require__(11),
+	const soundex = __webpack_require__(12),
 		isSoul = __webpack_require__(3),
-		isInt = __webpack_require__(13),
-		isFloat = __webpack_require__(14),
-		validateLuhn = __webpack_require__(15),
+		isInt = __webpack_require__(14),
+		isFloat = __webpack_require__(15),
+		validateLuhn = __webpack_require__(16),
 		joqular = {
 			$(a,f) {
 				f = typeof(f)==="function" ? f : !this.options.inline || new Function("return " + f)();
@@ -863,7 +886,7 @@
 }).call(this);
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -874,7 +897,7 @@
 }).call(this);
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -908,7 +931,7 @@
 }).call(this);
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -917,7 +940,7 @@
 }).call(this)
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -926,7 +949,7 @@
 }).call(this)
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 // https://en.wikipedia.org/wiki/Luhn_algorithm
@@ -955,11 +978,13 @@
 
 
 /***/ }),
-/* 16 */
-/***/ (function(module, exports) {
+/* 17 */
+/***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
+	const MapSet = __webpack_require__(6);
+	
 	function toSerializable(data,copy) {
 		const type = typeof(data),
 			clone = copy && data && type==="object" ? Array.isArray(data) ? [] : {} : data;
@@ -978,6 +1003,9 @@
 		if(data && type==="object") {
 			if(data instanceof Date) {
 				return `Date@${data.getTime()}`;
+			}
+			if(data instanceof Set) {
+				return new MapSet({id:data["#"],set:data});
 			}
 			if(data.serialize) {
 				return data.serialize();
@@ -1003,7 +1031,7 @@
 }).call(this);
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1047,11 +1075,11 @@
 }).call(this);
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const uid = __webpack_require__(1),
+	const uid = __webpack_require__(0),
 		isSoul = __webpack_require__(3),
 		secure = __webpack_require__(5);
 	
@@ -1059,6 +1087,25 @@
 		Object.defineProperty(this,"db",{enumerable:false,value:db});
 		this.parent = parent;
 		this.path = path;
+	}
+	Edge.prototype.add = async function(data,options) {
+		let set = await this.db.getItem(this.path.join("!"));
+		if(!set || !set.startsWith("MapSet@")) {
+			set = `MapSet@${uid()}`;
+			await this.value(set);
+		}
+		if(data && typeof(data)==="object") {
+			let id = data["#"];
+			if(!id) {
+				id = data["#"] = `${data.constructor.name}@${uid()}`;
+				await this.db.put(data,options);
+			}
+			await this.db.put({"#":set,id},options);
+		} else {
+			const key = JSON.stringify(data);
+			await this.db.put({"#":set,[key]:data},options);
+		}
+		return this;
 	}
 	Edge.prototype.delete = async function() {
 		const keys = await this.db.keys(this.path.join("!"));
@@ -1068,23 +1115,22 @@
 		await this.db.removeItem(this.path.join("!"))
 		return this.db.clear(this.path.join("!"));
 	}
-	Edge.prototype.get = function(path) {
+	Edge.prototype.get = async function(path) {
 		const parts = Array.isArray(path) ? path : path.split(".");
-		let parent = this,
+		let node = this,
 			part;
 		path = this.path.slice();
 		while(part = parts.shift()) {
 			path.push(part);
-			parent = new Edge({db:this.db,parent,path:path.slice()});
+			node = new Edge({db:this.db,parent:node,path:path.slice()});
 		}
-		return parent;
+		return node;
 	}
 	Edge.prototype.put = async function(data,options={}) {
 		let node = this,
 			type = typeof(data);
 		if(data && type==="object") {
 			const id = data["#"];
-			// add id if not present?
 			// when here?
 			// transform here
 			// validate here
@@ -1111,19 +1157,55 @@
 		}
 		return data;
 	}
+	Edge.prototype.remove = async function(data) {
+		const set = await this.db.getItem(this.path.join("!"));
+		if(!set || !set.startsWith('MapSet@')) {
+			return this;
+		}
+		let key;
+		if(data && typeof(data)==="object") {
+			key = data["#"];
+		} else {
+			key = JSON.stringify(data);
+		}
+		if(key) {
+			const path = `!e!MapSet@!${set}!${key}`;
+			await this.db.removeItem(path);
+			await this.db.clear(path);
+		}
+		return this;
+	}
 	Edge.prototype.restore = async function(data) {
 		if(typeof(data)!=="string") {
-			const path = this.path.slice();
-			path.shift(); // remove ""
-			if(path[0].endsWith("@")) {
-				path.splice(1,1); // remove id;
-			}
+			//const path = this.path.slice();
+			//path.shift(); // remove ""
+			//if(path[0].endsWith("@")) {
+			//	path.splice(1,1); // remove id;
+			//}
 			// security here using edge path
 			return data;
 		}
-		const cname = data.split("@")[0];
-		if(cname) {
-			const keys = await this.db.keys(`!e!${cname}@!${data}!`),
+		if(data.startsWith("MapSet@")) {
+			const path = `!e!MapSet@!${data}!`,
+				keys = await this.db.keys(path),
+				set = new Set();
+			set["#"] = data;
+			for(const key of keys) {
+				const parts = key.split("!"),
+					value = parts[parts.length-1];
+				if(value && value!=="#") {
+					if(isSoul(parts[0],false)) {
+						set.add(await this.restore(value));
+					} else {
+						set.add(JSON.parse(value));
+					}
+				}
+			}
+			return set;
+		}
+		if(isSoul(data,false)) {
+			const cname = data.split("@")[0],
+				keys = await this.db.keys(`!e!${cname}@!${data}!`),
 				object = {};
 			for(const key of keys) {
 				const parts = key.split("!"),
@@ -1156,16 +1238,19 @@
 			if(data!==undefined) {
 				return this.db.cache.put(this.path.join("!"),data,options)
 			}
+			return;
 		}
 		value = await this.restore(await this.db.cache.get(this.path.join("!")));
 		const {data} = await secure.call(this,{key:vpath,action:"read",data:value,request,user});
-		return data;
+		if(data===value) {
+			return value;
+		}
 	}
 	module.exports = Edge;
 }).call(this)
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1280,7 +1365,7 @@
 }).call(this);
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1292,7 +1377,7 @@
 }).call(this);
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1328,7 +1413,7 @@
 }).call(this);
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1351,7 +1436,7 @@
 }).call(this);
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1362,7 +1447,7 @@
 }).call(this);
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -1407,10 +1492,10 @@
 }).call(this)
 
 /***/ }),
-/* 25 */,
 /* 26 */,
 /* 27 */,
-/* 28 */
+/* 28 */,
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1425,15 +1510,15 @@ const //uid = require("./uid.js"),
 	//fromSerializable = require("./from-serializable.js"),
 	//toSerializable = require("./to-serializable.js"),
 	//Entity = require("./entity.js"),
-	Schema = __webpack_require__(6),
-	User = __webpack_require__(8),
+	Schema = __webpack_require__(7),
+	User = __webpack_require__(9),
 	//functions = require("../functions.js").browser,
 	//when = require("../when.js").browser;
 	//Thunderclap = require("../thunderclap.js"),
-	hashPassword = __webpack_require__(24),
-	toSerializable = __webpack_require__(16),
-	Thunderhead = __webpack_require__(29),
-	dboPassword = __webpack_require__(9).dboPassword,
+	hashPassword = __webpack_require__(25),
+	toSerializable = __webpack_require__(17),
+	Thunderhead = __webpack_require__(30),
+	dboPassword = __webpack_require__(10).dboPassword,
 	secure = __webpack_require__(5);
 
 /*const thunderclapjs = `(function() 
@@ -1618,7 +1703,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
@@ -1628,29 +1713,29 @@ async function handleRequest(event) {
 	Copyright AnyWhichWay, LLC 2019
 	 */
 	"use strict"
-	const uid = __webpack_require__(1),
+	const uid = __webpack_require__(0),
 		isSoul = __webpack_require__(3),
-		toClassName = __webpack_require__(39),
-		joqular = __webpack_require__(10),
-		hashPassword = __webpack_require__(24),
+		toClassName = __webpack_require__(31),
+		joqular = __webpack_require__(11),
+		hashPassword = __webpack_require__(25),
 		secure = __webpack_require__(5),
-		trigrams = __webpack_require__(30),
-		tokenize = __webpack_require__(31),
-		stopwords = __webpack_require__(32),
-		stemmer = __webpack_require__(33),
-		on = __webpack_require__(34)("cloud"),
-		fromSerializable = __webpack_require__(17),
-		sendMail = __webpack_require__(36),
-		User = __webpack_require__(8),
-		Schema = __webpack_require__(6),
+		trigrams = __webpack_require__(32),
+		tokenize = __webpack_require__(33),
+		stopwords = __webpack_require__(34),
+		stemmer = __webpack_require__(35),
+		on = __webpack_require__(36)("cloud"),
+		fromSerializable = __webpack_require__(18),
+		sendMail = __webpack_require__(38),
+		User = __webpack_require__(9),
+		Schema = __webpack_require__(7),
 		Position = __webpack_require__(2),
 		Coordinates = __webpack_require__(4),
-		Cache = __webpack_require__(37),
-		Edge = __webpack_require__(18),
-		when = __webpack_require__(21).cloud,
-		functions = __webpack_require__(22).cloud,
-		classes = __webpack_require__(23),
-		keys = __webpack_require__(9);
+		Cache = __webpack_require__(39),
+		Edge = __webpack_require__(19),
+		when = __webpack_require__(22).cloud,
+		functions = __webpack_require__(23).cloud,
+		classes = __webpack_require__(24),
+		keys = __webpack_require__(10);
 	
 	const hexStringToUint8Array = hexString => new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -1668,12 +1753,16 @@ async function handleRequest(event) {
 			this.register(Position);
 			this.register(Coordinates);
 			Object.keys(classes).forEach((cname) => this.register(classes[cname]));
-			__webpack_require__(38)(this);
+			__webpack_require__(40)(this);
 			joqular.db = this;
 			namespace.keys = this.keys;
 			setInterval(() => {
 				this.cache = new Cache({namespace});
 			},refresh);
+		}
+		async add(path,data,options={}) {
+			const edge = await this.get(path);
+			return edge.add(data,options);
 		}
 		async addRoles(userName,roles=[]) {
 			if(roles.length>=0) {
@@ -1807,12 +1896,12 @@ async function handleRequest(event) {
 				}
 			}
 		}
-		async put(data) {
+		async put(data,options={}) {
 			const edge = new Edge({db:this});
-			for(const key in data) {
-				await (await edge.get(key)).put(data[key]);
-			}
-			return data;
+			//for(const key in data) {
+			//	await (await edge.get(key)).put(data[key],options);
+			//}
+			edge.put(data);
 		}
 		async putItem(object,options={}) {
 			const request = this.request,
@@ -2155,6 +2244,10 @@ async function handleRequest(event) {
 				this.ctors[ctor.name] = ctor;
 			}
 		}
+		async remove(path,data) {
+			const edge = await this.get(path);
+			return await edge.remove(data);
+		}
 		async removeItem(keyOrObject) {
 			const type = typeof(keyOrObject),
 				request = this.request,
@@ -2312,7 +2405,15 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 30 */
+/* 31 */
+/***/ (function(module, exports) {
+
+(function() {
+	module.exports = (id) => id.substring(0,id.indexOf("@"));
+}).call(this)
+
+/***/ }),
+/* 32 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2330,7 +2431,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 31 */
+/* 33 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2341,7 +2442,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 32 */
+/* 34 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2363,7 +2464,7 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 33 */
+/* 35 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2554,12 +2655,12 @@ async function handleRequest(event) {
 
 
 /***/ }),
-/* 34 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const toRegExp = __webpack_require__(7);
+	const toRegExp = __webpack_require__(8);
 	
 	let actions;
 	async function on({key,when,action,data,changes,request,user}) {
@@ -2605,13 +2706,13 @@ async function handleRequest(event) {
 		return true;
 	}
 	module.exports = (type) => {
-		actions = __webpack_require__(35)[type];
+		actions = __webpack_require__(37)[type];
 		return on;
 	};
 }).call(this);
 
 /***/ }),
-/* 35 */
+/* 37 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2659,11 +2760,11 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 36 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
-	const {mailgunKey,mailgunHostName} = __webpack_require__(9);
+	const {mailgunKey,mailgunHostName} = __webpack_require__(10);
 	
 	function sendMail({from,to,cc,bcc,subject,body}) {
 		return fetch(`https://api.mailgun.net/v3/${mailgunHostName}/messages`, {
@@ -2685,7 +2786,7 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 37 */
+/* 39 */
 /***/ (function(module, exports) {
 
 (function() {
@@ -2742,12 +2843,12 @@ async function handleRequest(event) {
 }).call(this);
 
 /***/ }),
-/* 38 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 (function() {
 	"use strict"
-	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(9),
+	const {accountId,namespaceId,authEmail,authKey} = __webpack_require__(10),
 		getKeys = (prefix,limit=1000,cursor) => { 
 			limit = Math.max(limit,1000);
 			return fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/keys?limit=${limit}${cursor ? "&cursor="+cursor : ""}${prefix!=null ? "&prefix="+prefix : ""}`,
@@ -2829,14 +2930,6 @@ async function handleRequest(event) {
 		Object.assign(namespace,methods);
 	}
 }).call(this);
-
-/***/ }),
-/* 39 */
-/***/ (function(module, exports) {
-
-(function() {
-	module.exports = (id) => id.substring(0,id.indexOf("@"));
-}).call(this)
 
 /***/ })
 /******/ ]);
