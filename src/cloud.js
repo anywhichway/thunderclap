@@ -46,7 +46,7 @@ addEventListener('fetch', event => {
 		dbo = new User("dbo",{"#":"User@dbo",roles:{dbo:true}});
 	request.URL = new URL(request.url);
 	thunderhead = new Thunderhead({request,namespace:NAMESPACE,dbo});
-	setInterval(() => {
+	setTimeout(() => {
 		thunderhead.resetCache();
 	},5000)
 	event.respondWith(handleRequest(event));
